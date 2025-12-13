@@ -110,6 +110,7 @@ ringbuf_write(struct ringbuf *rb, const uint8_t *buf, size_t buf_size)
 	return 0;
 }
 
+
 /*!
  * \brief Read from ring buffer.
  * \warning Only call this function from a single consumer thread.
@@ -132,7 +133,6 @@ ringbuf_read(struct ringbuf *rb, uint8_t *buf, size_t buf_size)
 		size_t read = _ringbuf_min(size, buf_size);
 		size_t read_overflow = _RINGBUF_IDX(read_idx) + read;
 		if (read_overflow > rb->capacity) {
-
             // read0 = read - (read_overflow & rb->capacity_mask);
             // read1 = 0;
 			read1 = read_overflow & rb->capacity_mask;
@@ -169,21 +169,28 @@ static size_t ringbuf_peek(struct ringbuf *rb, uint8_t **buf)
 		size_t read = size;
 		size_t read_overflow = _RINGBUF_IDX(read_idx) + read;
 		if (read_overflow > rb->capacity) {
+            // Only peek up to the end of the buffer, as we can't return a
+            // contiguous pointer otherwise.
             read0 = read - (read_overflow & rb->capacity_mask);
-            read1 = 0;
+            //read1 = 0;
+
 			//read1 = read_overflow & rb->capacity_mask;
 			//read0 = read - read1;
 		}
 		else {
 			read0 = read;
-			read1 = 0;
+			//read1 = 0;
 		}
 
         *buf = &rb->data[_RINGBUF_IDX(read_idx)];
         return read0;
     }
+
+    // No data available
     return 0;
 }
+
+
 
 
 /*!

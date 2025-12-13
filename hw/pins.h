@@ -1,0 +1,1 @@
+#define PIN_12V_SENSE 27

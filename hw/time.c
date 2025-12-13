@@ -1,9 +1,11 @@
+#include "time.h"
+
 #include "pico/stdlib.h"
 
 #include <stdint.h>
 
 
-uint64_t millis;
+millis_t millis;
 
 void update_millis() {
     // Update the global millis variable with the current time in milliseconds

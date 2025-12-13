@@ -11,7 +11,7 @@ void contactor_sm_tick(contactors_sm_t *contactor_sm) {
             }
             break;
         case CONTACTORS_PRECHARGING:
-            if(state_timeout((sm_t*)&contactor_sm, 5000)) {
+            if(state_timeout((sm_t*)contactor_sm, 5000)) {
                 printf("changing state2\n");
                 state_transition((sm_t*)contactor_sm, CONTACTORS_CLOSED);
             }
@@ -19,6 +19,7 @@ void contactor_sm_tick(contactors_sm_t *contactor_sm) {
         case CONTACTORS_CLOSED:
             break;
         default:
+            // panic instead?
             printf("erk!");
             state_reset((sm_t*)contactor_sm);
             break;

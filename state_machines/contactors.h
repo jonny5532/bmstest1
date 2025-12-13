@@ -2,7 +2,7 @@
 
 typedef struct {
     // Anonymous base struct
-    sm_t;   
+    sm_t; 
 } contactors_sm_t;
 
 enum contactors_states {

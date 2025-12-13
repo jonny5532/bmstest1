@@ -12,7 +12,7 @@ void sm_init(sm_t* sm, const char* name) {
 }
 
 void state_transition(sm_t* sm, uint16_t new_state) {
-    printf("%llu [%s] state %d->%d\n", current_millis(), sm->name, sm->state, new_state);
+    printf("%llums [%s] state %d->%d\n", current_millis(), sm->name, sm->state, new_state);
     sm->state = new_state;
     sm->last_transition_time = current_millis();
 

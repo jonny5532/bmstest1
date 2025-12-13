@@ -22,275 +22,406 @@ int chars_rxed = 0;
 
 static void enable_tx_pin(duart *u) {
     // Set TX pin function to UART, which will switch the pin from an input with
-    // pull-up to a high output
+    // pull-up to a high output.
     gpio_set_function(u->tx_pin, UART_FUNCSEL_NUM(u->uart, u->tx_pin)); // 0 = TX
 }
 
 static void disable_tx_pin(duart *u) {
     // Set TX pin back to SIO (GPIO), which will switch back to a input with
-    // pull-up
+    // pull-up.
     gpio_set_function(u->tx_pin, GPIO_FUNC_SIO);
 }
 
-static void __duart_send(duart *u, const uint8_t *data, size_t len) {
-    // Record what we are sending, so we know how much to consume from the
-    // ringbuf once the DMA transfer is complete
+static void _duart_send(duart *u, const uint8_t *data, size_t len) {
+    // Record how much we are sending, so we know how much to consume from the
+    // ringbuf once the DMA transfer is complete.
     u->tx_sending = len;
 
     dma_channel_configure(
         u->tx_dma_channel,
         &u->tx_dma_config,
         &uart_get_hw(u->uart)->dr,
-        (uint8_t *)data,
+        (const uint8_t *)data,
         dma_encode_transfer_count(len), 
         true
     );
 }
 
-static void on_uart0_rx() {
-    while (uart_is_readable(uart0)) {
-        uint8_t ch = uart_getc(uart0);
-        // Can we send it back?
-        // if (uart_is_writable(INTERNAL_UART)) {
-        //     // Change it slightly first!
-        //     ch++;
-        //     uart_putc(INTERNAL_UART, ch);
-        // }
-        chars_rxed++;
-    }
-}
+// static void __isr __not_in_flash_func(on_uart0_rx)() {
+//     while (uart_is_readable(uart0)) {
+//         uint8_t ch = uart_getc(uart0);
+//         // Can we send it back?
+//         // if (uart_is_writable(INTERNAL_UART)) {
+//         //     // Change it slightly first!
+//         //     ch++;
+//         //     uart_putc(INTERNAL_UART, ch);
+//         // }
+//         chars_rxed++;
+//     }
+// }
 
-static void on_uart1_rx() {
-    while (uart_is_readable(uart1)) {
-        uint8_t ch = uart_getc(uart1);
-        // Can we send it back?
-        // if (uart_is_writable(INTERNAL_UART)) {
-        //     // Change it slightly first!
-        //     ch++;
-        //     uart_putc(INTERNAL_UART, ch);
-        // }
-        chars_rxed++;
-    }
-}
+// static void __isr __not_in_flash_func(on_uart1_rx)() {
+//     while (uart_is_readable(uart1)) {
+//         uint8_t ch = uart_getc(uart1);
+//         // Can we send it back?
+//         // if (uart_is_writable(INTERNAL_UART)) {
+//         //     // Change it slightly first!
+//         //     ch++;
+//         //     uart_putc(INTERNAL_UART, ch);
+//         // }
+//         chars_rxed++;
+//     }
+// }
 
-bool _send_buffered_data(duart *u) {
-    uint head = u->tx_head;
-    if(u->tx_head != u->tx_tail) {
-        // There's buffered data to send
-        if(u->tx_head > u->tx_tail) {
-            // single contiguous block
-            __duart_send(u, &u->tx_buffer[u->tx_tail], u->tx_head - u->tx_tail);
-            u->tx_tail = u->tx_head;
-        } else {
-            // send to end of buffer first
-            __duart_send(u, &u->tx_buffer[u->tx_tail], DUART_TX_BUFFER_LEN - u->tx_tail);
-            u->tx_tail = 0;
-        }
+int64_t disable_tx_callback(alarm_id_t id, void *user_data) {
+    duart *u = (duart *)user_data;
 
-        return true;
-    }
-    return false;
-}
+    (void)id;
 
-void _end_send(duart *u) {
-    if(u->deassert_tx_when_idle) {
+    if(!atomic_flag_test_and_set(&u->tx_active)) {
+        // No longer active, safe to disable TX pin
+
         disable_tx_pin(u);
-    }
-    atomic_flag_clear(&u->tx_active);
-}
 
-int64_t on_uart_wait_for_tx_buffer(alarm_id_t id, void *user_data) {
-    duart *u = (duart *) user_data;
-
-    if(atomic_flag_test_and_set(&u->tx_buffer_lock)) {
-        return 5; // Try again in 5us
+        atomic_flag_clear(&u->tx_active);
     }
 
-    bool sent = _send_buffered_data(u);
-
-    atomic_flag_clear(&u->tx_buffer_lock);
-
-    if(!sent) {
-        // No more data to send, end transmission
-        _end_send(u);
-    }
-
-    // Don't fire again
     return 0;
 }
 
-static void on_uart_tx_complete(duart *u, uint irq_index) {
+static void __not_in_flash_func(on_uart_tx_complete)(duart *u, uint irq_index) {
     if(dma_irqn_get_channel_status(irq_index, u->tx_dma_channel)) {
         dma_irqn_acknowledge_channel(irq_index, u->tx_dma_channel);
 
         if(u->tx_sending > 0) {
-            // Finished sending previous chunk
+            // Finished sending previous chunk, consume it from the ringbuf
             ringbuf_read(&u->tx_ringbuf, NULL, u->tx_sending);
             u->tx_sending = 0;
         }
 
+        // We grab a pointer to the next chunk of data to send, as we'll be
+        // sending it with DMA.
         uint8_t *buf = NULL;
         size_t available = ringbuf_peek(&u->tx_ringbuf, &buf);
 
         if(available>0) {
-            __duart_send(u, buf, available);
+            // Send the next chunk
+            _duart_send(u, buf, available);
             return;
         }
 
-        _end_send(u);
+        // Nothing else to send, finish up.
 
+        if(u->deassert_tx_when_idle) {
+            // FIXME: Wait for UART to finish transmitting last byte(s) before
+            // doing this (there's at least one still in the tx buffer, and
+            // probably another in the shift register?)
 
-        // return;
+            // Maybe enable the TX interrupt and disable the tx pin there?
+            // although then need to make sure the DMA hasn't started another
+            // transfer in the meantime... (atomic flag?)
 
-        //uint32_t sniffed_crc = dma_sniffer_get_data_accumulator();
-        //printf("sniffed CRC16: 0x%04x\n", sniffed_crc);
+            // Hmm no, this won't work since there's no interrupt when the
+            // transmit actually completes. We will need to set a timer or
+            // something to check when the UART is idle.
 
-        // if(atomic_flag_test_and_set(&u->tx_buffer_lock)) {
-        //     add_alarm_in_us(5, on_uart_wait_for_tx_buffer, (void *)u, true);
-        //     return;
-        // }
+            //disable_tx_pin(u);
+            add_alarm_in_us(100, disable_tx_callback, u, false);
+        }
 
-        // if(_send_buffered_data(u)) {
-        //     // Sent more data, keep tx_active set
-        //     atomic_flag_clear(&u->tx_buffer_lock);
-        //     return;
-        // }
-
-        // uint tail = atomic_load_explicit(&u->tx_tail, memory_order_relaxed);
-        // uint head = atomic_load_explicit(&u->tx_head, memory_order_acquire);
-
-        // if(tail != head) {
-        //     // There's buffered data to send
-        //     if(head > tail) {
-        //         // single contiguous block
-        //         __duart_send(u, &u->tx_buffer[tail], head - tail);
-        //         tail = head;
-        //     } else {
-        //         // send to end of buffer first
-        //         __duart_send(u, &u->tx_buffer[tail], DUART_TX_BUFFER_LEN - tail);
-        //         tail = 0;
-        //     }
-
-        //     atomic_store_explicit(&u->tx_tail, tail, memory_order_release);
-
-        //     return;
-        // }
-
-        // _end_send(u);
+        atomic_flag_clear(&u->tx_active);
+    } else {
+        printf("no tx irq?\n");
+    // if(dma_irqn_get_channel_status(irq_index, u->rx_dma_channel)) {
+    //     dma_irqn_acknowledge_channel(irq_index, u->rx_dma_channel);
     }
 }
 
-static void on_uart0_tx_complete() {
-    //printf("on_uart0_tx_complete\n");
+static void __not_in_flash_func(on_uart0_tx_complete)() {
     on_uart_tx_complete(&duart0, UART0_DMA_IRQ);
 }
 
-static void on_uart1_tx_complete() {
-    //printf("on_uart1_tx_complete\n");
+static void __not_in_flash_func(on_uart1_tx_complete)() {
     on_uart_tx_complete(&duart1, UART1_DMA_IRQ);
-}
-
-
-static bool _duart_send(duart *u, const uint8_t *data, size_t len) {
-    if (len > sizeof(u->tx_buffer)) {
-        // Too big to send
-        return false;
-    }
-
-    // Enable before memcpy to give some set-up time
-    enable_tx_pin(u);
-
-    memcpy(u->tx_buffer, data, len);
-
-    __duart_send(u, u->tx_buffer, len);
-
-    // Successfully started
-    return true;
 }
 
 bool duart_send(duart *u, const uint8_t *data, size_t len) {
     // Try to send data. Returns false if there is no room in the transmit
-    // buffer to enqueue the data.
-
+    // buffer to enqueue the data. Doesn't allow partial writes.
 
     if(atomic_flag_test_and_set(&u->tx_active)) {
         // Tx is busy. Try to enqueue data in buffer
 
-        // Spin wait for buffer lock
+        // Spin wait for buffer lock (ringbuf is single-writer).
         while(atomic_flag_test_and_set(&u->tx_buffer_lock));
 
         bool ret = ringbuf_write(&u->tx_ringbuf, data, len);
 
-        // uint head = atomic_load_explicit(&u->tx_head, memory_order_relaxed);
-        // uint tail = atomic_load_explicit(&u->tx_tail, memory_order_acquire);
-
-        // size_t space_available;
-        // if(head >= tail) {
-        //     space_available = DUART_TX_BUFFER_LEN - (head - tail) - 1;
-        // } else {
-        //     space_available = tail - head - 1;
-        // }
-        // if(len > space_available) {
-        //     // Not enough space
-        //     atomic_flag_clear(&u->tx_buffer_lock);
-        //     return false;
-        // }
-
-        // // Copy data into buffer
-        // for(size_t i=0; i<len; i++) {
-        //     u->tx_buffer[head] = data[i];
-        //     head = (head + 1) % DUART_TX_BUFFER_LEN;
-        // }
-
-        // atomic_store_explicit(&u->tx_head, head, memory_order_release);
-
         atomic_flag_clear(&u->tx_buffer_lock);
 
         // TODO - it is possible that the tx has just completed and there is no
-        // pending dma transfer.
+        // pending DMA transfer. In this case this data will remain unsent until
+        // the next call.
+
+        // This will only happen if it is possible for this function and the ISR
+        // to run concurrently (ie, on separate cores).
 
         return ret;
     }
 
-    if(ringbuf_write(&u->tx_ringbuf, data, len)) {
-        // Successfully buffered data, start sending
-        enable_tx_pin(u);
+    // Write data to buffer
+    bool ret = ringbuf_write(&u->tx_ringbuf, data, len);
 
-        uint8_t *buf = NULL;
-        size_t available = ringbuf_peek(&u->tx_ringbuf, &buf);
-        __duart_send(u, buf, available);
-        return true;
+    // We grab a pointer to the next chunk of data to send, as we need to
+    // initiate the send from the buffer.
+    uint8_t *buf = NULL;
+    size_t available = ringbuf_peek(&u->tx_ringbuf, &buf);
+
+    if(available>0) {
+        // There is something to send, start the TX process. It might not
+        // necessarily have been the data we just added though, if there was
+        // already data in the buffer.
+        
+        enable_tx_pin(u);
+        _duart_send(u, buf, available);
+    } else {
+        // Nothing was sent, clear the active flag.
+        atomic_flag_clear(&u->tx_active);
     }
 
-    return false;
-    //return _duart_send(u, data, len);
+    return ret;
 }
 
 bool duart_send_blocking(duart *u, const uint8_t *data, size_t len) {
-    // Waits until previous send is complete before sending.
-    // Doesn't wait for the current send to complete.
-    // Returns false if data is too large to send.
+    // Waits for room in the transmit buffer. Doesn't wait for the data to be
+    // fully sent, though.
+
+    if(len > DUART_TX_BUFFER_LEN) {
+        // Too big to send
+        return false;
+    }
 
     while(true) {
-        if(!atomic_flag_test_and_set(&u->tx_active)) {
-            // Was unset (ie, we claimed it), so we're ready to send
-            break;
+        if(duart_send(u, data, len)) {
+            return true;
         }
-        // Wait for previous send to complete
+
         dma_channel_wait_for_finish_blocking(u->tx_dma_channel);
     }
-    
-    return _duart_send(u, data, len);
 }
 
+size_t duart_peek(duart *u, uint8_t **buf, size_t *all_available) {
+    dma_channel_hw_t *dma_chan = dma_channel_hw_addr(u->rx_dma_channel);
+    size_t available = (dma_chan->write_addr - u->rx_pointer) & ((1<<DUART_RX_BUFFER_BITS)-1);
 
-bool init_duart(duart *u, uart_inst_t *uart_hw, uint baud_rate, uint tx_pin, uint rx_pin, bool deassert_tx_when_idle) {
-    u->uart = uart_hw;
+    // if(available > (1<<(DUART_RX_BUFFER_BITS-1))) {
+    //     // Buffer is more than half full!
+
+
+    //     return 0;
+    // }
+
+    *all_available = available;
+    size_t remaining_to_end = (1<<DUART_RX_BUFFER_BITS) - u->rx_pointer;
+
+    if(available>0) {
+        if(available > remaining_to_end) {
+            available = remaining_to_end;
+        }
+        
+        *buf = &u->rx_buffer[u->rx_pointer];
+        //printf("{p%d %d}", available, *all_available);
+        return available;
+    }
+
+    return 0;
+}
+
+void duart_flush(duart *u, size_t len) {
+    // Zero out len bytes from the receive buffer
+    // size_t remaining_to_end = (1<<DUART_RX_BUFFER_BITS) - u->rx_pointer;
+    // if(len <= remaining_to_end) {
+    //     memset(&u->rx_buffer[u->rx_pointer], 0, len);
+    // } else {
+    //     memset(&u->rx_buffer[u->rx_pointer], 0, remaining_to_end);
+    //     memset(u->rx_buffer, 0, len - remaining_to_end);
+    // }
+
+
+    //printf("{f%d %d}", u->rx_pointer, len);
+    u->rx_pointer = (u->rx_pointer + len) & ((1<<DUART_RX_BUFFER_BITS)-1);
+}
+
+void memcpy_with_crc16(uint8_t *dest, const uint8_t *src, size_t len, uint16_t *crc16) {
+    // Copies data from src to dest, updating the CRC16 value as we go.
+
+    for(size_t i=0; i<len; i++) {
+        uint8_t b = src[i];
+        dest[i] = b;
+
+        *crc16 ^= b;
+        for(int j=0; j<8; j++) {
+            if(*crc16 & 1) {
+                *crc16 = (*crc16 >> 1) ^ 0xA001;
+            } else {
+                *crc16 >>= 1;
+            }
+        }
+    }
+}
+
+size_t duart_read_packet(duart *u, uint8_t *buf, size_t buf_size) {
+    // Reads a full packet from the receive buffer. Returns the number of bytes
+    // read, or 0 if no full packet is available.
+
+    // Packet format:
+    // 0xff (sync byte)
+    // <length-1 byte> (not including sync, CRC bytes or length byte itself)
+    // <payload bytes> (min 1 byte)
+    // <crc16 bytes>
+
+    // The initial sync allows quicker recovery from transmission errors, both
+    // if byte synchronisation is lost (in which case the receiver will search
+    // for the next 0xff byte before continuing), and if bit synchronisation is
+    // lost (since 0xFF is sent as a series of low levels on the line, so the
+    // receiver can re-lock its bit timing on the next start bit).
+
+
+    while(true) {
+        size_t available;
+        uint8_t *data;
+        size_t len = duart_peek(u, &data, &available);
+        if(available < 5) {
+            //printf("rx: not enough data\n");
+            return 0;
+        }
+        if(data[0] != 0xff) {
+            // Invalid start byte, flush one byte
+            duart_flush(u, 1);
+            continue;
+        }
+
+        // Pop the sync byte, wrapping if necessary
+        data = (uint8_t*)(((uintptr_t)data & ~((1<<DUART_RX_BUFFER_BITS)-1)) + ((uintptr_t)(data+1) % (1<<DUART_RX_BUFFER_BITS)));
+
+        size_t payload_len = data[0] + 1;
+        if((payload_len + 4) > available) {
+            // Message not fully available yet
+            //printf("rx: unfinished msg\n");
+            return 0;
+        }
+        if(payload_len > buf_size) {
+            // Payload too big for buffer, flush the entire packet
+            duart_flush(u, payload_len + 4);
+            continue;
+        }
+
+        // Pop the length byte, wrapping if necessary
+        data = (uint8_t*)(((uintptr_t)data & ~((1<<DUART_RX_BUFFER_BITS)-1)) + ((uintptr_t)(data+1) % (1<<DUART_RX_BUFFER_BITS)));
+        
+        if(len<=2) {
+            // We will have already wrapped, so whole message is now at start of buffer
+            len = available;
+        }
+
+        // printf("rx: len %d avail %d payload %d\n", len, available, payload_len);
+        // duart_flush(u, payload_len + 4);
+        // return 0;
+
+        uint16_t crc16 = CRC16_INIT;
+        uint8_t first_two_bytes[2];
+        first_two_bytes[0] = 0xff;
+        first_two_bytes[1] = payload_len - 1;
+        memcpy_with_crc16(&buf[0], &first_two_bytes[0], 2, &crc16);
+
+        if((payload_len + 4) <= len) {
+            // We have a full contiguous message
+            memcpy_with_crc16(&buf[0], &data[0], payload_len, &crc16);
+            // Read CRC16 from message
+            uint16_t msg_crc16 = data[payload_len] | (data[payload_len + 1] << 8);
+            duart_flush(u, payload_len + 4);
+            if(crc16 != msg_crc16) {
+                // CRC mismatch
+                printf("crc err1: %d calc %04x msg %04x\n", payload_len, crc16, msg_crc16);
+                continue;
+                //return 0;
+            }
+            //printf("rx: complete\n");
+            return payload_len;
+        } else {
+
+            // We have a full message, but it wraps around the end of the buffer
+            size_t first_part = len - 2;
+
+            // Maybe it's just the CRC that wraps?
+            if(first_part > payload_len) {
+                first_part = payload_len;
+            }
+
+            // if(first_part > payload_len) {
+            //     printf("blah: first_part %d payload_len %d\n", first_part, payload_len);
+            // }
+
+
+            // duart_flush(u, payload_len + 4);
+            // return 0;
+
+
+            memcpy_with_crc16(&buf[0], &data[0], first_part, &crc16);
+            duart_flush(u, first_part + 2);
+
+            size_t second_part = payload_len - first_part;
+            duart_peek(u, &data, &available);
+            memcpy_with_crc16(&buf[first_part], &data[0], second_part, &crc16);
+            // Read CRC16 from message
+            uint16_t msg_crc16 = data[second_part] | (data[second_part + 1] << 8);
+            duart_flush(u, second_part + 2);
+            if(crc16 != msg_crc16) {
+                // CRC mismatch
+                printf("crc err2: %d calc %04x msg %04x\n", payload_len, crc16, msg_crc16);
+                continue;
+                //return 0;
+            }
+            //printf("rx: split\n");
+            return payload_len;
+        }
+    }
+}
+
+bool duart_send_packet(duart *u, const uint8_t *payload, size_t payload_len) {
+    // Sends a full packet with the given payload. Returns true on success.
+
+    if(payload_len > 256) {
+        // Too big
+        return false;
+    }
+
+    uint8_t buf[DUART_TX_BUFFER_LEN];
+    buf[0] = 0xff; // sync byte
+    buf[1] = payload_len - 1; // length byte
+
+
+    // TODO: adapt the ringbuf to perform the CRC16 calculation, avoiding the
+    // extra copy
+
+    uint16_t crc16 = CRC16_INIT;
+    memcpy_with_crc16(&buf[0], &buf[0], 2, &crc16);
+    memcpy_with_crc16(&buf[2], payload, payload_len, &crc16);
+    buf[2 + payload_len] = crc16 & 0xff;
+    buf[2 + payload_len + 1] = (crc16 >> 8);
+
+    return duart_send(u, buf, payload_len + 4);
+}
+
+bool init_duart(duart *u, uint baud_rate, uint tx_pin, uint rx_pin, bool deassert_tx_when_idle) {
+    if(u==&duart0) {
+        u->uart = uart0;
+    } else {
+        u->uart = uart1;
+    }
     u->tx_pin = tx_pin;
     u->rx_pin = rx_pin;
     u->deassert_tx_when_idle = deassert_tx_when_idle;
-    u->tx_head = 0;
-    u->tx_tail = 0;
 
     ringbuf_init(&u->tx_ringbuf, u->tx_buffer, DUART_TX_BUFFER_LEN);
 
@@ -307,40 +438,58 @@ bool init_duart(duart *u, uart_inst_t *uart_hw, uint baud_rate, uint tx_pin, uin
     uart_set_hw_flow(u->uart, false, false);
 
     // Set our data format
-    uart_set_format(u->uart, 8, 1, UART_PARITY_NONE);
+    uart_set_format(u->uart, 8, 2, UART_PARITY_NONE);
 
     // Disable FIFOs
     uart_set_fifo_enabled(u->uart, false);
 
     if(u->uart==uart0) {
-        irq_set_exclusive_handler(UART0_IRQ, on_uart0_rx);
-        irq_set_enabled(UART0_IRQ, true);
+        // irq_set_exclusive_handler(UART0_IRQ, on_uart0_single_tx_complete);
+        // irq_set_enabled(UART0_IRQ, true);
+
+        //irq_set_exclusive_handler(UART0_IRQ, on_uart0_rx);
+        //irq_set_enabled(UART0_IRQ, true);
         irq_add_shared_handler(dma_get_irq_num(UART0_DMA_IRQ), on_uart0_tx_complete, UART0_DMA_IRQ_PRIORITY);
         irq_set_enabled(dma_get_irq_num(UART0_DMA_IRQ), true);
     } else {
-        irq_set_exclusive_handler(UART1_IRQ, on_uart1_rx);
-        irq_set_enabled(UART1_IRQ, true);
+        // irq_set_exclusive_handler(UART1_IRQ, on_uart1_single_tx_complete);
+        // irq_set_enabled(UART1_IRQ, true);
+
+        //irq_set_exclusive_handler(UART1_IRQ, on_uart1_rx);
+        //irq_set_enabled(UART1_IRQ, true);
         irq_add_shared_handler(dma_get_irq_num(UART1_DMA_IRQ), on_uart1_tx_complete, UART1_DMA_IRQ_PRIORITY);
         irq_set_enabled(dma_get_irq_num(UART1_DMA_IRQ), true);
     }
-    uart_set_irq_enables(u->uart, true, false);
+    //uart_set_irq_enables(u->uart, true, false);
     
     // Setup DMA for TX
-    u->tx_dma_channel = dma_claim_unused_channel(false);
-    if(!u->tx_dma_channel < 0) {
-        panic("No free dma channels");
-        return false;
-    }
+    u->tx_dma_channel = dma_claim_unused_channel(true);
     u->tx_dma_config = dma_channel_get_default_config(u->tx_dma_channel);
     channel_config_set_transfer_data_size(&u->tx_dma_config, DMA_SIZE_8);
     channel_config_set_read_increment(&u->tx_dma_config, true);
     channel_config_set_write_increment(&u->tx_dma_config, false);
     channel_config_set_dreq(&u->tx_dma_config, uart_get_dreq(u->uart, true));
-
-    channel_config_set_sniff_enable(&u->tx_dma_config, true);
-    dma_sniffer_enable(u->tx_dma_channel, DMA_SNIFF_CTRL_CALC_VALUE_CRC16, true);
-
+    // channel_config_set_sniff_enable(&u->tx_dma_config, true);
+    // dma_sniffer_enable(u->tx_dma_channel, DMA_SNIFF_CTRL_CALC_VALUE_CRC16, true);
     dma_irqn_set_channel_enabled(u->uart==uart0 ? UART0_DMA_IRQ : UART1_DMA_IRQ, u->tx_dma_channel, true);
+
+    // Setup DMA for RX
+    u->rx_dma_channel = dma_claim_unused_channel(true);
+    u->rx_dma_config = dma_channel_get_default_config(u->rx_dma_channel);
+    channel_config_set_transfer_data_size(&u->rx_dma_config, DMA_SIZE_8);
+    channel_config_set_read_increment(&u->rx_dma_config, false);
+    channel_config_set_write_increment(&u->rx_dma_config, true);
+    channel_config_set_dreq(&u->rx_dma_config, uart_get_dreq(u->uart, false));
+    channel_config_set_ring(&u->rx_dma_config, true, DUART_RX_BUFFER_BITS);
+    //dma_irqn_set_channel_enabled(u->uart==uart0 ? UART0_DMA_IRQ : UART1_DMA_IRQ, u->rx_dma_channel, true);
+    dma_channel_configure(
+        u->rx_dma_channel,
+        &u->rx_dma_config,
+        u->rx_buffer,
+        &uart_get_hw(u->uart)->dr,
+        dma_encode_endless_transfer_count(),
+        true
+    );
 
     atomic_flag_clear(&u->tx_active);
     atomic_flag_clear(&u->tx_buffer_lock);

@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef struct sm_struct {
+typedef struct {
     uint16_t state;
     uint64_t last_transition_time;
     const char* name;
