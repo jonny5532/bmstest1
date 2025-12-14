@@ -3,13 +3,10 @@
 
 //#include "pico/stdlib.h"
 
-void init_pwm() {
-    uint led_pin = 25;
-
-    // Tell the LED pin that the PWM is in charge of its value.
-    gpio_set_function(led_pin, GPIO_FUNC_PWM);
+void init_pwm_pin(uint pin) {
+    gpio_set_function(pin, GPIO_FUNC_PWM);
     // Figure out which slice we just connected to the LED pin
-    uint slice_num = pwm_gpio_to_slice_num(led_pin);
+    uint slice_num = pwm_gpio_to_slice_num(pin);
 
     pwm_config config = pwm_get_default_config();
     pwm_config_set_wrap(&config, 0xFFF);
@@ -17,7 +14,12 @@ void init_pwm() {
     pwm_init(slice_num, &config, true);
 
     // between 0 and wrap
-    pwm_set_gpio_level(led_pin, 0x400);
+    pwm_set_gpio_level(pin, 0);
 }
 
+void pwm_set(uint pin, uint32_t level) {
+    if(level>0x1000) level = 0x1000;
+
+    pwm_set_gpio_level(pin, level);
+}
 

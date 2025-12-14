@@ -1,1 +1,6 @@
 #define PIN_12V_SENSE 27
+
+#define PIN_CONTACTOR_POS 1
+#define PIN_CONTACTOR_NEG 2
+#define PIN_CONTACTOR_PRE 25
+

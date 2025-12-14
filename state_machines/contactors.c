@@ -9,6 +9,8 @@
 #define CONTACTORS_DELAYED_OPEN_MA 5000
 #define CONTACTORS_OPEN_DELAY_MS 2000
 
+
+
 inline int32_t abs_int32(int32_t v) {
     return (v < 0) ? -v : v;
 }
@@ -25,17 +27,33 @@ bool current_is_below(bms_model_t *model, int32_t threshold_ma) {
     return false;
 }
 
-void contactors_set_pos_pre_neg(bool pos, bool pre, bool neg) {
-    // TODO - implement hardware control
-    //printf("Contactors set: POS=%d PRE=%d NEG=%d\n", pos, pre, neg);
+#define PWM_INITIAL_LEVEL 0x1400
+#define PWM_DECREMENT 0x4
+#define PWM_MIN_LEVEL 0x300
 
+// should these go in the model? or the state machine?
+uint32_t pos_level = 0;
+uint32_t pre_level = 0;
+uint32_t neg_level = 0;
+
+void contactors_set_pos_pre_neg(bool pos, bool pre, bool neg) {
     // Positive and precharge contactors are in series
     bool actual_pos = pos || pre;
     // Precharge contactor actually bypasses the precharge resistor
-    bool actual_pre = !pre;
+    bool actual_pre = pos && !pre;
     bool actual_neg = neg;
 
-    // TODO - implement hardware control
+    if(!actual_pos) {
+        pos_level = 0;
+    } else if(actual_pos && pos_level==0) {
+        pos_level = PWM_INITIAL_LEVEL;
+    } else if(actual_pos) {
+        pos_level -= PWM_DECREMENT;
+        if(pos_level<PWM_MIN_LEVEL) pos_level = PWM_MIN_LEVEL;
+    }
+    pwm_set(PIN_CONTACTOR_POS, pos_level);
+
+    
 }
 
 void contactor_sm_tick(bms_model_t *model) {
@@ -51,6 +69,7 @@ void contactor_sm_tick(bms_model_t *model) {
         case CONTACTORS_STATE_PRECHARGING:
             contactors_set_pos_pre_neg(false, true, true);
 
+            // TODO: check voltage diff too
             if(state_timeout((sm_t*)contactor_sm, 1000) && current_is_below(model, PRECHARGE_SUCCESS_MA)) {
                 // successful precharge
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_CLOSED);
