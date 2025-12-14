@@ -6,9 +6,15 @@ typedef struct {
 } contactors_sm_t;
 
 enum contactors_states {
-    CONTACTORS_OPEN = 0,
-    CONTACTORS_PRECHARGING = 1,
-    CONTACTORS_CLOSED = 2,
+    CONTACTORS_STATE_OPEN = 0,
+    CONTACTORS_STATE_PRECHARGING = 1,
+    CONTACTORS_STATE_CLOSED = 2,
+};
+
+enum contactors_requests {
+    CONTACTORS_REQUEST_NULL = 0,
+    CONTACTORS_REQUEST_CLOSE = 1,
+    CONTACTORS_REQUEST_OPEN = 2,
 };
 
 void contactor_sm_tick();

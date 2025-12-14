@@ -5,9 +5,9 @@
 #include <stdint.h>
 
 
-millis_t millis;
+millis_t stored_millis;
 
 void update_millis() {
     // Update the global millis variable with the current time in milliseconds
-    millis = time_us_64() / 1000;
+    stored_millis = time_us_64() / 1000;
 }
