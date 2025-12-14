@@ -17,8 +17,10 @@ pico_sdk_init()
 
 add_executable(bms
     bms.c
+    model.c
     hw/internal_adc.c
     hw/duart.c
+    hw/pwm.c
     hw/time.c
     hw/watchdog.c
     debug/counters.c
@@ -54,6 +56,7 @@ target_link_libraries(bms
     hardware_adc
     hardware_dma
     hardware_pio
+    hardware_pwm
 )
 
 set(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS 3000)

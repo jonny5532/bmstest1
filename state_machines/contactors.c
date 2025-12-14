@@ -1,62 +1,82 @@
 #include "contactors.h"
+#include "../model.h"
+#include "../hw/time.h"
 
 #include <stdio.h>
 
 #define PRECHARGE_SUCCESS_MA 2000
 #define CONTACTORS_INSTANT_OPEN_MA 1000
 #define CONTACTORS_DELAYED_OPEN_MA 5000
-#define CONTACTOR_OPEN_DELAY_MS 2000
+#define CONTACTORS_OPEN_DELAY_MS 2000
 
-bool current_is_below(int32_t threshold_ma) {
-    // TODO - check age of current reading
-    if(millis_older_than(model.current_millis, 100)) {
+inline int32_t abs_int32(int32_t v) {
+    return (v < 0) ? -v : v;
+}
+
+bool current_is_below(bms_model_t *model, int32_t threshold_ma) {
+    if(!millis_recent_enough(model->current_millis, 100)) {
+        // stale reading
         return false;
     }
     
-    if(abs_int32(model.current_dA)<=threshold_ma) {
+    if(abs_int32(model->current_mA)<=threshold_ma) {
         return true;
     }
     return false;
 }
 
-void contactor_sm_tick(contactors_sm_t *contactor_sm) {
+void contactors_set_pos_pre_neg(bool pos, bool pre, bool neg) {
+    // TODO - implement hardware control
+    //printf("Contactors set: POS=%d PRE=%d NEG=%d\n", pos, pre, neg);
+
+    // Positive and precharge contactors are in series
+    bool actual_pos = pos || pre;
+    // Precharge contactor actually bypasses the precharge resistor
+    bool actual_pre = !pre;
+    bool actual_neg = neg;
+
+    // TODO - implement hardware control
+}
+
+void contactor_sm_tick(bms_model_t *model) {
+    contactors_sm_t *contactor_sm = &model->contactor_sm;
     switch(contactor_sm->state) {
-        case CONTACTORS_OPEN:
+        case CONTACTORS_STATE_OPEN:
             contactors_set_pos_pre_neg(false, false, false);
-            if(model.contactors_req == CONTACTORS_REQUEST_CLOSE) {
-                model.contactors_req = CONTACTORS_REQUEST_NULL;
-                state_transition((sm_t*)contactor_sm, CONTACTORS_PRECHARGING);
+            if(model->contactor_req == CONTACTORS_REQUEST_CLOSE) {
+                model->contactor_req = CONTACTORS_REQUEST_NULL;
+                state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING);
             }
             break;
-        case CONTACTORS_PRECHARGING:
+        case CONTACTORS_STATE_PRECHARGING:
             contactors_set_pos_pre_neg(false, true, true);
 
-            if(state_timeout((sm_t*)contactor_sm, 1000) && current_is_below(PRECHARGE_SUCCESS_MA)) {
+            if(state_timeout((sm_t*)contactor_sm, 1000) && current_is_below(model, PRECHARGE_SUCCESS_MA)) {
                 // successful precharge
-                state_transition((sm_t*)contactor_sm, CONTACTORS_CLOSED);
-            } elseif(state_timeout((sm_t*)contactor_sm, 10000)) {
+                state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_CLOSED);
+            } else if(state_timeout((sm_t*)contactor_sm, 10000)) {
                 // failed to precharge
-                state_transition((sm_t*)contactor_sm, CONTACTORS_PRECHARGE_FAILED);
+                state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGE_FAILED);
             }
             break;
-        case CONTACTORS_CLOSED:
+        case CONTACTORS_STATE_CLOSED:
              contactors_set_pos_pre_neg(true, false, true);
 
              if((
-                model.contactors_req == CONTACTORS_REQUEST_OPEN && (
-                    current_is_below(CONTACTOR_INSTANT_OPEN_MA)
-                    || (current_is_below(CONTACTOR_DELAYED_OPEN_MA) && state_timeout((sm_t*)contactor_sm, CONTACTOR_OPEN_DELAY_MS))) {
-             ) || model.contactors_req == CONTACTORS_REQUEST_FORCE_OPEN) {
-                 model.contactors_req = CONTACTORS_REQUEST_NULL;
-                 state_transition((sm_t*)contactor_sm, CONTACTORS_OPEN);
+                model->contactor_req == CONTACTORS_REQUEST_OPEN && (
+                    current_is_below(model, CONTACTORS_INSTANT_OPEN_MA)
+                    || (current_is_below(model, CONTACTORS_DELAYED_OPEN_MA) && state_timeout((sm_t*)contactor_sm, CONTACTORS_OPEN_DELAY_MS)))
+             ) || model->contactor_req == CONTACTORS_REQUEST_FORCE_OPEN) {
+                 model->contactor_req = CONTACTORS_REQUEST_NULL;
+                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_OPEN);
              }
              
              break;
-        case CONTACTORS_PRECHARGE_FAILED:
+        case CONTACTORS_STATE_PRECHARGE_FAILED:
             contactors_set_pos_pre_neg(false, false, false);
             // wait for the precharge to cool down
             if(state_timeout((sm_t*)contactor_sm, 20000)) {
-                state_transition((sm_t*)contactor_sm, CONTACTORS_OPEN);
+                state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_OPEN);
             }            
             break;
         default:

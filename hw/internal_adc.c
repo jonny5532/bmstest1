@@ -26,7 +26,7 @@ void __isr __not_in_flash_func(adc_irq_handler)() {
         adc_samples_smooth_accum[i] = (adc_samples_smooth_accum[i] * (SMOOTHING - 1) + sample * 256) / SMOOTHING;
         adc_samples_smoothed[i] = adc_samples_smooth_accum[i] / 256;
         // Record when we got this sample
-        adc_samples_millis[i] = current_millis();
+        adc_samples_millis[i] = millis();
     }
 }
 

@@ -1,8 +1,10 @@
 #include "hw/internal_adc.h"
 #include "hw/duart.h"
+#include "hw/pwm.h"
 #include "hw/time.h"
 #include "hw/watchdog.h"
 #include "state_machines/contactors.h"
+#include "model.h"
 
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
@@ -12,19 +14,23 @@
 #define CRC16_INIT                  ((uint16_t)-1l)
 void memcpy_with_crc16(uint8_t *dest, const uint8_t *src, size_t len, uint16_t *crc16);
 
+void init_model() {
+    sm_init((sm_t*)&model.contactor_sm, "contactors");
+}
+
 int main() {
     stdio_usb_init();
 
     sleep_ms(4000);
 
     init_adc();
+    init_pwm();
     //230400
     //init_duart(&duart0, 230400, 0, 1, true);
     init_duart(&duart1, 115200, 26, 27, true); //9375000
     init_watchdog();
-
-    contactors_sm_t contactor_sm;
-    sm_init((sm_t*)&contactor_sm, "contactors");
+    
+    init_model();
 
     //char str[] = "Lorem. Lorem. Lorem. Lorem.\n";
     uint8_t str[] = {
@@ -72,7 +78,7 @@ int main() {
 
         update_millis();
 
-        contactor_sm_tick(&contactor_sm);
+        contactor_sm_tick(&model);
 
         watchdog_update();
     }
@@ -81,7 +87,7 @@ int main() {
     while(true) {
         update_millis();
         
-        printf("Current millis: %llu\n", current_millis());
+        printf("Current millis: %llu\n", millis());
         sleep_ms(1000);
 
     }
