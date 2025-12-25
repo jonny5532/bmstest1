@@ -22,4 +22,3 @@ void pwm_set(uint pin, uint32_t level) {
 
     pwm_set_gpio_level(pin, level);
 }
-

@@ -126,8 +126,9 @@ static void __not_in_flash_func(on_uart_tx_complete)(duart *u, uint irq_index) {
             // transmit actually completes. We will need to set a timer or
             // something to check when the UART is idle.
 
-            //disable_tx_pin(u);
-            add_alarm_in_us(100, disable_tx_callback, u, false);
+            // Note - the delay has to be long enough for at least one byte to
+            // finish sending, maybe two?
+            add_alarm_in_us(150, disable_tx_callback, u, false);
         }
 
         atomic_flag_clear(&u->tx_active);
