@@ -1,9 +1,12 @@
 #include "../hw/allocation.h"
 #include "../hw/pins.h"
+#include "../model.h"
 
 #include "can2040.h"
 
 #include <pico/stdlib.h>
+
+extern bool battery_ready(bms_model_t *model);
 
 static const int battery_capacity_Wh = 60000;
 static const int FW_MAJOR_VERSION = 0x03;
@@ -13,6 +16,11 @@ static struct can2040 cbus;
 static bool inverter_present = false;
 static bool inverter_initialized = false;
 static int inverter_init_state = 0;
+// offsets to avoid sending all messages on the same timestep
+static uint32_t timestep_1 = 0;
+static uint32_t timestep_2 = 1;
+static uint32_t timestep_3 = 2;
+
 static const struct can2040_msg byd_250 = {
     .id = 0x250,
     .dlc = 4,
@@ -185,6 +193,9 @@ static void send_inverter_init_messages() {
 
     inverter_initialized = true;
     inverter_init_state = 0;
+    timestep_1 = timestep();
+    timestep_2 = timestep_1 + 1;
+    timestep_3 = timestep_1 + 2;
 }
 
 static int send_110() {
@@ -211,13 +222,13 @@ static int send_150() {
     msg.id = 0x150;
     msg.dlc = 8;
     
-    const uint16_t soc = 5000; // 50.00%
-    msg.data[0] = (soc >> 8) & 0xFF;
-    msg.data[1] = soc & 0xFF;
+    //const uint16_t soc = 5000; // 50.00%
+    msg.data[0] = (model.soc >> 8) & 0xFF;
+    msg.data[1] = model.soc & 0xFF;
     // TODO: workaround for Deye?
-    const uint16_t soh = 10000; // 100.00%
-    msg.data[2] = (soh >> 8) & 0xFF;
-    msg.data[3] = soh & 0xFF;
+    //const uint16_t soh = 10000; // 100.00%
+    msg.data[2] = (model.soh >> 8) & 0xFF;
+    msg.data[3] = model.soh & 0xFF;
     const uint16_t remaining_capacity_Ah = 120; // 12.0Ah
     msg.data[4] = (remaining_capacity_Ah >> 8) & 0xFF;
     msg.data[5] = remaining_capacity_Ah & 0xFF;
@@ -232,10 +243,11 @@ static int send_1d0() {
     msg.id = 0x1D0;
     msg.dlc = 8;
 
-    const uint16_t pack_voltage_dV = 3600; // 360.0V
+    const uint16_t pack_voltage_dV = model.battery_voltage_mv / 100; // in 0.1V units
     msg.data[0] = (pack_voltage_dV >> 8) & 0xFF;
     msg.data[1] = pack_voltage_dV & 0xFF;
-    const int16_t pack_current_dA = -50; // -5.0A
+    // TODO: check current direction
+    const int16_t pack_current_dA = model.current_mA / 100; // in 0.1A units
     msg.data[2] = (pack_current_dA >> 8) & 0xFF;
     msg.data[3] = pack_current_dA & 0xFF;
     const int16_t temperature_midpoint_dC = 250; // 25.0C
@@ -247,14 +259,16 @@ static int send_1d0() {
 }
 
 static int send_210() {
+    // TODO - check values are recent
+
     struct can2040_msg msg;
     msg.id = 0x210;
     msg.dlc = 8;
 
-    const uint16_t temperature_max_dC = 260; // 26.0C
+    const int16_t temperature_max_dC = model.temperature_max_dC; // in 0.1C units
     msg.data[0] = (temperature_max_dC >> 8) & 0xFF;
     msg.data[1] = temperature_max_dC & 0xFF;
-    const uint16_t temperature_min_dC = 240; // 24.0C
+    const int16_t temperature_min_dC = model.temperature_min_dC; // in 0.1C units
     msg.data[2] = (temperature_min_dC >> 8) & 0xFF;
     msg.data[3] = temperature_min_dC & 0xFF;
     msg.data[4] = 0x00;
@@ -292,22 +306,42 @@ void inverter_tick() {
     }
 
     if(!inverter_initialized) {
+        if(!battery_ready(&model)) {
+            // Battery not ready yet
+            return;
+        }
+        
         // We haven't done the inverter init sequence yet
         send_inverter_init_messages();
         return;
     }
 
-    transmit_cycle++;
-    if((transmit_cycle % 20) == 0) { // every 2s
+    if(timestep_every_ms(100, &timestep_1)) {
+        // send regular messages every 100ms
         send_110();
     }
-    if((transmit_cycle % 100) == 0) { // every 10s
+    if(timestep_every_ms(10000, &timestep_2)) {
+        // send regular messages every 1000ms
         send_150();
         send_1d0();
         send_210();
     }
-    if((transmit_cycle % 600) == 0) { // every 60s
+    if(timestep_every_ms(60000, &timestep_3)) {
+        // send regular messages every 60000ms
         send_190();
-        transmit_cycle = 0;
     }
+
+    // transmit_cycle++;
+    // if((transmit_cycle % 20) == 0) { // every 2s
+    //     send_110();
+    // }
+    // if((transmit_cycle % 100) == 0) { // every 10s
+    //     send_150();
+    //     send_1d0();
+    //     send_210();
+    // }
+    // if((transmit_cycle % 600) == 0) { // every 60s
+    //     send_190();
+    //     transmit_cycle = 0;
+    // }
 }

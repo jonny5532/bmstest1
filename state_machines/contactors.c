@@ -16,7 +16,7 @@ inline int32_t abs_int32(int32_t v) {
 }
 
 bool current_is_below(bms_model_t *model, int32_t threshold_ma) {
-    if(!millis_recent_enough(model->current_millis, 100)) {
+    if(!millis_recent_enough(millis(), 100)) {
         // stale reading
         return false;
     }

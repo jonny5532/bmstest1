@@ -7,6 +7,8 @@
 millis64_t stored_millis64;
 millis_t stored_millis;
 
+uint32_t stored_timestep = 1;
+
 void update_millis() {
     // Update the global millis variable with the current time in milliseconds
     stored_millis64 = time_us_64() / 1000;
@@ -15,4 +17,8 @@ void update_millis() {
         stored_millis64 = 1;
     }
     stored_millis = (millis_t)(stored_millis64 & 0xFFFFFFFF);
+}
+
+void update_timestep() {
+    stored_timestep += 1;
 }

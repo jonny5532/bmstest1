@@ -22,6 +22,7 @@ include_directories(vendor/can2040/src)
 
 add_executable(bms
     bms.c
+    init.c
     model.c
     hw/contactors.c
     hw/internal_adc.c
