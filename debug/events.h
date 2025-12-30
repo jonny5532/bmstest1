@@ -25,7 +25,7 @@
 // so could iterate list to start with, then selection-sort the remainder? (based on timestamp)
 // should we ensure no two events have the same timestamp?
 
-#include "../hw/time.h"
+#include "../hw/chip/time.h"
 
 #include <stdint.h>
 

@@ -1,7 +1,7 @@
 #include "ina228.h"
 
-#include "allocation.h"
-#include "pins.h"
+#include "../allocation.h"
+#include "../pins.h"
 
 #include "hardware/irq.h"
 #include "hardware/i2c.h"

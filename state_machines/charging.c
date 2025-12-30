@@ -1,6 +1,6 @@
 #include "charging.h"
 #include "../model.h"
-#include "../hw/time.h"
+#include "../hw/chip/time.h"
 
 // voltage thresholds:
 // max - dangerously high, stop. eg, 4300mV for NMC

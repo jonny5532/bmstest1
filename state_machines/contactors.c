@@ -1,6 +1,7 @@
 #include "contactors.h"
 #include "../model.h"
-#include "../hw/time.h"
+#include "../hw/actuators/contactors.h"
+#include "../hw/chip/time.h"
 
 #include <stdio.h>
 
@@ -34,7 +35,7 @@ bool voltage_diff_is_below(bms_model_t *model, int32_t threshold_mv) {
         return false;
     }
 
-    int32_t diff = abs_int32(model->battery_voltage_mv - model->output_voltage_mv);
+    int32_t diff = abs_int32(model->battery_voltage_mV - model->output_voltage_mV);
 
     if(diff <= threshold_mv) {
         return true;

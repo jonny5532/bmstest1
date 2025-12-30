@@ -1,5 +1,5 @@
 #include "ads1115.h"
-#include "pins.h"
+#include "../pins.h"
 #include "../model.h"
 
 #include "hardware/irq.h"
@@ -136,13 +136,13 @@ static void ads1115_i2c_read_async(ads1115_t *dev, uint8_t reg) {
 
 static void store_battery_voltage(int16_t raw) {
     // TODO - check conversion factor
-    model.battery_voltage_mv = (raw * 2048) / 32768; // in mV
+    model.battery_voltage_mV = (raw * 2048) / 32768; // in mV
     model.battery_voltage_millis = millis();
 }
 
 static void store_output_voltage(int16_t raw) {
     // TODO - check conversion factor
-    model.output_voltage_mv = (raw * 2048) / 32768; // in mV
+    model.output_voltage_mV = (raw * 2048) / 32768; // in mV
     model.output_voltage_millis = millis();
 }
 

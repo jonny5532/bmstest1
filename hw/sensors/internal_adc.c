@@ -1,5 +1,5 @@
-#include "time.h"
-#include "pins.h"
+#include "../chip/time.h"
+#include "../pins.h"
 #include "../util/sampler.h"
 
 #include "hardware/adc.h"

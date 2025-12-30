@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "../hw/time.h"
+#include "../hw/chip/time.h"
 
 #include <stdint.h>
 

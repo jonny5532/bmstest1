@@ -24,15 +24,15 @@ add_executable(bms
     bms.c
     init.c
     model.c
-    hw/contactors.c
-    hw/internal_adc.c
-    hw/ina228.c
-    hw/ads1115.c
-    hw/duart.c
-    hw/nvm.c
-    hw/pwm.c
-    hw/time.c
-    hw/watchdog.c
+    hw/actuators/contactors.c
+    hw/sensors/internal_adc.c
+    hw/sensors/ina228.c
+    hw/sensors/ads1115.c
+    hw/comms/duart.c
+    hw/chip/nvm.c
+    hw/chip/pwm.c
+    hw/chip/time.c
+    hw/chip/watchdog.c
     bmb3y/bmb3y.c
     battery/balancing.c
     debug/counters.c
@@ -75,12 +75,14 @@ target_link_libraries(bms
     pico_stdlib
     pico_multicore
     pico_flash
+    pico_float
     hardware_adc
     hardware_dma
     hardware_flash
     hardware_i2c
     hardware_pio
     hardware_pwm
+    cmsis_core
 )
 
 set(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS 3000)

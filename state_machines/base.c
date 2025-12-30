@@ -1,6 +1,6 @@
 #include "base.h"
 
-#include "../hw/time.h"
+#include "../hw/chip/time.h"
 
 #include <stdbool.h>
 #include <stdint.h>

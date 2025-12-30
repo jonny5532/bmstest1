@@ -1,7 +1,9 @@
 #include "sampler.h"
 
+#include "../lib/math.h"
+
 void sampler_add(sampler_t* sampler, int32_t sample, uint16_t max_samples, uint16_t divide_shift) {
-    sampler->accumulator += (sample >> divide_shift);
+    sampler->accumulator = sadd_i32(sampler->accumulator, sample >> divide_shift);
     sampler->sample_count += 1;
     if (sample < sampler->cur_min_value || sampler->sample_count == 1) {
         sampler->cur_min_value = sample;

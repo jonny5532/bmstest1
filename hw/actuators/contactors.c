@@ -1,5 +1,5 @@
-#include "pins.h"
-#include "pwm.h"
+#include "../pins.h"
+#include "../chip/pwm.h"
 
 #include <stdbool.h>
 #include <stdint.h>

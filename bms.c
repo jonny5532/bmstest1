@@ -1,11 +1,11 @@
-#include "hw/internal_adc.h"
-#include "hw/duart.h"
-#include "hw/ina228.h"
-#include "hw/ads1115.h"
+#include "hw/chip/pwm.h"
+#include "hw/chip/time.h"
+#include "hw/chip/watchdog.h"
+#include "hw/comms/duart.h"
+#include "hw/sensors/ina228.h"
+#include "hw/sensors/internal_adc.h"
+#include "hw/sensors/ads1115.h"
 #include "hw/pins.h"
-#include "hw/pwm.h"
-#include "hw/time.h"
-#include "hw/watchdog.h"
 #include "state_machines/contactors.h"
 #include "battery/balancing.h"
 #include "model.h"
@@ -47,7 +47,7 @@ void tick() {
     update_balancing(&model);
 
     model_tick(&model);
-    inverter_tick();
+    inverter_tick(&model);
 }
 
 void synchronize_time() {

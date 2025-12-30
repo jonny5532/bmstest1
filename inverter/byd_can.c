@@ -198,37 +198,33 @@ static void send_inverter_init_messages() {
     timestep_3 = timestep_1 + 2;
 }
 
-static int send_110() {
+static int send_110(bms_model_t *model) {
     struct can2040_msg msg;
     msg.id = 0x110;
     msg.dlc = 8;
-    const uint16_t max_voltage_dV = 4000; // 400.0V
-    const uint16_t min_voltage_dV = 3000; // 300.0V
-    msg.data[0] = (max_voltage_dV >> 8) & 0xFF;
-    msg.data[1] = max_voltage_dV & 0xFF;
-    msg.data[2] = (min_voltage_dV >> 8) & 0xFF;
-    msg.data[3] = min_voltage_dV & 0xFF;
-    const uint16_t max_discharge_current_dA = 100; // 10A
-    const uint16_t max_charge_current_dA = 100; // 10A
-    msg.data[4] = (max_discharge_current_dA >> 8) & 0xFF;
-    msg.data[5] = max_discharge_current_dA & 0xFF;
-    msg.data[6] = (max_charge_current_dA >> 8) & 0xFF;
-    msg.data[7] = max_charge_current_dA & 0xFF;
+    msg.data[0] = (model->max_voltage_limit_dV >> 8) & 0xFF;
+    msg.data[1] = model->max_voltage_limit_dV & 0xFF;
+    msg.data[2] = (model->min_voltage_limit_dV >> 8) & 0xFF;
+    msg.data[3] = model->min_voltage_limit_dV & 0xFF;
+    msg.data[4] = (model->discharge_current_limit_dA >> 8) & 0xFF;
+    msg.data[5] = model->discharge_current_limit_dA & 0xFF;
+    msg.data[6] = (model->charge_current_limit_dA >> 8) & 0xFF;
+    msg.data[7] = model->charge_current_limit_dA & 0xFF;
     return can2040_transmit(&cbus, &msg);
 }
 
-static int send_150() {
+static int send_150(bms_model_t *model) {
     struct can2040_msg msg;
     msg.id = 0x150;
     msg.dlc = 8;
     
     //const uint16_t soc = 5000; // 50.00%
-    msg.data[0] = (model.soc >> 8) & 0xFF;
-    msg.data[1] = model.soc & 0xFF;
+    msg.data[0] = (model->soc >> 8) & 0xFF;
+    msg.data[1] = model->soc & 0xFF;
     // TODO: workaround for Deye?
     //const uint16_t soh = 10000; // 100.00%
-    msg.data[2] = (model.soh >> 8) & 0xFF;
-    msg.data[3] = model.soh & 0xFF;
+    msg.data[2] = (model->soh >> 8) & 0xFF;
+    msg.data[3] = model->soh & 0xFF;
     const uint16_t remaining_capacity_Ah = 120; // 12.0Ah
     msg.data[4] = (remaining_capacity_Ah >> 8) & 0xFF;
     msg.data[5] = remaining_capacity_Ah & 0xFF;
@@ -238,16 +234,16 @@ static int send_150() {
     return can2040_transmit(&cbus, &msg);
 }
 
-static int send_1d0() {
+static int send_1d0(bms_model_t *model) {
     struct can2040_msg msg;
     msg.id = 0x1D0;
     msg.dlc = 8;
 
-    const uint16_t pack_voltage_dV = model.battery_voltage_mv / 100; // in 0.1V units
+    const uint16_t pack_voltage_dV = model->battery_voltage_mV / 100; // in 0.1V units
     msg.data[0] = (pack_voltage_dV >> 8) & 0xFF;
     msg.data[1] = pack_voltage_dV & 0xFF;
     // TODO: check current direction
-    const int16_t pack_current_dA = model.current_mA / 100; // in 0.1A units
+    const int16_t pack_current_dA = model->current_mA / 100; // in 0.1A units
     msg.data[2] = (pack_current_dA >> 8) & 0xFF;
     msg.data[3] = pack_current_dA & 0xFF;
     const int16_t temperature_midpoint_dC = 250; // 25.0C
@@ -258,17 +254,17 @@ static int send_1d0() {
     return can2040_transmit(&cbus, &msg);
 }
 
-static int send_210() {
+static int send_210(bms_model_t *model) {
     // TODO - check values are recent
 
     struct can2040_msg msg;
     msg.id = 0x210;
     msg.dlc = 8;
 
-    const int16_t temperature_max_dC = model.temperature_max_dC; // in 0.1C units
+    const int16_t temperature_max_dC = model->temperature_max_dC; // in 0.1C units
     msg.data[0] = (temperature_max_dC >> 8) & 0xFF;
     msg.data[1] = temperature_max_dC & 0xFF;
-    const int16_t temperature_min_dC = model.temperature_min_dC; // in 0.1C units
+    const int16_t temperature_min_dC = model->temperature_min_dC; // in 0.1C units
     msg.data[2] = (temperature_min_dC >> 8) & 0xFF;
     msg.data[3] = temperature_min_dC & 0xFF;
     msg.data[4] = 0x00;
@@ -278,11 +274,12 @@ static int send_210() {
     return can2040_transmit(&cbus, &msg);
 }
 
-static int send_190() {
+static int send_190(bms_model_t *model) {
     // Alarms
     struct can2040_msg msg;
     msg.id = 0x190;
     msg.dlc = 8;
+    (void)model;
 
     msg.data[0] = 0x00;
     msg.data[1] = 0x00;
@@ -297,7 +294,7 @@ static int send_190() {
 
 static uint8_t transmit_cycle = 0;
 
-void inverter_tick() {
+void inverter_tick(bms_model_t *model) {
     // This should get called every 100ms
 
     if(!inverter_present) {
@@ -306,7 +303,7 @@ void inverter_tick() {
     }
 
     if(!inverter_initialized) {
-        if(!battery_ready(&model)) {
+        if(!battery_ready(model)) {
             // Battery not ready yet
             return;
         }
@@ -318,17 +315,17 @@ void inverter_tick() {
 
     if(timestep_every_ms(100, &timestep_1)) {
         // send regular messages every 100ms
-        send_110();
+        send_110(model);
     }
     if(timestep_every_ms(10000, &timestep_2)) {
         // send regular messages every 1000ms
-        send_150();
-        send_1d0();
-        send_210();
+        send_150(model);
+        send_1d0(model);
+        send_210(model);
     }
     if(timestep_every_ms(60000, &timestep_3)) {
         // send regular messages every 60000ms
-        send_190();
+        send_190(model);
     }
 
     // transmit_cycle++;
