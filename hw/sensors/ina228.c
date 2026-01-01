@@ -225,7 +225,10 @@ void ina228_configure(ina228_t *dev) {
     // A = continuous, shunt only
     // 
     
-    write_reg16(dev, INA228_REG_ADC_CONFIG, 0xAFFF); 
+    write_reg16(dev, INA228_REG_ADC_CONFIG, 0xAFF4 | 5); 
+
+    write_reg16(dev, INA228_REG_SHUNT_CAL, 206);
+
 }
 
 int32_t ina228_get_current_raw() {
