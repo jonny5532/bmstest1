@@ -9,11 +9,11 @@
 #define ISOSPI_MASTER_SM 0
 
 void isospi_master_setup(unsigned int tx_pin_base, uint rx_pin_base) {
-    // tx_pin_base      is the tx data pin (noninverting)
-    // tx_pin_base + 1  is the driver enable pin (active high)
+    // tx_pin_base      is the driver enable pin (active high)
+    // tx_pin_base + 1  is the tx data pin (noninverting)
 
-    // rx_pin_base      is the low rx data pin
-    // rx_pin_base + 1  is the high rx data pin
+    // rx_pin_base      is the high rx data pin
+    // rx_pin_base + 1  is the low rx data pin
 
     isospi_master_program_init(ISOSPI_MASTER_PIO, tx_pin_base, rx_pin_base);
 }

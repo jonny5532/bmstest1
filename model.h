@@ -1,9 +1,12 @@
+#pragma once
+
 #include "hw/chip/time.h"
 #include "battery/balancing.h"
 #include "state_machines/charging.h"
 #include "state_machines/contactors.h"
 
 #include <stdint.h>
+#include <stdio.h>
 
 
 // This entire structure will be zero-initialized at startup
@@ -11,6 +14,8 @@ typedef struct {
     // Positive current means battery is charging
     int32_t current_mA;
     millis_t current_millis;
+    int64_t charge_raw;
+    millis_t charge_millis;
 
     int32_t temperature_min_dC;
     int32_t temperature_max_dC;
@@ -23,6 +28,11 @@ typedef struct {
     uint32_t cell_voltage_min_mV;
     uint32_t cell_voltage_max_mV;
     millis_t cell_voltage_millis;
+
+    int16_t pos_contactor_voltage_mV;
+    millis_t pos_contactor_voltage_millis;
+    int16_t neg_contactor_voltage_mV;
+    millis_t neg_contactor_voltage_millis;
 
     uint32_t soc; // state of charge in 0.01% units (0=0%, 10000=100.00%)
     uint32_t soh; // state of health in 0.01% units (0=0%, 10000=100.00%)

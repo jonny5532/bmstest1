@@ -52,5 +52,6 @@ typedef struct {
 bool ads1115_init(ads1115_t *dev, uint8_t addr, uint16_t pga_config);
 void ads1115_start_sampling(ads1115_t *dev);
 void ads1115_irq_handler(ads1115_t *dev);
+int16_t ads1115_get_sample(int channel);
 
 #endif

@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_C_STANDARD 11)
 
+set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
+set(PICO_BOARD bms_rp2354b)
+
 # Support for anonymous structs
 add_definitions("-fms-extensions")
 
@@ -29,6 +32,7 @@ add_executable(bms
     hw/sensors/ina228.c
     hw/sensors/ads1115.c
     hw/comms/duart.c
+    hw/comms/internal_serial.c
     hw/chip/nvm.c
     hw/chip/pwm.c
     hw/chip/time.c
@@ -39,6 +43,7 @@ add_executable(bms
     debug/events.c
     inverter/byd_can.c
     isospi/isospi_master.c
+    isospi/isosnoop.c
     state_machines/base.c
     state_machines/contactors.c
     util/sampler.c
@@ -51,7 +56,7 @@ pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/vendor/can2040/pio/can204
 
 
 pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/isospi/isospi_master.pio)
-#pico_generate_pio_header(isosnooper ${CMAKE_CURRENT_LIST_DIR}/isosnoop.pio)
+pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/isospi/isosnoop.pio)
 #pico_generate_pio_header(isosnooper ${CMAKE_CURRENT_LIST_DIR}/isospi_scope.pio)
 #pico_generate_pio_header(isosnooper ${CMAKE_CURRENT_LIST_DIR}/isospi_device.pio)
 

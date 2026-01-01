@@ -36,6 +36,52 @@ void core1_entry() {
     }
 }
 
+
+// should this go?
+void read_inputs(bms_model_t *model) {
+    // ADS1115 voltage readings
+
+    // For differential readings, full scale should be 436V
+
+    // Read battery voltage from ADS1115 channel 0
+    int16_t raw_batt = ads1115_get_sample(0);
+    millis_t raw_batt_millis = ads1115_get_sample_millis(0);
+    model->battery_voltage_mV = raw_batt * 436000 / 32768;
+    model->battery_voltage_millis = raw_batt_millis;
+
+    // Read output voltage from ADS1115 channel 1
+    int16_t raw_out = ads1115_get_sample(1);
+    millis_t raw_out_millis = ads1115_get_sample_millis(1);
+    model->output_voltage_mV = raw_out * 436000 / 32768;
+    model->output_voltage_millis = raw_out_millis;
+
+    int16_t raw_neg_ctr = ads1115_get_sample(2);
+    millis_t raw_neg_ctr_millis = ads1115_get_sample_millis(2);
+    model->neg_contactor_voltage_mV = raw_neg_ctr * 436000 / 32768;
+    model->neg_contactor_voltage_millis = raw_neg_ctr_millis;
+
+    // For absolute readings, full scale should be 1745V
+
+    int16_t raw_bat_plus = ads1115_get_sample(3);
+    millis_t raw_bat_plus_millis = ads1115_get_sample_millis(3);
+    int16_t raw_out_plus = ads1115_get_sample(4);
+    millis_t raw_out_plus_millis = ads1115_get_sample_millis(4);
+    model->pos_contactor_voltage_mV = (raw_bat_plus - raw_out_plus) * 1745000 / 32768;
+    model->pos_contactor_voltage_millis = raw_bat_plus_millis < raw_out_plus_millis ? raw_bat_plus_millis : raw_out_plus_millis; // Use older value
+
+    // INA228 current and charge readings
+
+    int32_t current_raw = ina228_get_current_raw();
+    millis_t current_millis = ina228_get_current_millis();
+    model->current_mA = current_raw; // TODO - convert to mA properly
+    model->current_millis = current_millis;
+    
+    uint32_t charge_raw = ina228_get_charge_raw();
+    millis_t charge_millis = ina228_get_charge_millis();
+    model->charge_raw = charge_raw;
+    model->charge_millis = charge_millis;
+}
+
 void tick() {
     // The main tick function
 
@@ -46,21 +92,74 @@ void tick() {
 
     update_balancing(&model);
 
+    if(timestep() & 32) {
+        gpio_put(PIN_LED, true);
+    } else {
+        gpio_put(PIN_LED, false);
+    }
+
+    read_inputs(&model);
     model_tick(&model);
     inverter_tick(&model);
+    internal_serial_tick();
+
+    if((timestep() & 63) == 32) {
+        //uint32_t start = time_us_32();
+        bmb3y_wakeup_blocking();
+        // uint32_t end = time_us_32();
+        // printf("BMB3Y wakeup took %d us\n", end - start);
+    }
+
+    if((timestep() & 63) == 0) {
+        // every 64 ticks, output stuff
+        isosnoop_print_buffer();
+
+        printf("Temp: %3d dC | 3V3: %4d mV | 5V: %4d mV | 12V: %5d mV | CtrV: %5d mV\n",
+            get_temperature_c_times10(),
+            internal_adc_read_3v3_mv(),
+            internal_adc_read_5v_mv(),
+            internal_adc_read_12v_mv(),
+            internal_adc_read_contactor_mv()
+        );
+
+        printf("Batt: %6dmV | Out: %6dmV | NegCtr: %6dmV | PosCtr: %6dmV\n",
+            model.battery_voltage_mV,
+            model.output_voltage_mV,
+            model.neg_contactor_voltage_mV,
+            model.pos_contactor_voltage_mV
+        );
+        printf("Current: %6d mA | Charge: %lld raw\n\n",
+            model.current_mA,
+            model.charge_raw
+        );
+        
+        // printf("ADS1115 Battery voltage: %d (%d)\n", ads1115_get_sample(0), ads1115_get_sample_millis(0));
+        // printf("ADS1115 Output voltage: %d (%d)\n", ads1115_get_sample(1), ads1115_get_sample_millis(1));
+        // printf("ADS1115 Across neg ctr: %d (%d)\n", ads1115_get_sample(2), ads1115_get_sample_millis(2));
+        // printf("ADS1115 Bat+: %d (%d)\n", ads1115_get_sample(3), ads1115_get_sample_millis(3));
+        // printf("ADS1115 Out+: %d (%d)\n", ads1115_get_sample(4), ads1115_get_sample_millis(4));
+
+        // printf("INA228 Current: %ld raw\n", ina228_get_current_raw());
+        // printf("INA228 Charge: %ld raw\n", ina228_get_charge_raw());
+        // for(int i = 0; i < 5; i++) {
+        //     printf("ADS1115 Channel %d: %d (%d)\n", i, ads1115_get_sample(i), ads1115_get_sample_millis(i));
+        // }
+    }
 }
 
 void synchronize_time() {
     uint32_t prev = millis();
     update_millis();
-    update_timestep();
 
-    uint32_t delta = millis() - prev;
-    if(delta < 20) {
+    int32_t delta = millis() - prev;
+    if(delta <= 20) {
         sleep_ms(20 - delta);
     } else {
         // took too long!
+        printf("Warning: loop overran (%d ms)\n", delta);
     }
+    update_millis();
+    update_timestep();
 }
 
 // TODO - where to put this?
@@ -103,68 +202,6 @@ int main() {
     while(true) {
         tick();
         synchronize_time();
-    }
-
-    uint8_t str[] = {
-        'K', 'e', 'e', 'p', 'A', 'l', 'i', 'v',
-    };
-
-    int i=0;
-    int n=0;
-    while(true) {
-        //sprintf((char*)&str[0], "%08d", n++);
-        if(n>99999999) {
-            n = 0;
-        }
-
-        if(duart_send_packet(&duart1, (uint8_t *)str, 8)) {
-            //printf("Sent successfully\n");
-            //putchar('1');
-        } else {
-            //printf("Send failed\n");
-            //putchar('0');
-        }
-        if(i++ >= 80) {
-            //putchar('\n');
-            printf("Temp: %d C\n", get_temperature_c_times10());
-            printf("ADC 12V: raw=%u smoothed=%u variance=%u\n", adc_samples_raw[0], adc_samples_smoothed[0], adc_samples_variance[0]);
-            printf("Temp Sensor: raw=%u smoothed=%u variance=%u\n", adc_samples_raw[1], adc_samples_smoothed[1], adc_samples_variance[1]);
-            //printf("INA228 Charge: %.3f C\n", ina228_dev.charge_c);
-            i = 0;
-
-
-        }
-        sleep_us(10000);
-
-        while(true) {
-            uint8_t buf[256];
-            size_t len = duart_read_packet(&duart1, buf, sizeof(buf));
-            if(len > 0) {
-                printf("<%.*s>", len, buf);
-            } else {
-                break;
-            }
-        }
-
-
-        //printf("ADC 12V: raw=%u smoothed=%u\n", adc_samples_raw[0], adc_samples_smoothed[0]);
-
-        update_millis();
-
-        model.contactor_req = CONTACTORS_REQUEST_CLOSE;
-        contactor_sm_tick(&model);
-        update_balancing(&model);
-
-        watchdog_update();
-    }
-
-
-    while(true) {
-        update_millis();
-        
-        printf("Current millis: %llu\n", millis());
-        sleep_ms(1000);
-
     }
 
     return 0;

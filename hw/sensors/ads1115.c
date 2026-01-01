@@ -1,4 +1,5 @@
 #include "ads1115.h"
+#include "../allocation.h"
 #include "../pins.h"
 #include "../model.h"
 
@@ -22,8 +23,11 @@ static void ads1115_internal_irq_handler(void) {
     }
 }
 
+int16_t ads1115_samples[5];
+millis_t ads1115_sample_millis[5];
+
 bool ads1115_init(ads1115_t *dev, uint8_t addr, uint16_t pga_config) {
-    dev->i2c = i2c1; // Based on pins 18, 19
+    dev->i2c = ADS1115_I2C; // Based on pins 18, 19
     dev->addr = addr;
     dev->busy = false;
     dev->state = ADS1115_STATE_IDLE;
@@ -52,6 +56,9 @@ bool ads1115_init(ads1115_t *dev, uint8_t addr, uint16_t pga_config) {
     // Set target address for subsequent manual HW access if needed
     i2c_get_hw(dev->i2c)->tar = dev->addr;
 
+    // Blank out IRQ mask
+    i2c_get_hw(dev->i2c)->intr_mask = 0;
+
     ads_irq_ctx = dev;
     uint irq_num = (dev->i2c == i2c0) ? I2C0_IRQ : I2C1_IRQ;
     irq_set_exclusive_handler(irq_num, ads1115_internal_irq_handler);
@@ -70,7 +77,8 @@ bool ads1115_init(ads1115_t *dev, uint8_t addr, uint16_t pga_config) {
 
 static void ads1115_start_conversion(ads1115_t *dev, int channel) {
     uint16_t config = ADS1115_CONFIG_OS_SINGLE | 
-                      ADS1115_CONFIG_PGA_2_048V | 
+                      //ADS1115_CONFIG_PGA_4_096V |
+                      //ADS1115_CONFIG_PGA_2_048V | 
                       ADS1115_CONFIG_MODE_SINGLE | 
                       ADS1115_CONFIG_DR_128SPS | 
                       ADS1115_CONFIG_COMP_QUE_NONE;
@@ -78,18 +86,23 @@ static void ads1115_start_conversion(ads1115_t *dev, int channel) {
     switch (channel) {
         case 0: 
             // ADC0 - ADC1 (battery voltage)
-            config |= ADS1115_CONFIG_MUX_DIFF_0_1; 
+            config |= ADS1115_CONFIG_PGA_1_024V | ADS1115_CONFIG_MUX_DIFF_0_1; 
             break;
         case 1: 
             // ADC2 - ADC3 (output terminal voltage)
-            config |= ADS1115_CONFIG_MUX_DIFF_2_3; 
+            config |= ADS1115_CONFIG_PGA_1_024V | ADS1115_CONFIG_MUX_DIFF_2_3; 
             break;
         case 2: 
             // ADC1 - ADC3 (voltage across negative contactor)
-            config |= ADS1115_CONFIG_MUX_DIFF_1_3; 
+            config |= ADS1115_CONFIG_PGA_1_024V | ADS1115_CONFIG_MUX_DIFF_1_3; 
             break;
         case 3: 
-            config |= ADS1115_CONFIG_MUX_SINGLE_3; 
+            // ADC0 single-ended (Bat+)
+            config |= ADS1115_CONFIG_PGA_4_096V | ADS1115_CONFIG_MUX_SINGLE_0;
+            break;
+        case 4:
+            // ADC2 single-ended (Output+)
+            config |= ADS1115_CONFIG_PGA_4_096V | ADS1115_CONFIG_MUX_SINGLE_2;
             break;
     }
 
@@ -192,14 +205,16 @@ void ads1115_irq_handler(ads1115_t *dev) {
             hw->intr_mask &= ~I2C_IC_INTR_MASK_M_RX_FULL_BITS;
             
             if (dev->state == ADS1115_STATE_READ_CONVERSION_DATA) {
-                if(dev->current_channel == 0) {
-                    store_battery_voltage((dev->async_buf[0] << 8) | dev->async_buf[1]);
-                } else if(dev->current_channel == 1) {
-                    store_output_voltage((dev->async_buf[0] << 8) | dev->async_buf[1]);
-                }
+                ads1115_samples[dev->current_channel] = (dev->async_buf[0] << 8) | dev->async_buf[1];
+                ads1115_sample_millis[dev->current_channel] = millis();
+                // if(dev->current_channel == 0) {
+                //     store_battery_voltage((dev->async_buf[0] << 8) | dev->async_buf[1]);
+                // } else if(dev->current_channel == 1) {
+                //     store_output_voltage((dev->async_buf[0] << 8) | dev->async_buf[1]);
+                // }
                 
                 dev->current_channel++;
-                if (dev->current_channel < 4) {
+                if (dev->current_channel < 5) {
                     ads1115_start_conversion(dev, dev->current_channel);
                 } else {
                     dev->busy = false;
@@ -226,4 +241,12 @@ static bool ads1115_periodic_timer_callback(struct repeating_timer *t) {
     ads1115_t *dev = (ads1115_t *)t->user_data;
     ads1115_start_sampling(dev);
     return true;
+}
+
+int16_t ads1115_get_sample(int channel) {
+    return ads1115_samples[channel];
+}
+
+millis_t ads1115_get_sample_millis(int channel) {
+    return ads1115_sample_millis[channel];
 }

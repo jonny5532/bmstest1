@@ -7,7 +7,7 @@
 
 ; Actual patterns when using a driver
 .define PUBLIC TX_HIGH 0b11
-.define PUBLIC TX_LOW  0b10
+.define PUBLIC TX_LOW  0b01
 .define PUBLIC TX_IDLE 0b00
 
 ; length of half-bit pulses (multipled by 6.7ns)
@@ -192,10 +192,10 @@ void isospi_master_program_init(PIO pio, uint tx_pin_base, uint rx_pin_base) {
     sm_config_set_in_pin_base(&master_config, rx_pin_base);
     sm_config_set_in_pin_count(&master_config, 2);
 
-    int sampling_pin = 22; // just after the TX pins
-    pio_gpio_init(pio, sampling_pin);
-    pio_sm_set_consecutive_pindirs(pio, 0, sampling_pin, 1, true);
-    sm_config_set_sideset_pins(&master_config, sampling_pin);
+    //int sampling_pin = 22; // just after the TX pins
+    //pio_gpio_init(pio, sampling_pin);
+    //pio_sm_set_consecutive_pindirs(pio, 0, sampling_pin, 1, true);
+    //sm_config_set_sideset_pins(&master_config, sampling_pin);
 
     //sm_config_set_clkdiv_int_frac8(&c, 1, 120);
     sm_config_set_clkdiv_int_frac8(&master_config, 1, 0);

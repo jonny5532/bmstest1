@@ -4,6 +4,7 @@
 #include "hw/pins.h"
 #include "hw/chip/pwm.h"
 #include "hw/chip/watchdog.h"
+#include "inverter/inverter.h"
 #include "state_machines/contactors.h"
 #include "model.h"
 
@@ -14,6 +15,9 @@ void init_hw() {
     init_watchdog();
 
     init_adc();
+
+    gpio_init(PIN_LED);
+    gpio_set_dir(PIN_LED, GPIO_OUT);
 
     init_pwm_pin(PIN_CONTACTOR_POS);
     init_pwm_pin(PIN_CONTACTOR_PRE);
@@ -27,10 +31,21 @@ void init_hw() {
     if(!ads1115_init(&ads1115_dev, 0x48, 2048)) {
         printf("ADS1115 init failed!\n");
     }
+
+    isospi_master_setup(
+        PIN_ISOSPI_TX_EN,
+        PIN_ISOSPI_RX_HIGH
+    );
+    isosnoop_setup(
+        PIN_ISOSPI_RX_HIGH,
+        PIN_ISOSNOOP_RX_DEBUG,
+        PIN_ISOSPI_RX_AND,
+        PIN_ISOSNOOP_TIMER_DISABLE
+    );
 }
 
 void init_comms() {
-    init_duart(&duart1, 115200, 26, 27, true); //9375000 works!
+    init_internal_serial();
 
     init_inverter();
 }

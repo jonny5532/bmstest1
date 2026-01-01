@@ -1,8 +1,9 @@
-#define ISOSPI_MASTER_PIO pio0
-
 #define INA228_I2C i2c0
 
 #define ADS1115_I2C i2c1
 
 #define CAN2040_PIO_NUM 0
 #define CAN2040_PIO_IRQ0 PIO0_IRQ_0
+
+#define ISOSPI_MASTER_PIO pio1
+#define ISOSNOOP_PIO pio2

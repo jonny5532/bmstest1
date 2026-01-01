@@ -9,7 +9,7 @@
 #define CONTACTORS_INSTANT_OPEN_MA 1000
 #define CONTACTORS_DELAYED_OPEN_MA 5000
 #define CONTACTORS_OPEN_DELAY_MS 2000
-#define CONTACTORS_TEST_WAIT_MS 500
+#define CONTACTORS_TEST_WAIT_MS 5000
 
 
 inline int32_t abs_int32(int32_t v) {
@@ -30,8 +30,14 @@ bool current_is_below(bms_model_t *model, int32_t threshold_ma) {
 
 bool voltage_diff_is_below(bms_model_t *model, int32_t threshold_mv) {
     if(!millis_recent_enough(model->battery_voltage_millis, 200) ||
-       !millis_recent_enough(model->output_voltage_millis, 200)) {
+       !millis_recent_enough(model->output_voltage_millis, 200) ||
+       !millis_recent_enough(model->neg_contactor_voltage_millis, 200)) {
         // stale reading
+        return false;
+    }
+
+    // Check negative contactor is still closed
+    if(abs_int32(model->neg_contactor_voltage_mV) > 1000) {
         return false;
     }
 
@@ -56,24 +62,43 @@ bool battery_is_healthy(bms_model_t *model) {
     return true;
 }
 
-bool contactor_neg_seems_closed() {
-    // TODO - check that reading is fresh, and that voltage across neg contactor is low
-    return true;
+bool contactor_neg_seems_closed(bms_model_t *model) {
+    if(!millis_recent_enough(model->neg_contactor_voltage_millis, 200)) {
+        // stale reading
+        return false;
+    }
+
+    return abs_int32(model->neg_contactor_voltage_mV) < 1000; // less than 100mV drop
 }
 
-bool contactor_neg_seems_open() {
-    // TODO - check that reading is fresh, and that voltage across neg contactor is high
+bool contactor_neg_seems_open(bms_model_t *model) {
+    if(!millis_recent_enough(model->neg_contactor_voltage_millis, 200)) {
+        // stale reading
+        return false;
+    }
+
+    // FIXME testing
     return true;
+
+    return abs_int32(model->neg_contactor_voltage_mV) > 5000; // more than 5V drop
 }
 
-bool contactor_pos_seems_closed() {
-    // TODO - check that reading is fresh, and that voltage across pos contactor is low
-    return true;
+bool contactor_pos_seems_closed(bms_model_t *model) {
+    if(!millis_recent_enough(model->pos_contactor_voltage_millis, 200)) {
+        // stale reading
+        return false;
+    }
+
+    return abs_int32(model->pos_contactor_voltage_mV) < 1000; // less than 100mV drop
 }
 
-bool contactor_pos_seems_open() {
-    // TODO - check that reading is fresh, and that voltage across pos contactor is high
-    return true;
+bool contactor_pos_seems_open(bms_model_t *model) {
+    if(!millis_recent_enough(model->pos_contactor_voltage_millis, 200)) {
+        // stale reading
+        return false;
+    }
+
+    return abs_int32(model->pos_contactor_voltage_mV) > 5000; // more than 5V drop
 }
 
 void contactor_sm_tick(bms_model_t *model) {
@@ -85,7 +110,8 @@ void contactor_sm_tick(bms_model_t *model) {
                 model->contactor_req = CONTACTORS_REQUEST_NULL;
 
                 // Do a self-test of the contactors before precharging
-                state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_CLOSED);
+                state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_OPEN);
+                //state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_CLOSED);
                 //state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING);
             }
             break;
@@ -125,7 +151,7 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(false, false, false);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(contactor_neg_seems_open()) {
+                if(contactor_neg_seems_open(model)) {
                     // passed
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_CLOSED);
                 } else {
@@ -138,7 +164,7 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(false, false, true);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(contactor_neg_seems_closed()) {
+                if(contactor_neg_seems_closed(model)) {
                     // passed
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_POS_OPEN);
                 } else {
@@ -151,7 +177,7 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(false, false, false);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(contactor_pos_seems_open()) {
+                if(contactor_pos_seems_open(model)) {
                     // all tests passed
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_POS_CLOSED);
                 } else {
@@ -164,7 +190,7 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(true, false, false);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(contactor_pos_seems_closed()) {
+                if(contactor_pos_seems_closed(model)) {
                     // all tests passed, go to precharging
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING);
                 } else {

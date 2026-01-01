@@ -24,7 +24,7 @@ int chars_rxed = 0;
 static void enable_tx_pin(duart *u) {
     // Set TX pin function to UART, which will switch the pin from an input with
     // pull-up to a high output.
-    gpio_set_function(u->tx_pin, UART_FUNCSEL_NUM(u->uart, u->tx_pin)); // 0 = TX
+    gpio_set_function(u->tx_pin, UART_FUNCSEL_NUM(u->uart, u->tx_pin));
 }
 
 static void disable_tx_pin(duart *u) {
@@ -84,6 +84,7 @@ int64_t disable_tx_callback(alarm_id_t id, void *user_data) {
 
         disable_tx_pin(u);
 
+        // Release the active flag we just grabbed
         atomic_flag_clear(&u->tx_active);
     }
 
@@ -448,7 +449,7 @@ bool init_duart(duart *u, uint baud_rate, uint tx_pin, uint rx_pin, bool deasser
     ringbuf_init(&u->tx_ringbuf, u->tx_buffer, DUART_TX_BUFFER_LEN);
 
     uart_init(u->uart, baud_rate);
-    gpio_set_function(u->rx_pin, UART_FUNCSEL_NUM(u->uart, u->rx_pin)); // 1 = RX
+    gpio_set_function(u->rx_pin, UART_FUNCSEL_NUM(u->uart, u->rx_pin));
     if(u->deassert_tx_when_idle) {
         gpio_pull_up(u->tx_pin);
         disable_tx_pin(u);
