@@ -9,7 +9,7 @@
 #define CONTACTORS_INSTANT_OPEN_MA 1000
 #define CONTACTORS_DELAYED_OPEN_MA 5000
 #define CONTACTORS_OPEN_DELAY_MS 2000
-#define CONTACTORS_TEST_WAIT_MS 5000
+#define CONTACTORS_TEST_WAIT_MS 500
 
 
 inline int32_t abs_int32(int32_t v) {
@@ -109,16 +109,21 @@ void contactor_sm_tick(bms_model_t *model) {
             if(model->contactor_req == CONTACTORS_REQUEST_CLOSE) {
                 model->contactor_req = CONTACTORS_REQUEST_NULL;
 
-                // Do a self-test of the contactors before precharging
+                // Start a self-test of the contactors before precharging
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_OPEN);
-                //state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_CLOSED);
-                //state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING);
+            }
+            break;
+        case CONTACTORS_STATE_PRECHARGING_NEG:
+            // Close negative contactor first
+            contactors_set_pos_pre_neg(false, false, true);
+            if(state_timeout((sm_t*)contactor_sm, 500)) {
+                state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING);
             }
             break;
         case CONTACTORS_STATE_PRECHARGING:
+            // Now close precharge contactor
             contactors_set_pos_pre_neg(false, true, true);
 
-            // TODO: check voltage diff too
             if(state_timeout((sm_t*)contactor_sm, 1000) && voltage_diff_is_below(model, 10000)) {
                 // successful precharge
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_CLOSED);
@@ -187,12 +192,13 @@ void contactor_sm_tick(bms_model_t *model) {
             }
             break;
         case CONTACTORS_STATE_TESTING_POS_CLOSED:
-            contactors_set_pos_pre_neg(true, false, false);
+            // Both positive and precharge (since this actually leaves the precharge open due to the inverted logic)
+            contactors_set_pos_pre_neg(true, true, false);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
                 if(contactor_pos_seems_closed(model)) {
                     // all tests passed, go to precharging
-                    state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING);
+                    state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING_NEG);
                 } else {
                     // fault detected
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_FAILED);
@@ -201,7 +207,7 @@ void contactor_sm_tick(bms_model_t *model) {
             break;
         case CONTACTORS_STATE_TESTING_FAILED:
             contactors_set_pos_pre_neg(false, false, false);
-            // wait for some arbitrary time
+            // Wait for some arbitrary time to avoid cycling too fast
             if(state_timeout((sm_t*)contactor_sm, 20000)) {
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_OPEN);
             }

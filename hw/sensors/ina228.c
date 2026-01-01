@@ -82,10 +82,12 @@ void ina228_irq_handler(ina228_t *dev) {
 
             // Process data
             if (dev->async_reg == INA228_REG_CURRENT && dev->async_bytes_expected == 3) {
-                uint32_t raw = (dev->async_buf[0] << 16) | (dev->async_buf[1] << 8) | dev->async_buf[2];
-                // sign extend 24-bit to 32-bit
+                uint32_t raw = (dev->async_buf[0] << 12) | (dev->async_buf[1] << 4) | (dev->async_buf[2] >> 4);
+                // sign extend
                 current_raw = (int32_t)raw;
-                if (raw & 0x800000) current_raw |= 0xFF000000;
+                if(current_raw & 0x80000) {
+                    current_raw |= 0xFFF00000;
+                }
                 current_millis = millis();
             } else if (dev->async_reg == INA228_REG_CHARGE && dev->async_bytes_expected == 5) {
                 // int64_t raw = ((int64_t)dev->async_buf[0] << 32) |
@@ -172,10 +174,12 @@ bool ina228_init(ina228_t *dev, uint8_t addr, float shunt_resistor_ohms, float m
     // Calculate SHUNT_CAL
     // SHUNT_CAL = 13107.2 * 10^6 * Current_LSB * R_SHUNT
     // The constant 13107.2e6 is for the INA228 specifically.
-    float shunt_cal_val = 13107.2e6f * dev->current_lsb * dev->shunt_resistor_ohms;
+    //float shunt_cal_val = 13107.2e6f * dev->current_lsb * dev->shunt_resistor_ohms;
+    float shunt_cal_val = 1;//0x1000;
+
     
     // Write SHUNT_CAL
-    if(!write_reg16(dev, INA228_REG_SHUNT_CAL, (uint16_t)shunt_cal_val)) {
+    if(!write_reg16(dev, INA228_REG_SHUNT_CAL, 1000)) { //(uint16_t)shunt_cal_val)) {
         // Didn't acknowledge, probably not connected
         return false;
     }
@@ -209,8 +213,7 @@ void ina228_configure(ina228_t *dev) {
     // CONFIG register (0x00)
     // Default is fine for now, or set ADCRANGE if needed.
     // Bit 4: ADCRANGE (0 = +/- 163.84mV, 1 = +/- 40.96mV)
-    // Let's assume default range (0) for higher current capability.
-    write_reg16(dev, INA228_REG_CONFIG, 0x0000);
+    write_reg16(dev, INA228_REG_CONFIG, 0x0010);
 
     // ADC_CONFIG register (0x01)
     // MODE (bits 15-12): 1111 = Continuous Bus Voltage, Shunt Voltage, and Temperature
@@ -219,11 +222,10 @@ void ina228_configure(ina228_t *dev) {
     // VTCT (bits 5-3): Conversion time for Temp
     // AVG (bits 2-0): Averaging count
     
-    // Set to continuous mode, default conversion times (1052us), 16 averages
-    // MODE=0xF, VBUSCT=4 (1052us), VSHCT=4 (1052us), VTCT=4 (1052us), AVG=2 (16) -> 0xFB49?
-    // Let's use defaults but ensure continuous mode.
-    // 0xFB68 -> Continuous all, 1052us, 64 averages.
-    write_reg16(dev, INA228_REG_ADC_CONFIG, 0xFB68); 
+    // A = continuous, shunt only
+    // 
+    
+    write_reg16(dev, INA228_REG_ADC_CONFIG, 0xAFFF); 
 }
 
 int32_t ina228_get_current_raw() {
