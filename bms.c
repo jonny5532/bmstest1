@@ -118,22 +118,22 @@ void tick() {
         // printf("BMB3Y snapshot took %d us\n", end - start);
     }
 
-    if((timestep() & 0x7ff) == 31) {
+    if((timestep() & 0x1ff) == 31) {
         uint32_t start = time_us_32();
 
         bmb3y_wakeup_blocking();
-        isospi_send_command_blocking(BMB3Y_CMD_IDLE_WAKE, false);
-        isospi_send_command_blocking(BMB3Y_CMD_SNAPSHOT, false);
+        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+        bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
 
-        // 70 sometimes isn't enough time, 100 seems ok
+        // 70 sometimes isn't enough time, 100  seems ok
         sleep_us(100);
 
-        bmb3y_read_cell_voltages_blocking();
+        bmb3y_read_cell_voltages_blocking(&model);
 
         uint32_t end = time_us_32();
         printf("BMB3Y test took %ld us\n", end - start);
     }
-    if((timestep() & 0x7ff) == 32) {
+    if((timestep() & 0x1ff) == 32) {
         for(int i=0; i<120; i++) {
             printf("[c%3d]: %4d mV | ", i, model.cell_voltages_mV[i]);
         }
@@ -143,8 +143,9 @@ void tick() {
     if((timestep() & 63) == 0) {
         // every 64 ticks, output stuff
         //isosnoop_print_buffer();
+        print_bms_events();
 
-        printf("Temp: %3ld dC | 3V3: %4d mV | 5V: %4d mV | 12V: %5d mV | CtrV: %5d mV\n",
+        printf("Temp: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
             get_temperature_c_times10(),
             internal_adc_read_3v3_mv(),
             internal_adc_read_5v_mv(),

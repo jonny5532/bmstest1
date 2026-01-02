@@ -1,3 +1,7 @@
+#pragma once
+
+#include "../model.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -40,11 +44,13 @@ print(list((hex(crc8_2f(bytes([n, 0]))) for n in range(0x47, 0x4C+10))))
 #define BMB3Y_CMD_READ_AUX_B   0x4E001C00    // Aux register B
 #define BMB3Y_CMD_READ_STATUS  0x4F00F500    // Status register
 #define BMB3Y_CMD_READ_CONFIG  0x50009400    // Config register
-#define BMB3Y_CMD_WRITE_CONFIG 0x11    // Write config
+#define BMB3Y_CMD_WRITE_CONFIG 0x112F        // Write config
 #define BMB3Y_CMD_READ_TEMPS   0x0E1B
+
+void bmb3y_send_command_blocking(uint16_t cmd_word);
+bool bmb3y_get_data_blocking(uint32_t cmd, uint8_t *buf, int len);
 
 void bmb3y_wakeup_blocking(void);
 void bmb3y_request_snapshot_blocking();
-bool bmb3y_get_data_blocking(uint32_t cmd, uint8_t *buf, int len);
 bool bmb3y_read_test_blocking(uint32_t cmd, int cells);
-bool bmb3y_read_cell_voltages_blocking();
+bool bmb3y_read_cell_voltages_blocking(bms_model_t *model);

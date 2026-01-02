@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include <stdint.h>
 
 const uint16_t CRC14_POLYNOMIAL = 0x025b;

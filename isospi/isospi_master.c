@@ -106,35 +106,4 @@ void isospi_send_wakeup_cs_blocking() {
     sleep_us(20);
 }
 
-void isospi_send_command_blocking(uint16_t cmd_word) {
-    // Send a 16-bit command with normal CS pattern
-    uint8_t tx[2];
-    uint8_t rx[2] = {0};
-    
-    // Split 16-bit command into 2 bytes (MSB first)
-    tx[0] = (cmd_word >> 8) & 0xFF;
-    tx[1] = cmd_word & 0xFF;
-    
-    isospi_write_read_blocking(tx, rx, 2, 0);
-}
 
-
-
-bool isospi_get_data_blocking(uint32_t cmd, uint8_t *response, size_t response_len) {
-    // FIXME - choose a more sensible size
-    uint8_t tx[100] = {0};
-
-    // CRC is CRC8 with polynomial 2f (AUTOSAR) but we just bake it into the commands
-
-    tx[0] = (cmd >> 24) & 0xFF;
-    tx[1] = (cmd >> 16) & 0xFF;
-    tx[2] = (cmd >> 8) & 0xFF;
-    tx[3] = cmd & 0xFF;
-
-    // tx[0] = reg_cmd; // command byte
-    // tx[1] = 0;       // dummy byte
-    // tx[2] = 0x70;    // CRC8 (poly=0x2F, init=0x10)
-    // tx[3] = 0;       // 
-    
-    return isospi_write_read_blocking(tx, response, 4 + response_len, 4);
-}
