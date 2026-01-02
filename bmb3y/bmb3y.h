@@ -7,6 +7,9 @@
 
 // Read commands have a CRC8(poly 0x2F, initial 0x10) of the first two bytes in the third byte. 
 // This is precalculated in the read commands.
+
+// The other commands are single byte followed by the CRC8 byte.
+
 /*
 def crc8_2f(data: bytes) -> int:
     crc = 0x10  # Initial value

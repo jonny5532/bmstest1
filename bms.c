@@ -91,6 +91,16 @@ void read_inputs(bms_model_t *model) {
 
 uint8_t bitmap_on[16] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                       0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+uint8_t bitmap_set[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+// mapping is a bit strange:
+// 0x0f in last byte is cells 8,9,10,11 (zero based)
+// 0xf0 is cell 12,13,14
+// 0xf00 is cell 0,1,2,3
+// 0x100 is cell 0 ('even')
+// 0x800 is cell 3 ('odd')
+// 0xf000 is cell 4,5,6,7
+    
 uint8_t bitmap_off[16] = {0};
 
 void tick() {
@@ -122,7 +132,7 @@ void tick() {
         // printf("BMB3Y snapshot took %d us\n", end - start);
     }
 
-    if((timestep() & 0x1ff) == 31) {
+    if((timestep() & 0x3f) == 31) {
         uint32_t start = time_us_32();
 
         bmb3y_wakeup_blocking();
@@ -139,11 +149,12 @@ void tick() {
         printf("BMB3Y test took %ld us\n", end - start);
 
         //bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
+        bmb3y_set_balancing(bitmap_set, false);
     }
-    //bmb3y_set_balancing(bitmap_off, false);
 
 
-    if((timestep() & 0x1ff) == 32) {
+    if((timestep() & 0x3f) == 32) {
+        //isosnoop_print_buffer();
         for(int i=0; i<120; i++) {
             printf("[c%3d]: %4d mV | ", i, model.cell_voltages_mV[i]);
         }

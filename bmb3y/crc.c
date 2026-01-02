@@ -36,3 +36,28 @@ uint16_t crc14(uint8_t *data, int len, uint16_t initial_crc) {
 
     return crc & 0x3fff;
 }
+
+/*
+def crc14(data, initial):
+    crc = initial
+    poly = 0x025B
+
+    for byte in data:
+        crc ^= (byte << 6)
+        for _ in range(8):
+            if crc & 0x2000:
+                crc = (crc << 1) ^ poly
+            else:
+                crc = crc << 1
+            crc &= 0x3FFF
+
+    # Two extra zero bits
+    for _ in range(2):
+        if crc & 0x2000:
+            crc = (crc << 1) ^ poly
+        else:
+            crc = crc << 1
+        crc &= 0x3FFF
+
+    return crc & 0x3FFF
+*/

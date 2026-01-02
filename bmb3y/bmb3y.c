@@ -130,8 +130,10 @@ bool bmb3y_set_balancing(uint8_t bitmap[15], bool even) {
     uint8_t balance_mask = even ? 0x55 : 0xAA;
 
     for(int module=0; module<8; module++) {
-        tx_buf[2 + module*6] = 0xF3; // not sure which way
-        tx_buf[3 + module*6] = 0x00; // round these two go
+        // was f3
+        tx_buf[2 + module*6] = 0xf3;
+        // was 00
+        tx_buf[3 + module*6] = 0;
 
         tx_buf[4 + module*6] = bitmap[module*2] & balance_mask;
         tx_buf[5 + module*6] = bitmap[module*2 + 1] & balance_mask;
@@ -172,6 +174,7 @@ bool bmb3y_read_cell_voltages_blocking(bms_model_t *model) {
     };
 
     bool success = true;
+    bool crc_ok = true;
 
     for(uint8_t i=0; i<5; i++) {
         uint32_t cmd = READ_COMMANDS[i];
@@ -181,18 +184,31 @@ bool bmb3y_read_cell_voltages_blocking(bms_model_t *model) {
             continue;
         }
 
+        // for(int j=0; j<10; j++) {
+        //     printf("%02X ", rx_buf[j]);
+        // }
+        // printf("\n");
+
         // Each bank has data for all 8 modules, with 3 cells, a 2-byte CRC and a padding byte per module
 
+        // static uint16_t initial = -1;
+        // initial++;
+        // printf("Trying initial %04X\n", initial);
+
+
         // Go through each module (0-7, 8 total)
-        for(int module=0; module<8; module++) {
+        for(int module=0; module<1; module++) {
+
+            // Weird, playing with balancing stopped the CRC working. It also resulted in 16-bit CRC values?
 
             uint16_t module_crc = (uint16_t)(rx_buf[module * 9 + 6] << 8) | (uint16_t)(rx_buf[module * 9 + 7]);
             uint16_t calc_crc = crc14(&rx_buf[module * 9], 6, 0x1000);
 
             if(module_crc != calc_crc) {
-                //printf("Bad CRC on module %d!\n", module);
+                //printf("Bad CRC on module %d: msg 0x%04X calc 0x%04X\n", module, module_crc, calc_crc);
                 success = false;
-                continue;
+                crc_ok = false;
+                //continue;
                 //return false;
             }
 
@@ -222,6 +238,7 @@ bool bmb3y_read_cell_voltages_blocking(bms_model_t *model) {
 
         cell_offset += 3;
     }
+    printf("CRC: %s\n", crc_ok ? "OK" : "FAIL");
 
     if(success) {
         model->cell_voltages_millis = millis();
