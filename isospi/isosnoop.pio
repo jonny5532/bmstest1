@@ -46,7 +46,7 @@ received_something:
 
     ; Extra delay for RX to settle (but not so long that we miss the next half of a CS)
     nop [POST_RX_DELAY] side 0
-    ; might need more delay?
+    ;nop [5] side 0 ; a bit more delay
 
     ; Start the timer by clearing IRQ1
     irq clear 1 side 0

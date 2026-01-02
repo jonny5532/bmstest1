@@ -62,4 +62,10 @@ void init() {
     // This will advance the time to a non-zero value
     update_millis();
 
+    int boot_count = update_boot_count();
+    if (boot_count >= 0) {
+        printf("Boot count from LittleFS: %d\n", boot_count);
+    } else {
+        printf("Failed to update boot count in LittleFS\n");
+    }
 }

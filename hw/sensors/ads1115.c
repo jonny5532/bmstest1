@@ -56,8 +56,8 @@ bool ads1115_init(ads1115_t *dev, uint8_t addr, uint16_t pga_config) {
     // Set target address for subsequent manual HW access if needed
     i2c_get_hw(dev->i2c)->tar = dev->addr;
 
-    // Blank out IRQ mask
-    i2c_get_hw(dev->i2c)->intr_mask = 0;
+    // Set IRQ mask to only things we care about
+    i2c_get_hw(dev->i2c)->intr_mask = I2C_IC_INTR_MASK_M_TX_ABRT_BITS;
 
     ads_irq_ctx = dev;
     uint irq_num = (dev->i2c == i2c0) ? I2C0_IRQ : I2C1_IRQ;
@@ -207,11 +207,6 @@ void ads1115_irq_handler(ads1115_t *dev) {
             if (dev->state == ADS1115_STATE_READ_CONVERSION_DATA) {
                 ads1115_samples[dev->current_channel] = (dev->async_buf[0] << 8) | dev->async_buf[1];
                 ads1115_sample_millis[dev->current_channel] = millis();
-                // if(dev->current_channel == 0) {
-                //     store_battery_voltage((dev->async_buf[0] << 8) | dev->async_buf[1]);
-                // } else if(dev->current_channel == 1) {
-                //     store_output_voltage((dev->async_buf[0] << 8) | dev->async_buf[1]);
-                // }
                 
                 dev->current_channel++;
                 if (dev->current_channel < 5) {

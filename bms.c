@@ -10,7 +10,10 @@
 #include "battery/balancing.h"
 #include "model.h"
 
+#include "bmb3y/bmb3y.h"
+
 #include "hardware/watchdog.h"
+#include "pico/multicore.h"
 #include "pico/stdlib.h"
 #include "vendor/littlefs/lfs.h"
 
@@ -39,6 +42,10 @@ void core1_entry() {
 
 // should this go?
 void read_inputs(bms_model_t *model) {
+    // Read various inputs into the model. These are all gathered asynchronously 
+    // so this is a quick process.
+
+
     // ADS1115 voltage readings
 
     // For differential readings, full scale should be 436V
@@ -103,18 +110,41 @@ void tick() {
     inverter_tick(&model);
     internal_serial_tick();
 
-    if((timestep() & 63) == 32) {
-        //uint32_t start = time_us_32();
-        bmb3y_wakeup_blocking();
+    if(timestep() == 31) {
+        //bmb3y_wakeup_blocking();
+        // uint32_t start = time_us_32();
+        // isospi_send_command_blocking(BMB3Y_CMD_SNAPSHOT, true);
         // uint32_t end = time_us_32();
-        // printf("BMB3Y wakeup took %d us\n", end - start);
+        // printf("BMB3Y snapshot took %d us\n", end - start);
+    }
+
+    if((timestep() & 0x7ff) == 31) {
+        uint32_t start = time_us_32();
+
+        bmb3y_wakeup_blocking();
+        isospi_send_command_blocking(BMB3Y_CMD_IDLE_WAKE, false);
+        isospi_send_command_blocking(BMB3Y_CMD_SNAPSHOT, false);
+
+        // 70 sometimes isn't enough time, 100 seems ok
+        sleep_us(100);
+
+        bmb3y_read_cell_voltages_blocking();
+
+        uint32_t end = time_us_32();
+        printf("BMB3Y test took %ld us\n", end - start);
+    }
+    if((timestep() & 0x7ff) == 32) {
+        for(int i=0; i<120; i++) {
+            printf("[c%3d]: %4d mV | ", i, model.cell_voltages_mV[i]);
+        }
+        printf("\n");
     }
 
     if((timestep() & 63) == 0) {
         // every 64 ticks, output stuff
-        isosnoop_print_buffer();
+        //isosnoop_print_buffer();
 
-        printf("Temp: %3d dC | 3V3: %4d mV | 5V: %4d mV | 12V: %5d mV | CtrV: %5d mV\n",
+        printf("Temp: %3ld dC | 3V3: %4d mV | 5V: %4d mV | 12V: %5d mV | CtrV: %5d mV\n",
             get_temperature_c_times10(),
             internal_adc_read_3v3_mv(),
             internal_adc_read_5v_mv(),
@@ -122,16 +152,17 @@ void tick() {
             internal_adc_read_contactor_mv()
         );
 
-        printf("Batt: %6dmV | Out: %6dmV | NegCtr: %6dmV | PosCtr: %6dmV\n",
+        printf("Batt: %6ldmV | Out: %6ldmV | NegCtr: %6dmV | PosCtr: %6dmV\n",
             model.battery_voltage_mV,
             model.output_voltage_mV,
             model.neg_contactor_voltage_mV,
             model.pos_contactor_voltage_mV
         );
-        printf("Current: %6d mA | Charge: %lld raw\n\n",
+        printf("Current: %6ld mA | Charge: %lld raw\n\n",
             model.current_mA,
             model.charge_raw
         );
+
         
         // printf("ADS1115 Battery voltage: %d (%d)\n", ads1115_get_sample(0), ads1115_get_sample_millis(0));
         // printf("ADS1115 Output voltage: %d (%d)\n", ads1115_get_sample(1), ads1115_get_sample_millis(1));
@@ -156,7 +187,7 @@ void synchronize_time() {
         sleep_ms(20 - delta);
     } else {
         // took too long!
-        printf("Warning: loop overran (%d ms)\n", delta);
+        printf("Warning: loop overran (%ld ms)\n", delta);
     }
     update_millis();
     update_timestep();
@@ -191,13 +222,6 @@ int main() {
     multicore_launch_core1(core1_entry);
 
     init();
-    
-    int boot_count = update_boot_count();
-    if (boot_count >= 0) {
-        printf("Boot count from LittleFS: %d\n", boot_count);
-    } else {
-        printf("Failed to update boot count in LittleFS\n");
-    }
 
     while(true) {
         tick();

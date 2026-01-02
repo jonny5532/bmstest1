@@ -6,8 +6,8 @@
 ;.define TX_IDLE 0b00
 
 ; Actual patterns when using a driver
-.define PUBLIC TX_HIGH 0b11
-.define PUBLIC TX_LOW  0b01
+.define PUBLIC TX_HIGH 0b01
+.define PUBLIC TX_LOW  0b11
 .define PUBLIC TX_IDLE 0b00
 
 ; length of half-bit pulses (multipled by 6.7ns)
@@ -262,20 +262,11 @@ void isospi_master_program_init(PIO pio, uint tx_pin_base, uint rx_pin_base) {
 }
 
 void isospi_master_cs(bool start) {
-/*
-  // Load the CS program into sm0 and start it
-  pio_sm_init(master_pio, 0, cs_program_offset, &cs_program_config);
-  pio_sm_set_enabled(master_pio, 0, true);
-
-  // Send a CS
-  pio_sm_put_blocking(master_pio, 0, (start ? 0b1011 : 0b1110) << 28);
-
-  sleep_us(2);
-*/
-
+  // Load the chip select program into sm0
   pio_sm_init(master_pio, 0, cs_program_offset, &cs_program_config);
 
-  // Queue up six instructions (there should be enough space in the FIFO)
+  // Queue up six instructions (there should be enough space in the FIFO 
+  // for this not to block)
 
   pio_sm_put_blocking(
     master_pio, 0, 
@@ -301,13 +292,9 @@ void isospi_master_cs(bool start) {
   
   pio_sm_get_blocking(master_pio, 0);
 
-  // Flush out the program to ensure it has finished
-  // for(int i=0;i<4;i++) {
-  //   pio_sm_put_blocking(master_pio, 0, (pio_encode_nop()<<16) | pio_encode_nop());
-  // }
-
   // Load the master program back into sm0
   pio_sm_init(master_pio, 0, master_offset, &master_config);
+  
   // Start it
   pio_sm_set_enabled(master_pio, 0, true);
 }

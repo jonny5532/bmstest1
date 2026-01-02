@@ -11,3 +11,7 @@
 
 void init_adc();
 int32_t get_temperature_c_times10();
+int32_t internal_adc_read_3v3_mv();
+int32_t internal_adc_read_5v_mv();
+int32_t internal_adc_read_12v_mv();
+int32_t internal_adc_read_contactor_mv();

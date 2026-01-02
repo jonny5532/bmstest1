@@ -36,8 +36,8 @@ void isospi_master_flush() {
  *
  * The first received byte after the skipped ones will be stored at in_buf[0].
  *
- * @param tx_buf Buffer of bytes to send out
- * @param rx_buf  Buffer to receive bytes into
+ * @param tx_buf  Buffer of bytes to send out
+ * @param rx_buf  Buffer to receive bytes into (can be smaller than tx_buf if skip > 0)
  * @param len     Number of bytes to send/receive
  * @param skip    Number of initial bytes to skip receiving
  */
@@ -101,6 +101,11 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
     return valid;
 }
 
+void isospi_send_wakeup_cs_blocking() {
+    isospi_master_cs(false);
+    sleep_us(20);
+}
+
 void isospi_send_command_blocking(uint16_t cmd_word) {
     // Send a 16-bit command with normal CS pattern
     uint8_t tx[2];
@@ -115,14 +120,21 @@ void isospi_send_command_blocking(uint16_t cmd_word) {
 
 
 
-bool isospi_get_data_blocking(uint8_t reg_cmd, uint8_t *response, size_t response_len) {
+bool isospi_get_data_blocking(uint32_t cmd, uint8_t *response, size_t response_len) {
     // FIXME - choose a more sensible size
     uint8_t tx[100] = {0};
 
-    tx[0] = reg_cmd; // command byte
-    tx[1] = 0;       // dummy byte
-    tx[2] = 0x70;    // CRC?
-    tx[3] = 0;       // 
+    // CRC is CRC8 with polynomial 2f (AUTOSAR) but we just bake it into the commands
+
+    tx[0] = (cmd >> 24) & 0xFF;
+    tx[1] = (cmd >> 16) & 0xFF;
+    tx[2] = (cmd >> 8) & 0xFF;
+    tx[3] = cmd & 0xFF;
+
+    // tx[0] = reg_cmd; // command byte
+    // tx[1] = 0;       // dummy byte
+    // tx[2] = 0x70;    // CRC8 (poly=0x2F, init=0x10)
+    // tx[3] = 0;       // 
     
     return isospi_write_read_blocking(tx, response, 4 + response_len, 4);
 }

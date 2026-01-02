@@ -38,6 +38,7 @@ add_executable(bms
     hw/chip/time.c
     hw/chip/watchdog.c
     bmb3y/bmb3y.c
+    bmb3y/crc.c
     battery/balancing.c
     debug/counters.c
     debug/events.c

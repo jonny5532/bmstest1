@@ -87,52 +87,52 @@ void isosnoop_print_buffer() {
             //     break;
             // }    
             switch(chunk>>4) {
-            case 0:
+            case 0b0000:
                 printf("_ ");
                 break;
-            case 1:
+            case 0b0001:
                 printf("0001 ");
                 break;
-            case 2:
+            case 0b0010:
                 printf("0010 ");
                 break;
-            case 3:
+            case 0b0011:
                 printf("0011 ");
                 break;
-            case 4:
+            case 0b0100:
                 printf("0100 ");
                 break;
-            case 5:
+            case 0b0101:
                 printf("CS0 ");
                 break;
-            case 6:
+            case 0b0110:
                 printf("0 ");
                 break;
-            case 7:
+            case 0b0111:
                 printf("0111 ");
                 break;
-            case 8:
+            case 0b1000:
                 printf("1000 ");
                 break;
-            case 9:
+            case 0b1001:
                 printf("1 ");
                 break;
-            case 10:
+            case 0b1010:
                 printf("CS1 ");
                 break;
-            case 11:
+            case 0b1011:
                 printf("1011 ");
                 break;
-            case 12:
+            case 0b1100:
                 printf("1100 ");
                 break;
-            case 13:
+            case 0b1101:
                 printf("1101 ");
                 break;
-            case 14:
+            case 0b1110:
                 printf("1110 ");
                 break;
-            case 15:
+            case 0b1111:
                 printf("1111 ");
                 break;
             }    

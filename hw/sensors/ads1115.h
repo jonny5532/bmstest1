@@ -1,5 +1,6 @@
-#ifndef ADS1115_H
-#define ADS1115_H
+#pragma once
+
+#include "../chip/time.h"
 
 #include "hardware/i2c.h"
 #include <stdint.h>
@@ -53,5 +54,4 @@ bool ads1115_init(ads1115_t *dev, uint8_t addr, uint16_t pga_config);
 void ads1115_start_sampling(ads1115_t *dev);
 void ads1115_irq_handler(ads1115_t *dev);
 int16_t ads1115_get_sample(int channel);
-
-#endif
+millis_t ads1115_get_sample_millis(int channel);
