@@ -1,10 +1,14 @@
 #include "hw/comms/duart.h"
+#include "hw/comms/internal_serial.h"
 #include "hw/sensors/ads1115.h"
 #include "hw/sensors/ina228.h"
+#include "hw/sensors/internal_adc.h"
 #include "hw/pins.h"
 #include "hw/chip/pwm.h"
 #include "hw/chip/watchdog.h"
 #include "inverter/inverter.h"
+#include "isospi/isosnoop.h"
+#include "isospi/isospi_master.h"
 #include "state_machines/contactors.h"
 #include "model.h"
 
@@ -14,7 +18,7 @@ ads1115_t ads1115_dev;
 void init_hw() {
     init_watchdog();
 
-    init_adc();
+    init_internal_adc();
 
     gpio_init(PIN_LED);
     gpio_set_dir(PIN_LED, GPIO_OUT);
@@ -28,7 +32,7 @@ void init_hw() {
         printf("INA228 init failed!\n");
     }
 
-    if(!ads1115_init(&ads1115_dev, 0x48, 2048)) {
+    if(!ads1115_init(&ads1115_dev, 0x48)) {
         printf("ADS1115 init failed!\n");
     }
 

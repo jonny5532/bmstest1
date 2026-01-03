@@ -7,10 +7,11 @@
 #pragma once
 
 #include "../hw/chip/time.h"
-
 #include "../state_machines/base.h"
 
 #include <stdint.h>
+
+typedef struct bms_model bms_model_t;
 
 typedef struct {
     sm_t;
@@ -26,3 +27,5 @@ enum balancing_states {
     BALANCING_STATE_ACTIVE = 1,
     
 };
+
+void balancing_sm_tick(bms_model_t *model);

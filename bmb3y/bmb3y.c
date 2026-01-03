@@ -1,7 +1,10 @@
 #include "bmb3y.h"
+#include "crc.h"
 
 #include "../model.h"
 #include "../isospi/isospi_master.h"
+
+#include "pico/stdlib.h"
 
 #include <stdint.h>
 
@@ -156,8 +159,6 @@ bool bmb3y_set_balancing(uint8_t bitmap[16], bool even) {
     return true;
 }
 
-// TODO - this needs to be synced with the balancing state machine
-// so that the even/odd share is equal. However it also needs to fit in with the BMB message timing
 void bmb3y_send_balancing(bms_model_t *model) {
     balancing_sm_t *balancing_sm = &model->balancing_sm;
 
@@ -166,32 +167,56 @@ void bmb3y_send_balancing(bms_model_t *model) {
     tx_buf[0] = (BMB3Y_CMD_WRITE_CONFIG >> 8) & 0xFF;
     tx_buf[1] = BMB3Y_CMD_WRITE_CONFIG & 0xFF;
 
+    /* The balancing mask consists of four 32-bit ints , with a bit for each cell - the LSB of the last int is cell 0.
+
+    However the BMB modules consume the mask 15-bits at a time, so it is necessary to re-pack the bits accordingly.
+    */
+
+    uint64_t window = 0;
+    // We will throw away the top 8 bits of the first mask int.
+    int bits_in_window = -8;
+    int mask_idx = 4;
+
+    //printf("Sending mask ");
+
     for(int module=0; module<8; module++) {
-        // was f3
         tx_buf[2 + module*6] = 0xf3;
-        // was 00
         tx_buf[3 + module*6] = 0;
 
-        // Calculate mask index and shift directly
-        // TODO - this assumes 16 cells per module, but there are only 15.
-        // It is unclear whether there's a dummy bit that will need skipping over (there probably is?)
-
-        int mask_idx = 3 - (module / 2);
-        uint32_t mask = balancing_sm->balance_request_mask[mask_idx];
-
-        if (module % 2 == 0) {
-            tx_buf[4 + module*6] = (uint8_t)((mask >> 16) & 0xFF);
-            tx_buf[5 + module*6] = (uint8_t)((mask >> 24) & 0xFF);
-        } else {
-            tx_buf[4 + module*6] = (uint8_t)(mask & 0xFF);
-            tx_buf[5 + module*6] = (uint8_t)((mask >> 8) & 0xFF);
+        // Pull more bits into the window if needed
+        while (bits_in_window < 15 && mask_idx > 0) {
+            window |= ((uint64_t)balancing_sm->balance_request_mask[--mask_idx]) << (32 - bits_in_window);
+            bits_in_window += 32;
         }
+
+        // Extract 15 bits for this module
+        uint16_t balance_bits = (uint16_t)(window >> 49);
+        window <<= 15;
+        bits_in_window -= 15;
+
+        tx_buf[4 + module*6] = (uint8_t)(balance_bits & 0xFF);
+        tx_buf[5 + module*6] = (uint8_t)((balance_bits >> 8) & 0xFF);
+        
+        /* old code (assumes 16 bits per module rather than 15) */
+        // int mask_idx2 = 3 - (module / 2);
+        // uint32_t mask = balancing_sm->balance_request_mask[mask_idx2];
+        // if (module % 2 == 0) {
+        //     tx_buf[4 + module*6] = (uint8_t)((mask >> 16) & 0xFF);
+        //     tx_buf[5 + module*6] = (uint8_t)((mask >> 24) & 0xFF);
+        // } else {
+        //     tx_buf[4 + module*6] = (uint8_t)(mask & 0xFF);
+        //     tx_buf[5 + module*6] = (uint8_t)((mask >> 8) & 0xFF);
+        // }
+
+        //printf("0x%02X%02X ", tx_buf[5 + module*6], tx_buf[4 + module*6]);
 
         uint16_t calc_crc = crc14(&tx_buf[2 + module*6], 4, 0x0010);
 
         tx_buf[6 + module*6] = (calc_crc >> 8) & 0xFF;
         tx_buf[7 + module*6] = calc_crc & 0xFF;
     }
+
+    //printf("\n");
 
     // We skip all of the response bytes
     isospi_write_read_blocking(tx_buf, NULL, 50, 50);
@@ -220,7 +245,7 @@ bool bmb3y_read_cell_voltages_blocking(bms_model_t *model) {
     for(uint8_t i=0; i<5; i++) {
         uint32_t cmd = READ_COMMANDS[i];
         if (!bmb3y_get_data_blocking(cmd, rx_buf, 72)) {
-            printf("BMB3Y read failed for cmd 0x%02X\n", cmd);
+            printf("BMB3Y read failed for cmd 0x%02lX\n", cmd);
             success = false;
             continue;
         }

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../model.h"
-
 #include <stdbool.h>
 #include <stdint.h>
+
+typedef struct bms_model bms_model_t;
 
 // Read commands have a CRC8(poly 0x2F, initial 0x10) of the first two bytes in the third byte. 
 // This is precalculated in the read commands.
@@ -57,3 +57,4 @@ void bmb3y_wakeup_blocking(void);
 void bmb3y_request_snapshot_blocking();
 bool bmb3y_read_test_blocking(uint32_t cmd, int cells);
 bool bmb3y_read_cell_voltages_blocking(bms_model_t *model);
+void bmb3y_send_balancing(bms_model_t *model);

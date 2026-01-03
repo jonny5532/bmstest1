@@ -2,13 +2,18 @@
 
 #include "../model.h"
 
-#define AUTO_BALANCING_EVERY_MS 600000 // 10 minutes
+#define AUTO_BALANCING_PERIOD_MS 60000 // how long to wait between auto-balancing sessions
+#define PERIODS_PER_MV 1 // how many balancing periods per mV above minimum
+#define BALANCE_MIN_OFFSET_MV 3 // minimum voltage difference to balance
 
 static bool good_conditions_for_balancing(bms_model_t *model) {
     // Check if conditions are suitable for balancing
     return true;
 }
 
+// Update the balance request mask based on the remaining balance times and
+// whether even or odd cells are being balanced this cycle. Decrement the
+// remaining balance times by the given amount.
 static void update_balance_requests(balancing_sm_t *balancing_sm, int16_t decrement) {
     for(int cell=0; cell<120; cell++) {
         int mask_index = cell / 32;
@@ -29,18 +34,22 @@ static void update_balance_requests(balancing_sm_t *balancing_sm, int16_t decrem
     );
 }
 
+// Calculate how long to balance a cell for, based on its voltage above the
+// minimum cell voltage, in BMB update periods.
 int16_t calculate_balance_time(int16_t voltage_mV, int16_t min_voltage_mV) {
     // Calculate balance time in BMB-update-periods based on voltage difference
 
     // TODO - figure out multiplier, and base on SoC/OCV curve
 
-    int16_t diff = voltage_mV - min_voltage_mV - 3; // 3mV hysteresis
+    int16_t diff = voltage_mV - min_voltage_mV - BALANCE_MIN_OFFSET_MV;
     if(diff < 0) {
         return 0;
     }
-    return diff*5;
+    return diff*PERIODS_PER_MV;
 }
 
+// Start the balancing process by determining which cells need balancing and for
+// how long, and updating the times and balance request mask accordingly.
 static bool start_balancing(bms_model_t *model) {
     balancing_sm_t *balancing_sm = &model->balancing_sm;
 
@@ -68,7 +77,8 @@ static bool start_balancing(bms_model_t *model) {
 }
 
 
-// Decrement balance times by one period, check if individual cells are done balancing, and update the request mask accordingly.
+// Decrement balance times by one period, check if individual cells are done
+// balancing, and update the request mask accordingly.
 static void decrement_balance_times_and_update(balancing_sm_t *balancing_sm) {
     update_balance_requests(balancing_sm, 1);
 }
@@ -83,13 +93,14 @@ static bool finished_balancing(balancing_sm_t *balancing_sm) {
     return true;
 }
 
-// Note - this is called every BMB send, not every timestep
+// Note - this is called every BMB send, not every timestep, since it needs to
+// be synchronized with the BMB sends.
 void balancing_sm_tick(bms_model_t *model) {
     balancing_sm_t *balancing_sm = &model->balancing_sm;
 
     switch(balancing_sm->state) {
         case BALANCING_STATE_IDLE:
-            if(state_timeout((sm_t*)balancing_sm, AUTO_BALANCING_EVERY_MS) && good_conditions_for_balancing(model)) {
+            if(state_timeout((sm_t*)balancing_sm, AUTO_BALANCING_PERIOD_MS) && good_conditions_for_balancing(model)) {
                 // Start balancing
                 if(start_balancing(model)) {
                     state_transition((sm_t*)balancing_sm, BALANCING_STATE_ACTIVE);
@@ -98,7 +109,9 @@ void balancing_sm_tick(bms_model_t *model) {
             break;
 
         case BALANCING_STATE_ACTIVE:
-            decrement_balance_times_and_update(balancing_sm);
+            // Update the mask and decrement the times.
+            update_balance_requests(balancing_sm, 1);
+            // Switch even/odd cells for next time
             balancing_sm->even_cells = !balancing_sm->even_cells;
 
             if(finished_balancing(balancing_sm)) {

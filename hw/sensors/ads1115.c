@@ -26,7 +26,7 @@ static void ads1115_internal_irq_handler(void) {
 int16_t ads1115_samples[5];
 millis_t ads1115_sample_millis[5];
 
-bool ads1115_init(ads1115_t *dev, uint8_t addr, uint16_t pga_config) {
+bool ads1115_init(ads1115_t *dev, uint8_t addr) {
     dev->i2c = ADS1115_I2C; // Based on pins 18, 19
     dev->addr = addr;
     dev->busy = false;
@@ -227,6 +227,7 @@ void ads1115_irq_handler(ads1115_t *dev) {
 }
 
 static int64_t ads1115_conversion_timer_callback(alarm_id_t id, void *user_data) {
+    (void)id;
     ads1115_t *dev = (ads1115_t *)user_data;
     ads1115_i2c_read_async(dev, ADS1115_REG_CONVERSION);
     return 0;

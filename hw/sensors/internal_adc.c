@@ -64,7 +64,7 @@ int32_t get_temperature_c_times10() {
     return (int16_t)(tempC*10);
 }
 
-void init_adc() {
+void init_internal_adc() {
     adc_init();
 
     adc_gpio_init(PIN_3V3_SENSE);

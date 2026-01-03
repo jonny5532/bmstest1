@@ -1,3 +1,4 @@
+#include "debug/events.h"
 #include "hw/chip/pwm.h"
 #include "hw/chip/time.h"
 #include "hw/chip/watchdog.h"
@@ -8,11 +9,13 @@
 #include "hw/pins.h"
 #include "state_machines/contactors.h"
 #include "battery/balancing.h"
+#include "inverter/inverter.h"
 #include "model.h"
 
 #include "bmb3y/bmb3y.h"
 
 #include "hardware/watchdog.h"
+#include "pico/flash.h"
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
 #include "vendor/littlefs/lfs.h"
@@ -133,6 +136,7 @@ void tick() {
         // printf("BMB3Y snapshot took %d us\n", end - start);
     }
 
+    // We talk to the BMB3Y every 64 ticks (about once per second)
     if((timestep() & 0x3f) == 99931) {
         uint32_t start = time_us_32();
 
@@ -157,9 +161,9 @@ void tick() {
         // bmb3y_set_balancing(bitmap_set, even_counter & 8);
         
         // We need the balancing state machine to update here so that
-        // it updates in sync with the BMB sends+
-
+        // it updates in sync with the BMB sends. Otherwise the actual balancing won't be applied for as long as the state machine expects.
         balancing_sm_tick(&model);
+
         bmb3y_send_balancing(&model);
     }
 

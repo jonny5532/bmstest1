@@ -37,7 +37,7 @@ typedef struct {
         uint32_t data32[2];
         uint64_t data64;
     };
-    uint32_t count;
+    uint16_t count;
     uint16_t level;
 } bms_event_slot_t;
 
@@ -63,3 +63,6 @@ typedef enum {
     ERR_CURRENT_STALE,
     ERR_HIGHEST,
 } bms_event_type_t;
+
+void log_bms_event(bms_event_type_t event_type, bms_event_level_t level, uint64_t data);
+void print_bms_events();

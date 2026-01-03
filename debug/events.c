@@ -1,4 +1,7 @@
 #include "events.h"
+#include "../lib/math.h"
+
+#include <stdio.h>
 
 bms_event_slot_t bms_event_slots[ERR_HIGHEST] = {0};
 uint16_t bms_event_log_next_index = 0;
@@ -18,7 +21,7 @@ static void recalculate_highest_level() {
     }
 }
 
-void log_bms_event(uint16_t type, uint16_t level, uint64_t data) {
+void log_bms_event(bms_event_type_t type, bms_event_level_t level, uint64_t data) {
     if (type >= ERR_HIGHEST) return;
 
     bms_event_slot_t *slot = &bms_event_slots[type];
@@ -26,7 +29,7 @@ void log_bms_event(uint16_t type, uint16_t level, uint64_t data) {
 
     slot->timestamp = now;
     slot->data64 = data;
-    slot->count += 1;
+    slot->count = sadd_u16(slot->count, 1);
 
     if(level != slot->level) {
         slot->level = level;
@@ -48,7 +51,7 @@ void print_bms_events() {
     for(int i = 0; i < ERR_HIGHEST; i++) {
         bms_event_slot_t *slot = &bms_event_slots[i];
         if (slot->count > 0) {
-            printf("Event %d: Level %d, Count %u, Last Timestamp %u, Data 0x%016llX\n",
+            printf("Event %d: Level %d, Count %u, Last Timestamp %lu, Data 0x%016llX\n",
                    i, slot->level, slot->count, slot->timestamp, slot->data64);
         }
     }

@@ -2,6 +2,8 @@
 
 #include "base.h"
 
+typedef struct bms_model bms_model_t;
+
 typedef struct {
     // Anonymous base struct
     sm_t; 
@@ -27,4 +29,4 @@ typedef enum contactors_requests {
     CONTACTORS_REQUEST_FORCE_OPEN = 3,
 } contactors_requests_t;
 
-void contactor_sm_tick();
+void contactor_sm_tick(bms_model_t *model);

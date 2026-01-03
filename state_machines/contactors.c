@@ -262,7 +262,7 @@ check_result_t contactor_pos_seems_open(bms_model_t *model) {
 }
 
 void contactor_sm_tick(bms_model_t *model) {
-    contactors_sm_t *contactor_sm = &model->contactor_sm;
+    contactors_sm_t *contactor_sm = &(model->contactor_sm);
     check_result_t result = {0};
     switch(contactor_sm->state) {
         case CONTACTORS_STATE_OPEN:

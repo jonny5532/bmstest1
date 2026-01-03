@@ -1,4 +1,6 @@
-#include "../model.h"
+#pragma once
+
+typedef struct bms_model bms_model_t;
 
 // API for inverters
 

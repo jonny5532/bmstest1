@@ -8,9 +8,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-
 // This entire structure will be zero-initialized at startup
-typedef struct {
+typedef struct bms_model {
     // Positive current means battery is charging
     int32_t current_mA;
     millis_t current_millis;

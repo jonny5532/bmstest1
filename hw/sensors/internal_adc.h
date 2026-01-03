@@ -9,7 +9,7 @@
 // extern uint16_t adc_samples_raw[8];
 // extern uint16_t adc_samples_smoothed[8];
 
-void init_adc();
+void init_internal_adc();
 int32_t get_temperature_c_times10();
 int32_t internal_adc_read_3v3_mv();
 int32_t internal_adc_read_5v_mv();
