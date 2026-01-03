@@ -137,7 +137,7 @@ void tick() {
     }
 
     // We talk to the BMB3Y every 64 ticks (about once per second)
-    if((timestep() & 0x3f) == 99931) {
+    if((timestep() & 0x3f) == 999931) {
         uint32_t start = time_us_32();
 
         bmb3y_wakeup_blocking();
@@ -185,7 +185,7 @@ void tick() {
     // }
 
 
-    if((timestep() & 0x7f) == 32) {
+    if((timestep() & 0x3f) == 99932) {
         //isosnoop_print_buffer();
         for(int i=0; i<15; i++) {
             printf("[c%3d]: %4d mV | ", i, model.cell_voltages_mV[i]);
@@ -234,7 +234,7 @@ void tick() {
     // }
 
 
-    if((timestep() & 63) == 99990) {
+    if((timestep() & 63) == 0) {
         // every 64 ticks, output stuff
         //isosnoop_print_buffer();
         print_bms_events();

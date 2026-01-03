@@ -16,16 +16,20 @@ typedef struct bms_model bms_model_t;
 typedef struct {
     sm_t;
 
+    // Bitmap of which cells to balance this cycle. Each bit corresponds to a
+    // cell (1=balance, 0=no balance).
+    // Bit 0 of the last uint32_t corresponds to cell 0.
     uint32_t balance_request_mask[4];
+    // Remaining balance time for each cell, in balancing periods, for the
+    // current balancing session.
     int16_t balance_time_remaining[120];
+    // Whether we're balancing even or odd cells this cycle.
     bool even_cells;
-//    millis_t last_update_millis;
 } balancing_sm_t;
 
 enum balancing_states {
     BALANCING_STATE_IDLE = 0,
     BALANCING_STATE_ACTIVE = 1,
-    
 };
 
 void balancing_sm_tick(bms_model_t *model);

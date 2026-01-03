@@ -73,7 +73,7 @@ static bool start_balancing(bms_model_t *model) {
 
     update_balance_requests(balancing_sm, 0);
 
-    return true;    
+    return true;
 }
 
 

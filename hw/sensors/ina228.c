@@ -175,14 +175,22 @@ bool ina228_init(ina228_t *dev, uint8_t addr, float shunt_resistor_ohms, float m
     // SHUNT_CAL = 13107.2 * 10^6 * Current_LSB * R_SHUNT
     // The constant 13107.2e6 is for the INA228 specifically.
     //float shunt_cal_val = 13107.2e6f * dev->current_lsb * dev->shunt_resistor_ohms;
-    float shunt_cal_val = 1;//0x1000;
+    //float shunt_cal_val = 1;//0x1000;
+    uint16_t shunt_cal_val = 200;
 
-    
-    // Write SHUNT_CAL
-    if(!write_reg16(dev, INA228_REG_SHUNT_CAL, 1000)) { //(uint16_t)shunt_cal_val)) {
+    // try to reset device
+    if(!write_reg16(dev, INA228_REG_CONFIG, 0x8000)) {
         // Didn't acknowledge, probably not connected
         return false;
     }
+    sleep_ms(10);
+
+
+    // // Write SHUNT_CAL
+    // if(!write_reg16(dev, INA228_REG_SHUNT_CAL, shunt_cal_val)) { //(uint16_t)shunt_cal_val)) {
+    //     // Didn't acknowledge, probably not connected
+    //     return false;
+    // }
     
     // Configure ADC
     ina228_configure(dev);
@@ -207,8 +215,8 @@ bool ina228_init(ina228_t *dev, uint8_t addr, float shunt_resistor_ohms, float m
 
 void ina228_configure(ina228_t *dev) {
     // Reset
-    write_reg16(dev, INA228_REG_CONFIG, 0x8000);
-    sleep_ms(10);
+    // write_reg16(dev, INA228_REG_CONFIG, 0x8000);
+    // sleep_ms(10);
 
     // CONFIG register (0x00)
     // Default is fine for now, or set ADCRANGE if needed.
@@ -224,10 +232,20 @@ void ina228_configure(ina228_t *dev) {
     
     // A = continuous, shunt only
     // 
-    
-    write_reg16(dev, INA228_REG_ADC_CONFIG, 0xAFF4 | 5); 
 
-    write_reg16(dev, INA228_REG_SHUNT_CAL, 206);
+    const uint32_t MODE = 0xF; // Continuous Shunt Voltage
+    const uint32_t VBUSCT = 0;
+    const uint32_t VSHCT = 0;   // 50us (fastest)
+    //4.1ms (slowest) shunt conv time
+    const uint32_t VTCT = 0;   // 1.1ms temp conv time
+    const uint32_t AVG = 0;  // no averaging
+      // 128 samples averaging
+
+    
+    //write_reg16(dev, INA228_REG_ADC_CONFIG, 0xAFF4 | 5); 
+    write_reg16(dev, INA228_REG_ADC_CONFIG, (MODE << 12) | (VBUSCT << 9) | (VSHCT << 6) | (VTCT << 3) | (AVG << 0));
+
+    write_reg16(dev, INA228_REG_SHUNT_CAL, 10000);//206);
 
 }
 
