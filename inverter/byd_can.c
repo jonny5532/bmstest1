@@ -297,6 +297,8 @@ static uint8_t transmit_cycle = 0;
 void inverter_tick(bms_model_t *model) {
     // This should get called every 100ms
 
+    inverter_present = true; // FIXME: testing
+
     if(!inverter_present) {
         // We haven't received any CAN messages from the inverter yet
         return;

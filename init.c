@@ -18,6 +18,14 @@ ads1115_t ads1115_dev;
 void init_hw() {
     init_watchdog();
 
+    gpio_init(PIN_MCU_CHECK);
+    gpio_set_dir(PIN_MCU_CHECK, GPIO_IN);
+    bool mcu_check = gpio_get(PIN_MCU_CHECK);
+    if(mcu_check) {
+        printf("Error: BMS firmware is running on the supervisor MCU!\n");
+        while(1);
+    }
+
     init_internal_adc();
 
     gpio_init(PIN_LED);

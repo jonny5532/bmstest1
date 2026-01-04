@@ -40,18 +40,6 @@
 // How long we wait for the current to fall before potentially failing to open contactors
 #define CONTACTORS_OPEN_TIMEOUT_MS 2000
 
-// A type representing the result of a check. Includes event type and data which will be populated if unsuccessful.
-typedef struct {
-    bool success;
-    bms_event_type_t event_type;
-    union {
-        uint8_t data8[8];
-        uint16_t data16[4];
-        uint32_t data32[2];
-        uint64_t data64;
-    };
-} check_result_t;
-
 static inline int32_t abs_int32(int32_t v) {
     return (v < 0) ? -v : v;
 }
@@ -65,97 +53,128 @@ static inline int32_t clamp(int32_t v, int32_t min, int32_t max) {
     return v;
 }
 
-static inline bool check(check_result_t res) {
-    if(res.success) {
-        // hmm, how do we clear multiple event types?
-        //clear_bms_event(res.event_type);
-    }
-
-    return res.success;
-}
-
-static inline bool check_or_report(check_result_t res, bms_event_level_t level) {
-    if(!res.success) {
+static inline bool confirm(bool success, bms_event_type_t event_type, bms_event_level_t level, uint64_t data) {
+    if(!success) {
         log_bms_event(
-            res.event_type,
+            event_type,
             level,
-            res.data64
+            data
         );
+    } else {
+        clear_bms_event(event_type);
     }
 
-    return res.success;
+    return success;
 }
 
-check_result_t current_is_below(bms_model_t *model, int32_t threshold_ma) {
-    check_result_t ret = {0};
+static inline bool check_or_confirm(bool success, bool do_confirm, bms_event_type_t event_type, bms_event_level_t level, uint64_t data) {
+    if(!success && do_confirm) {
+        log_bms_event(
+            event_type,
+            level,
+            data
+        );
+    } else if(success && do_confirm) {
+        clear_bms_event(event_type);
+    }
+
+    return success;
+}
+
+bool check_current_is_below(bms_model_t *model, int32_t threshold_ma) {
     if(!millis_recent_enough(model->current_millis, STALENESS_THRESHOLD_MS)) {
         // stale reading
-        ret.event_type = ERR_CURRENT_STALE;
-        ret.data64 = model->current_millis;
-        return ret;
+        //ret.event_type = ERR_CURRENT_STALE;
+        //ret.data64 = model->current_millis;
+        return false;
     }
     
-    if(abs_int32(model->current_mA)<=threshold_ma) {
-        ret.success = true;
-        return ret;
-    }
+    return abs_int32(model->current_mA) <= threshold_ma;
 
-    ret.event_type = ERR_CONTACTOR_PRECHARGE_CURRENT_TOO_HIGH;
-    ret.data64 = model->current_mA;
-    return ret;
+    // if(abs_int32(model->current_mA)<=threshold_ma) {
+    //     ret.success = true;
+    //     return ret;
+    // }
+
+    // ret.event_type = ERR_CONTACTOR_PRECHARGE_CURRENT_TOO_HIGH;
+    // ret.data64 = model->current_mA;
+    // return ret;
 }
 
-check_result_t precharge_successful(bms_model_t *model) {
-    check_result_t ret = {0};
-    if(!millis_recent_enough(model->battery_voltage_millis, STALENESS_THRESHOLD_MS)) {
-        ret.event_type = ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH;
-        ret.data64 = 0x1000000000000000;
-        return ret;
-    }
-    if(!millis_recent_enough(model->output_voltage_millis, STALENESS_THRESHOLD_MS)) {
-        ret.event_type = ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH;
-        ret.data64 = 0x2000000000000000;
-        return ret;
-    }
-    if(!millis_recent_enough(model->neg_contactor_voltage_millis, STALENESS_THRESHOLD_MS)) {
-        ret.event_type = ERR_CONTACTOR_PRECHARGE_NEG_OPEN;
-        ret.data64 = 0x3000000000000000;
-        return ret;
-    }
-    if(!millis_recent_enough(model->current_millis, STALENESS_THRESHOLD_MS)) {
-        ret.event_type = ERR_CONTACTOR_PRECHARGE_CURRENT_TOO_HIGH;
-        ret.data64 = 0x4000000000000000;
-        return ret;
+bool check_precharge_successful(bms_model_t *model, bool log_errors) {
+    if(!check_or_confirm(
+        millis_recent_enough(model->battery_voltage_millis, STALENESS_THRESHOLD_MS),
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
+        LEVEL_CRITICAL,
+        0x1000000000000000
+    )) {
+        return false;
     }
 
-    // Check negative contactor is still closed
-    if(abs_int32(model->neg_contactor_voltage_mV) > CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV) {
-        ret.event_type = ERR_CONTACTOR_PRECHARGE_NEG_OPEN;
-        ret.data64 = model->neg_contactor_voltage_mV;
-        return ret;
+    if(!check_or_confirm(
+        millis_recent_enough(model->output_voltage_millis, STALENESS_THRESHOLD_MS),
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
+        LEVEL_CRITICAL,
+        0x2000000000000000
+    )) {
+        return false;
+    }
+
+    if(!check_or_confirm(
+        millis_recent_enough(model->neg_contactor_voltage_millis, STALENESS_THRESHOLD_MS),
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_NEG_OPEN,
+        LEVEL_CRITICAL,
+        0x3000000000000000
+    )) {
+        return false;
+    }
+
+    if(!check_or_confirm(
+        millis_recent_enough(model->current_millis, STALENESS_THRESHOLD_MS),
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_CURRENT_TOO_HIGH,
+        LEVEL_CRITICAL,
+        0x4000000000000000
+    )) {
+        return false;
+    }
+
+    if(!check_or_confirm(
+        abs_int32(model->neg_contactor_voltage_mV) <= CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV,
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_NEG_OPEN,
+        LEVEL_CRITICAL,
+        model->neg_contactor_voltage_mV
+    )) {
+        return false;
     }
 
     // Is current still too high?
-    if(abs_int32(model->current_mA) > PRECHARGE_SUCCESS_MAX_MA) {
-        ret.event_type = ERR_CONTACTOR_PRECHARGE_CURRENT_TOO_HIGH;
-        ret.data64 = model->current_mA;
-        return ret;
+    if(!check_or_confirm(
+        abs_int32(model->current_mA) <= PRECHARGE_SUCCESS_MAX_MA,
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_CURRENT_TOO_HIGH,
+        LEVEL_CRITICAL,
+        model->current_mA
+    )) {
+        return false;
     }
 
     // Is voltage difference low enough?
-    if(abs_int32(model->battery_voltage_mV - model->output_voltage_mV) > PRECHARGE_SUCCESS_MIN_MV) {
-        ret.event_type = ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH;
-        ret.data32[0] = model->battery_voltage_mV;
-        ret.data32[1] = model->output_voltage_mV;
-        return ret;
-    }
-
-    ret.success = true;
-    return ret;
+    return check_or_confirm(
+        abs_int32(model->battery_voltage_mV - model->output_voltage_mV) <= PRECHARGE_SUCCESS_MIN_MV,
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
+        LEVEL_CRITICAL,
+        ((uint64_t)model->battery_voltage_mV << 32) | (uint32_t)model->output_voltage_mV
+    );
 }
 
-check_result_t battery_is_healthy(bms_model_t *model) {
-    check_result_t ret = {0};
+bool confirm_battery_is_healthy(bms_model_t *model) {
+    //check_result_t ret = {0};
     // if(!millis_recent_enough(model->battery_voltage_millis, STALENESS_THRESHOLD_MS)) {
     //     ret.event_type = ERR_BATTERY_VOLTAGE_STALE;
     //     ret.data64 = model->battery_voltage_millis;
@@ -174,103 +193,96 @@ check_result_t battery_is_healthy(bms_model_t *model) {
     //     return ret;
     // }
 
-    ret.success = true;
-    return ret;
+    return true;
 }
 
-check_result_t contactor_neg_seems_closed(bms_model_t *model) {
-    check_result_t ret = {0};
-    if(!millis_recent_enough(model->neg_contactor_voltage_millis, STALENESS_THRESHOLD_MS)) {
-        // stale reading
-        ret.event_type = ERR_CONTACTOR_NEG_STUCK_OPEN;
-        ret.data64 = 0x1000000000000000;
-        return ret;
+bool confirm_contactor_neg_seems_closed(bms_model_t *model) {
+    if(!confirm(
+        millis_recent_enough(model->neg_contactor_voltage_millis, STALENESS_THRESHOLD_MS),
+        ERR_CONTACTOR_NEG_STUCK_OPEN,
+        LEVEL_CRITICAL,
+        0x1000000000000000
+    )) {
+        return false;
     }
 
-    if(abs_int32(model->neg_contactor_voltage_mV) > CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV) {
-        ret.event_type = ERR_CONTACTOR_NEG_STUCK_OPEN;
-        ret.data64 = model->neg_contactor_voltage_mV;
-        return ret;
-    }
-
-    ret.success = true;
-    return ret;
+    return confirm(
+        abs_int32(model->neg_contactor_voltage_mV) <= CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV,
+        ERR_CONTACTOR_NEG_STUCK_OPEN,
+        LEVEL_CRITICAL,
+        model->neg_contactor_voltage_mV
+    );
 }
 
-check_result_t contactor_neg_seems_open(bms_model_t *model) {
-    check_result_t ret = {0};
-    if(!millis_recent_enough(model->neg_contactor_voltage_millis, STALENESS_THRESHOLD_MS)) {
-        // stale reading
-        ret.event_type = ERR_CONTACTOR_NEG_STUCK_CLOSED;
-        ret.data64 = 0x1000000000000000;
-        return ret;
+bool confirm_contactor_neg_seems_open(bms_model_t *model) {
+    if(!confirm(
+        millis_recent_enough(model->neg_contactor_voltage_millis, STALENESS_THRESHOLD_MS),
+        ERR_CONTACTOR_NEG_STUCK_CLOSED,
+        LEVEL_CRITICAL,
+        0x1000000000000000
+    )) {
+        return false;
     }
 
     // FIXME testing
-    ret.success = true;
-    return ret;
+    return true;
 
     int32_t voltage = abs_int32(model->neg_contactor_voltage_mV);
-    if(voltage <= CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV) {
-        ret.event_type = ERR_CONTACTOR_NEG_STUCK_CLOSED;
-        ret.data64 = voltage;
-        return ret;
-    }
-
-    ret.success = true;
-    return ret;
+    return confirm(
+        voltage >= CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV,
+        ERR_CONTACTOR_NEG_STUCK_CLOSED,
+        LEVEL_CRITICAL,
+        voltage
+    );
 }
 
-check_result_t contactor_pos_seems_closed(bms_model_t *model) {
-    check_result_t ret = {0};
-    if(!millis_recent_enough(model->pos_contactor_voltage_millis, STALENESS_THRESHOLD_MS)) {
-        // stale reading
-        ret.event_type = ERR_CONTACTOR_POS_STUCK_OPEN;
-        ret.data64 = 0x1000000000000000;
-        return ret;
+bool confirm_contactor_pos_seems_closed(bms_model_t *model) {
+    if(!confirm(
+        millis_recent_enough(model->pos_contactor_voltage_millis, STALENESS_THRESHOLD_MS),
+        ERR_CONTACTOR_POS_STUCK_OPEN,
+        LEVEL_CRITICAL,
+        0x1000000000000000
+    )) {
+        return false;
     }
 
     int32_t voltage = abs_int32(model->pos_contactor_voltage_mV);
-    if(voltage > CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV) {
-        ret.event_type = ERR_CONTACTOR_POS_STUCK_OPEN;
-        ret.data64 = voltage;
-        return ret;
-    }
-
-    ret.success = true;
-    return ret;
+    return confirm(
+        voltage <= CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV,
+        ERR_CONTACTOR_POS_STUCK_OPEN,
+        LEVEL_CRITICAL,
+        voltage
+    );
 }
 
-check_result_t contactor_pos_seems_open(bms_model_t *model) {
-    check_result_t ret = {0};
-    if(!millis_recent_enough(model->pos_contactor_voltage_millis, STALENESS_THRESHOLD_MS)) {
-        // stale reading
-        ret.event_type = ERR_CONTACTOR_POS_STUCK_CLOSED;
-        ret.data64 = 0x1000000000000000;
-        return ret;
+bool confirm_contactor_pos_seems_open(bms_model_t *model) {
+    if(!confirm(
+        millis_recent_enough(model->pos_contactor_voltage_millis, STALENESS_THRESHOLD_MS),
+        ERR_CONTACTOR_POS_STUCK_CLOSED,
+        LEVEL_CRITICAL,
+        0x1000000000000000
+    )) {
+        return false;
     }
 
     int32_t voltage = abs_int32(model->pos_contactor_voltage_mV);
-    if(voltage < CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV) {
-        ret.event_type = ERR_CONTACTOR_POS_STUCK_CLOSED;
-        ret.data64 = voltage;
-        return ret;
-    }
-
-    ret.success = true;
-    return ret;
+    return confirm(
+        voltage >= CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV,
+        ERR_CONTACTOR_POS_STUCK_CLOSED,
+        LEVEL_CRITICAL,
+        voltage
+    );
 }
 
 void contactor_sm_tick(bms_model_t *model) {
     contactors_sm_t *contactor_sm = &(model->contactor_sm);
-    check_result_t result = {0};
     switch(contactor_sm->state) {
         case CONTACTORS_STATE_OPEN:
             contactors_set_pos_pre_neg(false, false, false);
             if(model->contactor_req == CONTACTORS_REQUEST_CLOSE) {
                 model->contactor_req = CONTACTORS_REQUEST_NULL;
 
-                if(check_or_report(battery_is_healthy(model), LEVEL_CRITICAL)) {
+                if(confirm_battery_is_healthy(model)) {
                     // Start a self-test of the contactors before precharging
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_OPEN);
                 }
@@ -287,14 +299,12 @@ void contactor_sm_tick(bms_model_t *model) {
             // Now close precharge contactor (actually just the Bat+ one)
             contactors_set_pos_pre_neg(false, true, true);
 
-            result = precharge_successful(model);
-
-            if(state_timeout((sm_t*)contactor_sm, 1000) && check(result)) {
+            if(state_timeout((sm_t*)contactor_sm, 1000) && check_precharge_successful(model, false)) {
                 // successful precharge
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_CLOSED);
             } else if(state_timeout((sm_t*)contactor_sm, 10000)) {
                 // failed to precharge
-                check_or_report(result, LEVEL_CRITICAL);
+                check_precharge_successful(model, true);
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGE_FAILED);
             }
             break;
@@ -303,8 +313,8 @@ void contactor_sm_tick(bms_model_t *model) {
 
              if((
                 model->contactor_req == CONTACTORS_REQUEST_OPEN && (
-                    check(current_is_below(model, CONTACTORS_INSTANT_OPEN_MA))
-                    || (check(current_is_below(model, CONTACTORS_DELAYED_OPEN_MA)) && state_timeout((sm_t*)contactor_sm, CONTACTORS_OPEN_TIMEOUT_MS)))
+                    check_current_is_below(model, CONTACTORS_INSTANT_OPEN_MA)
+                    || (check_current_is_below(model, CONTACTORS_DELAYED_OPEN_MA) && state_timeout((sm_t*)contactor_sm, CONTACTORS_OPEN_TIMEOUT_MS)))
              ) || model->contactor_req == CONTACTORS_REQUEST_FORCE_OPEN) {
                  model->contactor_req = CONTACTORS_REQUEST_NULL;
                  state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_OPEN);
@@ -322,7 +332,7 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(false, false, false);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(check_or_report(contactor_neg_seems_open(model), LEVEL_CRITICAL)) {
+                if(confirm_contactor_neg_seems_open(model)) {
                     // passed
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_CLOSED);
                 } else {
@@ -335,7 +345,7 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(false, false, true);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(check_or_report(contactor_neg_seems_closed(model), LEVEL_CRITICAL)) {
+                if(confirm_contactor_neg_seems_closed(model)) {
                     // passed
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_POS_OPEN);
                 } else {
@@ -348,7 +358,7 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(false, false, false);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(check_or_report(contactor_pos_seems_open(model), LEVEL_CRITICAL)) {
+                if(confirm_contactor_pos_seems_open(model)) {
                     // all tests passed
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_POS_CLOSED);
                 } else {
@@ -362,7 +372,7 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(true, true, false);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(check_or_report(contactor_pos_seems_closed(model), LEVEL_CRITICAL)) {
+                if(confirm_contactor_pos_seems_closed(model)) {
                     // all tests passed, go to precharging
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING_NEG);
                 } else {

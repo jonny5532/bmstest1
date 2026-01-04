@@ -16,6 +16,7 @@
 #define PIN_CAN_TX 19
 #define PIN_CAN_RX 20
 
+#define PIN_MCU_CHECK 0
 #define PIN_LED 25
 
 #define PIN_INTERNAL_SERIAL_RX 1

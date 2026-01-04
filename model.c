@@ -81,11 +81,10 @@ static void model_apply_current_limits(bms_model_t *model) {
 // it goes on for too long. This is to protect the battery from excessively high
 // charge or discharge currents.
 static void model_accumulate_overcurrent(bms_model_t *model) {
-    // TODO - add a grace margin to accommodate current measurement error?
-
     if(model->current_mA > 0) {
-        // Charging
+        // We are charging. Work out the excess current above the limit.
         int32_t excess_dA = (model->current_mA / 100) - model->charge_current_limit_dA - CURRENT_LIMIT_ERROR_MARGIN_DA;
+        // Accumulate into the charge buffer if there is excess
         model->excess_charge_buffer_dC = sadd_i32(model->excess_charge_buffer_dC, 
                                                   (excess_dA > 0) ? excess_dA : 0);
     } else if(model->current_mA < 0) {
