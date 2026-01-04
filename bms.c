@@ -208,9 +208,11 @@ void tick() {
             model.neg_contactor_voltage_mV,
             model.pos_contactor_voltage_mV
         );
-        printf("Current: %6ld mA | Charge: %lld raw\n\n",
+        int64_t charge_mC = (model.charge_raw * 132736) / 1000000;
+        printf("Current: %6ld mA | Charge: %lld mC\n\n",
             model.current_mA,
-            model.charge_raw
+            charge_mC
+            //model.charge_raw
         );
 
         

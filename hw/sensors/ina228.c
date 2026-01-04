@@ -252,9 +252,15 @@ void ina228_configure(ina228_t *dev) {
     printf("INA228: Configuration complete\n");
 }
 
+static int32_t div_round_closest(const int32_t n, const int32_t d)
+{
+  return ((n < 0) == (d < 0)) ? ((n + d/2)/d) : ((n - d/2)/d);
+}
+
 // Read current from the INA228 (blocking)
 bool ina228_read_current(ina228_t *dev) {
     int32_t current_raw;
+    int32_t current_corrected;
     
     uint16_t diag_alert;
     if (!ina228_read_reg16(dev, INA228_REG_DIAG_ALRT, &diag_alert)) {
@@ -269,16 +275,45 @@ bool ina228_read_current(ina228_t *dev) {
     
     // board values: 15 with tesla shunt
 
-    current_raw += 7;
-    model.current_mA = current_raw / 4;
+    current_corrected = current_raw - dev->null_offset;
+    model.current_mA = current_corrected / 4;
 
     // Was a new conversion
     if(diag_alert & 0x0002) {
         model.current_millis = millis();
 
         // Is a new conversion, update charge
-        model.charge_raw += (int64_t)current_raw;
+        model.charge_raw += (int64_t)current_corrected;
         model.charge_millis = model.current_millis;
+
+        // charge_raw is in units equivalent to 0.132736mC (0.25mA LSB, 530.944ms per sample)
+
+
+        // TODO, do this elsewhere, track contactors, etc
+        if(dev->null_counter < 256) {
+            dev->null_accumulator += current_raw;
+            dev->null_counter++;
+            if(dev->null_counter == 256) {
+                dev->null_offset = div_round_closest(dev->null_accumulator, 256);
+                model.charge_raw = 0;
+                printf("INA228: Null offset established: %ld\n", dev->null_offset);
+            }
+        }
+
+
+        //     // Accumulate null offset
+        //     dev->null_accumulator = ((dev->null_accumulator * 127) + current_raw * 256) / 128;
+        //     dev->null_offset = div_round_closest(dev->null_accumulator, 256);
+
+        //     // dev->null_counter++;
+        //     // if(dev->null_counter == 256) {
+        //     //     dev->null_offset = div_round_closest(dev->null_accumulator, 256);
+        //     //     model.charge_raw = 0;
+        //     //     printf("INA228: Null offset established: %ld\n", dev->null_offset);
+        //     // }
+        //     //printf("INA228: Null offset accumulating: %ld (%u/256)\n", dev->null_accumulator, dev->null_counter);
+        //     printf("INA228: Null offset is %ld\n", dev->null_offset);
+        // //}
     }
     
     return true;

@@ -35,6 +35,10 @@ typedef struct {
     uint8_t addr;
     float current_lsb;
     float shunt_resistor_ohms;
+
+    int32_t null_accumulator;
+    uint32_t null_counter;
+    int32_t null_offset;
     
     // Async state
     volatile bool async_busy;
