@@ -12,18 +12,19 @@
 #define HMI_TYPE_FLOAT  0x34
 #define HMI_TYPE_DOUBLE 0x38
 
-#define HMI_REG_MILLIS  1 // uint64
-#define HMI_REG_SOC     2 // uint32
-#define HMI_REG_CURRENT 3 // int32 (mA)
-#define HMI_REG_CHARGE  4 // int64 (mC)
-#define HMI_REG_BATTERY_VOLTAGE 5 // int32 (mV)
-#define HMI_REG_OUTPUT_VOLTAGE 6 // int32 (mV)
-#define HMI_REG_POS_CONTACTOR_VOLTAGE 7 // int32 (mV)
-#define HMI_REG_NEG_CONTACTOR_VOLTAGE 8 // int32 (mV)
-#define HMI_REG_TEMPERATURE_MIN 9 // int16 (0.1C)
-#define HMI_REG_TEMPERATURE_MAX 10 // int16 (0.1C)
-#define HMI_REG_CELL_VOLTAGE_MIN 11 // int16 (mV)
-#define HMI_REG_CELL_VOLTAGE_MAX 12 // int16 (mV)
+#define HMI_REG_SERIAL                  1 // uint64
+#define HMI_REG_MILLIS                  2 // uint64
+#define HMI_REG_SOC                     3 // uint32
+#define HMI_REG_CURRENT                 4 // int32 (mA)
+#define HMI_REG_CHARGE                  5 // int64 (mC)
+#define HMI_REG_BATTERY_VOLTAGE         6 // int32 (mV)
+#define HMI_REG_OUTPUT_VOLTAGE          7 // int32 (mV)
+#define HMI_REG_POS_CONTACTOR_VOLTAGE   8 // int32 (mV)
+#define HMI_REG_NEG_CONTACTOR_VOLTAGE   9 // int32 (mV)
+#define HMI_REG_TEMPERATURE_MIN        10 // int16 (0.1C)
+#define HMI_REG_TEMPERATURE_MAX        11 // int16 (0.1C)
+#define HMI_REG_CELL_VOLTAGE_MIN       12 // int16 (mV)
+#define HMI_REG_CELL_VOLTAGE_MAX       13 // int16 (mV)
 #define HMI_REG_CELL_VOLTAGES_START 0x100
 #define HMI_REG_CELL_VOLTAGES_END   0x1FF
 
