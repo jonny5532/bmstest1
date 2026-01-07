@@ -27,3 +27,4 @@ void sampler_add(sampler_t* sampler, int32_t sample, uint16_t max_samples, uint1
         sampler->sample_count = 0;
     }
 }
+

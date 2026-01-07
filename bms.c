@@ -55,28 +55,46 @@ void read_inputs(bms_model_t *model) {
     // Read battery voltage from ADS1115 channel 0
     int16_t raw_batt = ads1115_get_sample(0);
     millis_t raw_batt_millis = ads1115_get_sample_millis(0);
-    model->battery_voltage_mV = raw_batt * 436000 / 32768;
+    model->battery_voltage_mV = raw_batt * 436000 / 32768 / 8;
+    model->battery_voltage_range_mV = ads1115_get_sample_range(0) * 436000 / 32768;
     model->battery_voltage_millis = raw_batt_millis;
 
     // Read output voltage from ADS1115 channel 1
     int16_t raw_out = ads1115_get_sample(1);
     millis_t raw_out_millis = ads1115_get_sample_millis(1);
-    model->output_voltage_mV = raw_out * 436000 / 32768;
+    model->output_voltage_mV = raw_out * 436000 / 32768 / 8;
+    model->output_voltage_range_mV = ads1115_get_sample_range(1) * 436000 / 32768;
     model->output_voltage_millis = raw_out_millis;
 
     int16_t raw_neg_ctr = ads1115_get_sample(2);
     millis_t raw_neg_ctr_millis = ads1115_get_sample_millis(2);
-    model->neg_contactor_voltage_mV = raw_neg_ctr * 436000 / 32768;
+    model->neg_contactor_voltage_mV = raw_neg_ctr * 436000 / 32768 / 8;
+    model->neg_contactor_voltage_range_mV = ads1115_get_sample_range(2) * 436000 / 32768;
     model->neg_contactor_voltage_millis = raw_neg_ctr_millis;
+
+    // Positive contactor voltage has to be derived from the difference between (battery+
+    // to output-) and (output+ to output-), since we can't sample relative to battery+.
+
+    int16_t raw_bat_plus_to_out_neg = ads1115_get_sample(3);
+    millis_t raw_bat_plus_to_out_neg_millis = ads1115_get_sample_millis(3);
+    model->pos_contactor_voltage_mV = (raw_bat_plus_to_out_neg - raw_out) * 436000 / 32768 / 8;
+    model->pos_contactor_voltage_range_mV = (ads1115_get_sample_range(3) * 436000 / 32768)/2 + (ads1115_get_sample_range(1) * 436000 / 32768)/2;
+    model->pos_contactor_voltage_millis = raw_bat_plus_to_out_neg_millis < raw_out_millis ? raw_bat_plus_to_out_neg_millis : raw_out_millis;
+
+        
+    //     * 436000 / 32768 / 8;
+    // model->pos_contactor_voltage_range_m
+    // e
 
     // For absolute readings, full scale should be 1745V
 
-    int16_t raw_bat_plus = ads1115_get_sample(3);
-    millis_t raw_bat_plus_millis = ads1115_get_sample_millis(3);
-    int16_t raw_out_plus = ads1115_get_sample(4);
-    millis_t raw_out_plus_millis = ads1115_get_sample_millis(4);
-    model->pos_contactor_voltage_mV = (raw_bat_plus - raw_out_plus) * 1745000 / 32768;
-    model->pos_contactor_voltage_millis = raw_bat_plus_millis < raw_out_plus_millis ? raw_bat_plus_millis : raw_out_plus_millis; // Use older value
+    // int16_t raw_bat_plus = ads1115_get_sample(3);
+    // millis_t raw_bat_plus_millis = ads1115_get_sample_millis(3);
+    // int16_t raw_out_plus = ads1115_get_sample(4);
+    // millis_t raw_out_plus_millis = ads1115_get_sample_millis(4);
+    // model->pos_contactor_voltage_mV = (raw_bat_plus - raw_out_plus) * 1745000 / 32768 / 8;
+    // model->pos_contactor_voltage_range_mV = (ads1115_get_sample_range(3) * 1745000 / 32768)/2 + (ads1115_get_sample_range(4) * 1745000 / 32768)/2;
+    // model->pos_contactor_voltage_millis = raw_bat_plus_millis < raw_out_plus_millis ? raw_bat_plus_millis : raw_out_plus_millis; // Use older value
 
     // INA228 current and charge readings
     
@@ -123,6 +141,14 @@ void tick() {
 
     // Phase 2: Update model
 
+    static int32_t last_charge_raw = 0;
+    model.soc = kalman_update(
+        ((model.charge_raw - last_charge_raw) * 132736) / 1000000,
+        model.current_mA,
+        model.battery_voltage_mV
+    );
+    last_charge_raw = model.charge_raw;
+
     model_tick(&model);
     confirm_battery_safety(&model);
 
@@ -137,7 +163,7 @@ void tick() {
     
 
     // We talk to the BMB3Y every 64 ticks (about once per second)
-    if((timestep() & 0x3f) == 999931) {
+    if((timestep() & 0x3f) == 31) {
         uint32_t start = time_us_32();
 
         bmb3y_wakeup_blocking();
@@ -160,11 +186,13 @@ void tick() {
         // even_counter++;
         // bmb3y_set_balancing(bitmap_set, even_counter & 8);
         
-        // We need the balancing state machine to update here so that
-        // it updates in sync with the BMB sends. Otherwise the actual balancing won't be applied for as long as the state machine expects.
-        balancing_sm_tick(&model);
+        if(false) {
+            // We need the balancing state machine to update here so that
+            // it updates in sync with the BMB sends. Otherwise the actual balancing won't be applied for as long as the state machine expects.
+            balancing_sm_tick(&model);
 
-        bmb3y_send_balancing(&model);
+            bmb3y_send_balancing(&model);
+        }
     }
 
     // if((timestep() & 0x7f) == 31) {
@@ -185,7 +213,7 @@ void tick() {
     // }
 
 
-    if((timestep() & 0x3f) == 99932) {
+    if((timestep() & 0x3f) == 32) {
         //isosnoop_print_buffer();
         for(int i=0; i<15; i++) {
             printf("[c%3d]: %4d mV | ", i, model.cell_voltages_mV[i]);
@@ -207,17 +235,22 @@ void tick() {
             internal_adc_read_contactor_mv()
         );
 
-        printf("Batt: %6ldmV | Out: %6ldmV | NegCtr: %6dmV | PosCtr: %6dmV\n",
+        printf("Batt: %6ldmV (%3ldmV) | Out: %6ldmV (%3ldmV) | NegCtr: %6dmV (%3ldmV) | PosCtr: %6dmV (%3ldmV)\n",
             model.battery_voltage_mV,
+            model.battery_voltage_range_mV,
             model.output_voltage_mV,
+            model.output_voltage_range_mV,
             model.neg_contactor_voltage_mV,
-            model.pos_contactor_voltage_mV
+            model.neg_contactor_voltage_range_mV,
+            model.pos_contactor_voltage_mV,
+            model.pos_contactor_voltage_range_mV
         );
         int64_t charge_mC = (model.charge_raw * 132736) / 1000000;
-        printf("Current: %6ld mA | Charge: %lld mC\n\n",
+        printf("Current: %6ld mA | Charge: %lld mC | SoC: %2.2f %%\n",
             model.current_mA,
-            charge_mC
-            //model.charge_raw
+            charge_mC,
+            model.soc / 100.0f
+
         );
 
         

@@ -1,7 +1,8 @@
 #include "ads1115.h"
-#include "../allocation.h"
+#include "../allocations.h"
 #include "../pins.h"
 #include "../model.h"
+#include "../util/sampler.h"
 
 #include "hardware/irq.h"
 #include "hardware/i2c.h"
@@ -23,8 +24,10 @@ static void ads1115_internal_irq_handler(void) {
     }
 }
 
-int16_t ads1115_samples[5];
-millis_t ads1115_sample_millis[5];
+// int16_t ads1115_samples[5];
+// millis_t ads1115_sample_millis[5];
+
+static sampler_t samples[5] = {0};
 
 bool ads1115_init(ads1115_t *dev, uint8_t addr) {
     dev->i2c = ADS1115_I2C; // Based on pins 18, 19
@@ -70,7 +73,7 @@ bool ads1115_init(ads1115_t *dev, uint8_t addr) {
 
     // Start periodic sampling every 100ms
     static struct repeating_timer timer;
-    add_repeating_timer_ms(100, ads1115_periodic_timer_callback, dev, &timer);
+    add_repeating_timer_ms(50, ads1115_periodic_timer_callback, dev, &timer);
 
     return true;
 }
@@ -97,13 +100,14 @@ static void ads1115_start_conversion(ads1115_t *dev, int channel) {
             config |= ADS1115_CONFIG_PGA_1_024V | ADS1115_CONFIG_MUX_DIFF_1_3; 
             break;
         case 3: 
-            // ADC0 single-ended (Bat+)
-            config |= ADS1115_CONFIG_PGA_4_096V | ADS1115_CONFIG_MUX_SINGLE_0;
+            //// ADC0 single-ended (Bat+)
+            // ADC0 - ADC3 (voltage between battery positive and negative output)
+            config |= ADS1115_CONFIG_PGA_1_024V | ADS1115_CONFIG_MUX_DIFF_0_3;
             break;
-        case 4:
-            // ADC2 single-ended (Output+)
-            config |= ADS1115_CONFIG_PGA_4_096V | ADS1115_CONFIG_MUX_SINGLE_2;
-            break;
+        // case 4:
+        //     // ADC2 single-ended (Output+)
+        //     config |= ADS1115_CONFIG_PGA_4_096V | ADS1115_CONFIG_MUX_SINGLE_2;
+        //     break;
     }
 
     dev->state = ADS1115_STATE_WRITE_CONFIG;
@@ -175,7 +179,7 @@ void ads1115_irq_handler(ads1115_t *dev) {
             if (dev->state == ADS1115_STATE_WRITE_CONFIG) {
                 dev->state = ADS1115_STATE_WAIT_CONVERSION;
                 // Wait for conversion to complete (128 SPS = 7.8ms, so 10ms is safe)
-                add_alarm_in_ms(10, ads1115_conversion_timer_callback, dev, true);
+                add_alarm_in_ms(9, ads1115_conversion_timer_callback, dev, true);
             } else if (dev->state == ADS1115_STATE_READ_CONVERSION_REG_PTR) {
                 // Now start the read part
                 dev->state = ADS1115_STATE_READ_CONVERSION_DATA;
@@ -205,11 +209,14 @@ void ads1115_irq_handler(ads1115_t *dev) {
             hw->intr_mask &= ~I2C_IC_INTR_MASK_M_RX_FULL_BITS;
             
             if (dev->state == ADS1115_STATE_READ_CONVERSION_DATA) {
-                ads1115_samples[dev->current_channel] = (dev->async_buf[0] << 8) | dev->async_buf[1];
-                ads1115_sample_millis[dev->current_channel] = millis();
+                const int16_t sample = (int16_t)((dev->async_buf[0] << 8) | dev->async_buf[1]);
+                sampler_add(&samples[dev->current_channel], (int32_t)sample, 8, 0);
+
+                // ads1115_samples[dev->current_channel] = (dev->async_buf[0] << 8) | dev->async_buf[1];
+                // ads1115_sample_millis[dev->current_channel] = millis();
                 
                 dev->current_channel++;
-                if (dev->current_channel < 5) {
+                if (dev->current_channel < 4) {
                     ads1115_start_conversion(dev, dev->current_channel);
                 } else {
                     dev->busy = false;
@@ -240,9 +247,17 @@ static bool ads1115_periodic_timer_callback(struct repeating_timer *t) {
 }
 
 int16_t ads1115_get_sample(int channel) {
-    return ads1115_samples[channel];
+    //printf("ADS1115 sample ch %d: %d (range %ld)\n", channel, (int16_t)samples[channel].value, samples[channel].max_value - samples[channel].min_value);
+
+    return (int16_t)samples[channel].value;
+    //return ads1115_samples[channel];
+}
+
+int16_t ads1115_get_sample_range(int channel) {
+    return (int16_t)(samples[channel].max_value - samples[channel].min_value);
 }
 
 millis_t ads1115_get_sample_millis(int channel) {
-    return ads1115_sample_millis[channel];
+    return samples[channel].timestamp;
+    //return ads1115_sample_millis[channel];
 }

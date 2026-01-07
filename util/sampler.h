@@ -19,3 +19,6 @@ typedef struct {
 } sampler_t;
 
 void sampler_add(sampler_t* sampler, int32_t sample, uint16_t max_samples, uint16_t divide_shift);
+static inline int32_t sampler_get_value(sampler_t* sampler, int32_t divide) {
+    return sampler->value / divide;
+}

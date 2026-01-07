@@ -26,6 +26,7 @@ include_directories(vendor/can2040/src)
 add_executable(bms
     bms.c
     init.c
+    kalman.c
     model.c
     hw/actuators/contactors.c
     hw/sensors/internal_adc.c
@@ -56,7 +57,6 @@ add_executable(bms
     )
 
 pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/vendor/can2040/pio/can2040.pio)
-
 
 pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/isospi/isospi_master.pio)
 pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/isospi/isosnoop.pio)
@@ -91,6 +91,11 @@ target_link_libraries(bms
     hardware_pio
     hardware_pwm
     cmsis_core
+)
+
+target_compile_definitions(bms PRIVATE
+    USBD_MANUFACTURER="S3XY-BMS"
+    USBD_PRODUCT="Controller"
 )
 
 set(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS 3000)

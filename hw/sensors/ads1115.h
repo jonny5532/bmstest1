@@ -54,4 +54,5 @@ bool ads1115_init(ads1115_t *dev, uint8_t addr);
 void ads1115_start_sampling(ads1115_t *dev);
 void ads1115_irq_handler(ads1115_t *dev);
 int16_t ads1115_get_sample(int channel);
+int16_t ads1115_get_sample_range(int channel);
 millis_t ads1115_get_sample_millis(int channel);

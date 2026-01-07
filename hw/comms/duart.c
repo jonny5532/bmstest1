@@ -185,7 +185,9 @@ bool duart_send(duart *u, const uint8_t *data, size_t len) {
         // necessarily have been the data we just added though, if there was
         // already data in the buffer.
         
-        enable_tx_pin(u);
+        if(u->deassert_tx_when_idle) {
+            enable_tx_pin(u);
+        }
         _duart_send(u, buf, available);
     } else {
         // Nothing was sent, clear the active flag.
@@ -340,12 +342,20 @@ size_t duart_read_packet(duart *u, uint8_t *buf, size_t buf_size) {
         if((payload_len + 4) <= len) {
             // We have a full contiguous message
             memcpy_with_crc16(&buf[0], &data[0], payload_len, &crc16);
+
+            printf("DUART rx1: FF %02X ", payload_len - 1);
+            for(size_t i=0; i<payload_len; i++) {
+                printf("%02X ", buf[i]);
+            }
+            printf("%02X %02X", data[payload_len], data[payload_len + 1]);
+            printf("\n");
+
             // Read CRC16 from message
             uint16_t msg_crc16 = data[payload_len] | (data[payload_len + 1] << 8);
             duart_flush(u, payload_len + 4);
             if(crc16 != msg_crc16) {
                 // CRC mismatch
-                printf("crc err1: %d calc %04x msg %04x\n", payload_len, crc16, msg_crc16);
+                printf("DUART crc err1: %d calc %04x msg %04x\n", payload_len, crc16, msg_crc16);
                 if(u==&duart0) {
                     debug_counters.uart0_crc_errors++;
                 } else {
@@ -379,12 +389,25 @@ size_t duart_read_packet(duart *u, uint8_t *buf, size_t buf_size) {
             size_t second_part = payload_len - first_part;
             duart_peek(u, &data, &available);
             memcpy_with_crc16(&buf[first_part], &data[0], second_part, &crc16);
+
+            // print message bytes
+            printf("DUART rx2: FF %02X ", payload_len - 1);
+            for(size_t i=0; i<payload_len; i++) {
+                printf("%02X ", buf[i]);
+            }
+
+            printf("%02X %02X", data[second_part], data[second_part + 1]);
+            printf("\n");
+
             // Read CRC16 from message
             uint16_t msg_crc16 = data[second_part] | (data[second_part + 1] << 8);
             duart_flush(u, second_part + 2);
+
+
+
             if(crc16 != msg_crc16) {
                 // CRC mismatch
-                printf("crc err2: %d calc %04x msg %04x\n", payload_len, crc16, msg_crc16);
+                printf("DUART crc err2: %d calc %04x msg %04x\n", payload_len, crc16, msg_crc16);
                 if(u==&duart0) {
                     debug_counters.uart0_crc_errors++;
                 } else {
@@ -461,7 +484,7 @@ bool init_duart(duart *u, uint baud_rate, uint tx_pin, uint rx_pin, bool deasser
     uart_set_hw_flow(u->uart, false, false);
 
     // Set our data format
-    uart_set_format(u->uart, 8, 2, UART_PARITY_NONE);
+    uart_set_format(u->uart, 8, 1, UART_PARITY_NONE);
 
     // Disable FIFOs
     uart_set_fifo_enabled(u->uart, false);

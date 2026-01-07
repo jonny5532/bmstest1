@@ -1,6 +1,6 @@
 #include "hmi_serial.h"
 #include "duart.h"
-#include "../allocation.h"
+#include "../allocations.h"
 #include "../pins.h"
 #include "../chip/time.h"
 #include "../../model.h"
@@ -8,10 +8,17 @@
 #include "pico/unique_id.h"
 
 uint8_t device_address = 0;
+uint32_t next_announce_timestep = 0;
+uint32_t announce_period = 64;
 
 void init_hmi_serial() {
     // 937500 baud (close to 1Mbit)
     init_duart(&HMI_SERIAL_DUART, 460800, PIN_HMI_SERIAL_TX, PIN_HMI_SERIAL_RX, true); //9375000 works!
+
+    // Stagger announcements to reduce collisions
+    pico_unique_board_id_t id;
+    pico_get_unique_board_id(&id);
+    announce_period = 56 + (id.id[7] % 16);
 }
 
 static inline uint8_t hmi_buf_append_uint64(uint8_t *buf, uint64_t value) {
@@ -233,10 +240,50 @@ static void hmi_handle_write_registers(const uint8_t *rx_buf, size_t len, bms_mo
     duart_send_packet(&HMI_SERIAL_DUART, tx_buf, tx_idx);
 }
 
+static void hmi_handle_read_cell_voltages(const uint8_t *rx_buf, size_t len, bms_model_t *model) {
+    // if (len < 2) return;
+    // uint8_t addr = rx_buf[1];
+    // if (addr != device_address) return;
+
+    uint8_t tx_buf[243];
+    uint16_t tx_idx = 0;
+
+    tx_buf[tx_idx++] = HMI_MSG_READ_CELL_VOLTAGES_RESPONSE;
+    tx_buf[tx_idx++] = device_address;
+    tx_buf[tx_idx++] = 120; // number of cell voltages
+
+    // Note: Delta coding for cell voltages
+    //   Absolute voltages sent as two-byte big-endian signed integers, with the MSB set
+    //   Delta voltages sent as single-byte signed integers in the range -64 to +63, with MSB clear
+    //   Initial voltage is zero (if first byte is a delta).
+
+    int16_t last_cell_voltage = 0;
+    for(int cell_idx = 0; cell_idx < 120; cell_idx++) {
+        const int16_t cell_voltage = model->cell_voltages_mV[cell_idx];
+        const int16_t delta = cell_voltage - last_cell_voltage;
+        if(delta >= -64 && delta <= 63) {
+            // can encode as delta
+            tx_buf[tx_idx++] = (delta & 0x7F);
+        } else {
+            // encode as absolute
+            tx_buf[tx_idx++] = ((cell_voltage >> 8) & 0xFF) | 0x80; // set high bit for absolute values
+            tx_buf[tx_idx++] = (cell_voltage >> 0) & 0xFF;
+        }
+        last_cell_voltage = cell_voltage;
+    }
+
+    duart_send_packet(&HMI_SERIAL_DUART, tx_buf, tx_idx);
+}
+
 void hmi_serial_tick(bms_model_t *model) {
     uint8_t rx_buf[256];
 
     // Periodically announce ourselves. 
+    if(timestep() >= next_announce_timestep) {
+        next_announce_timestep = timestep() + announce_period;
+        hmi_send_announce_device();
+    }
+
     // Randomize the offset slightly based on address to reduce collisions.
     if((timestep() & 511) == (device_address * 17) % 512) {
         hmi_send_announce_device();
@@ -254,6 +301,9 @@ void hmi_serial_tick(bms_model_t *model) {
                 break;
             case HMI_MSG_WRITE_REGISTERS:
                 hmi_handle_write_registers(rx_buf, len, model);
+                break;
+            case HMI_MSG_READ_CELL_VOLTAGES:
+                hmi_handle_read_cell_voltages(rx_buf, len, model);
                 break;
             default:
                 // Ignore other messages (responses or unknown)

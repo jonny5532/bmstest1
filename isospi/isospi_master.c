@@ -1,6 +1,6 @@
 #include "isospi_master.pio.h"
 
-#include "../hw/allocation.h"
+#include "../hw/allocations.h"
 
 #include "pico/stdlib.h"
 

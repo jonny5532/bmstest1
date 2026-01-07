@@ -22,16 +22,20 @@ typedef struct bms_model {
 
     int32_t battery_voltage_mV;
     millis_t battery_voltage_millis;
+    int32_t battery_voltage_range_mV;
     int32_t output_voltage_mV;
     millis_t output_voltage_millis;
+    int32_t output_voltage_range_mV;
     int16_t cell_voltage_min_mV;
     int16_t cell_voltage_max_mV;
     millis_t cell_voltage_millis;
 
-    int16_t pos_contactor_voltage_mV;
+    int32_t pos_contactor_voltage_mV;
     millis_t pos_contactor_voltage_millis;
-    int16_t neg_contactor_voltage_mV;
+    int32_t pos_contactor_voltage_range_mV;
+    int32_t neg_contactor_voltage_mV;
     millis_t neg_contactor_voltage_millis;
+    int32_t neg_contactor_voltage_range_mV;
 
     uint32_t soc; // state of charge in 0.01% units (0=0%, 10000=100.00%)
     uint32_t soh; // state of health in 0.01% units (0=0%, 10000=100.00%)

@@ -29,7 +29,10 @@ void log_bms_event(bms_event_type_t type, bms_event_level_t level, uint64_t data
 
     slot->timestamp = now;
     slot->data64 = data;
-    slot->count = sadd_u16(slot->count, 1);
+    if(slot->level == LEVEL_NONE) {
+        // Only increment count if this is being asserted from a cleared state
+        slot->count = sadd_u16(slot->count, 1);
+    }
 
     if(level != slot->level) {
         slot->level = level;

@@ -1,7 +1,7 @@
 #include "isosnoop.h"
 #include "isosnoop.pio.h"
 
-#include "../hw/allocation.h"
+#include "../hw/allocations.h"
 
 #include "hardware/dma.h"
 #include "hardware/pio.h"

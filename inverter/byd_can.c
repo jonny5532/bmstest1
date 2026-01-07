@@ -1,4 +1,4 @@
-#include "../hw/allocation.h"
+#include "../hw/allocations.h"
 #include "../hw/pins.h"
 #include "../model.h"
 

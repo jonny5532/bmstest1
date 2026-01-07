@@ -1,5 +1,5 @@
 #include "duart.h"
-#include "../allocation.h"
+#include "../allocations.h"
 #include "../pins.h"
 #include "../chip/time.h"
 

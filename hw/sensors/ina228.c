@@ -1,6 +1,6 @@
 #include "ina228.h"
 
-#include "../allocation.h"
+#include "../allocations.h"
 #include "../pins.h"
 #include "../../model.h"
 
