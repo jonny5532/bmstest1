@@ -5,6 +5,7 @@
 #include "../chip/time.h"
 #include "../../model.h"
 
+#include "pico/stdlib.h"
 #include "pico/unique_id.h"
 
 uint8_t device_address = 0;
@@ -284,10 +285,7 @@ void hmi_serial_tick(bms_model_t *model) {
         hmi_send_announce_device();
     }
 
-    // Randomize the offset slightly based on address to reduce collisions.
-    if((timestep() & 511) == (device_address * 17) % 512) {
-        hmi_send_announce_device();
-    }
+    // message handling+response seems to take 50-100us
 
     size_t len = duart_read_packet(&HMI_SERIAL_DUART, rx_buf, sizeof(rx_buf));
     if(len > 0) {
@@ -298,6 +296,8 @@ void hmi_serial_tick(bms_model_t *model) {
                 break;
             case HMI_MSG_READ_REGISTERS:
                 hmi_handle_read_registers(rx_buf, len, model);
+                // Postpone the next announce
+                next_announce_timestep = timestep() + announce_period;
                 break;
             case HMI_MSG_WRITE_REGISTERS:
                 hmi_handle_write_registers(rx_buf, len, model);

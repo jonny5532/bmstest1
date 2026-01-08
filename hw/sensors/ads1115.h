@@ -1,10 +1,13 @@
 #pragma once
 
 #include "../chip/time.h"
+#include "../util/sampler.h"
 
 #include "hardware/i2c.h"
 #include <stdint.h>
 #include <stdbool.h>
+
+#define ADS1115_OVERSAMPLING 8
 
 #define ADS1115_REG_CONVERSION 0x00
 #define ADS1115_REG_CONFIG     0x01
@@ -28,7 +31,10 @@
 #define ADS1115_CONFIG_PGA_0_256V   (0x5 << 9)
 #define ADS1115_CONFIG_MODE_SINGLE  (1 << 8)
 #define ADS1115_CONFIG_DR_128SPS    (0x4 << 5)
+#define ADS1115_CONFIG_DR_250SPS    (0x5 << 5)
 #define ADS1115_CONFIG_COMP_QUE_NONE (0x3)
+
+extern sampler_t samples[5];
 
 typedef struct {
     i2c_inst_t *i2c;
@@ -53,6 +59,16 @@ typedef struct {
 bool ads1115_init(ads1115_t *dev, uint8_t addr);
 void ads1115_start_sampling(ads1115_t *dev);
 void ads1115_irq_handler(ads1115_t *dev);
-int16_t ads1115_get_sample(int channel);
 int16_t ads1115_get_sample_range(int channel);
 millis_t ads1115_get_sample_millis(int channel);
+
+static inline int32_t ads1115_scaled_sample(int channel, int32_t full_scale_mv) {
+    return (int32_t)(
+        (int64_t)samples[channel].value * full_scale_mv / (32768 * ADS1115_OVERSAMPLING)    
+    );
+}
+static inline int32_t ads1115_scaled_sample_range(int channel, int32_t full_scale_mv) {
+    return (int32_t)(
+        (int64_t)(samples[channel].max_value - samples[channel].min_value) * full_scale_mv / 32768
+    );
+}

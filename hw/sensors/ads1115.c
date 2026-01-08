@@ -2,13 +2,25 @@
 #include "../allocations.h"
 #include "../pins.h"
 #include "../model.h"
-#include "../util/sampler.h"
 
 #include "hardware/irq.h"
 #include "hardware/i2c.h"
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
+
+// With floating inputs, higher sample rates lead to larger readings - eg, 350mV
+// at 128SPS, but 1000mV at 250SPS, it is not clear why.
+
+// How often we do a full sampling cycle
+static const int ADS1115_SAMPLING_PERIOD = 25; // ms
+// How fast to sample (data rate setting)
+static const int ADS1115_SAMPLE_RATE_SETTING = ADS1115_CONFIG_DR_250SPS;
+// How long each conversion takes
+static const int ADS1115_CONVERSION_TIME_MS = 4;
+// How long extra to wait to be safe before reading conversion resultc
+static const int ADS1115_CONVERSION_TIME_EXTRA_MS = 1;
+
 
 // Global pointer for ISR context
 static ads1115_t *ads_irq_ctx = NULL;
@@ -27,7 +39,7 @@ static void ads1115_internal_irq_handler(void) {
 // int16_t ads1115_samples[5];
 // millis_t ads1115_sample_millis[5];
 
-static sampler_t samples[5] = {0};
+sampler_t samples[5] = {0};
 
 bool ads1115_init(ads1115_t *dev, uint8_t addr) {
     dev->i2c = ADS1115_I2C; // Based on pins 18, 19
@@ -71,43 +83,37 @@ bool ads1115_init(ads1115_t *dev, uint8_t addr) {
     i2c_get_hw(dev->i2c)->rx_tl = 0; // Interrupt when 1 byte in RX FIFO
     i2c_get_hw(dev->i2c)->tx_tl = 0; // Interrupt when TX FIFO is empty
 
-    // Start periodic sampling every 100ms
+    // Start periodic sampling
     static struct repeating_timer timer;
-    add_repeating_timer_ms(50, ads1115_periodic_timer_callback, dev, &timer);
+    add_repeating_timer_ms(ADS1115_SAMPLING_PERIOD, ads1115_periodic_timer_callback, dev, &timer);
 
     return true;
 }
 
 static void ads1115_start_conversion(ads1115_t *dev, int channel) {
     uint16_t config = ADS1115_CONFIG_OS_SINGLE | 
-                      //ADS1115_CONFIG_PGA_4_096V |
-                      //ADS1115_CONFIG_PGA_2_048V | 
+                      ADS1115_CONFIG_PGA_1_024V |
                       ADS1115_CONFIG_MODE_SINGLE | 
-                      ADS1115_CONFIG_DR_128SPS | 
+                      ADS1115_SAMPLE_RATE_SETTING | 
                       ADS1115_CONFIG_COMP_QUE_NONE;
     
     switch (channel) {
         case 0: 
             // ADC0 - ADC1 (battery voltage)
-            config |= ADS1115_CONFIG_PGA_1_024V | ADS1115_CONFIG_MUX_DIFF_0_1; 
+            config |= ADS1115_CONFIG_MUX_DIFF_0_1; 
             break;
         case 1: 
-            // ADC2 - ADC3 (output terminal voltage)
-            config |= ADS1115_CONFIG_PGA_1_024V | ADS1115_CONFIG_MUX_DIFF_2_3; 
+            // ADC2 - ADC3 (output voltage)
+            config |= ADS1115_CONFIG_MUX_DIFF_2_3; 
             break;
         case 2: 
             // ADC1 - ADC3 (voltage across negative contactor)
-            config |= ADS1115_CONFIG_PGA_1_024V | ADS1115_CONFIG_MUX_DIFF_1_3; 
+            config |= ADS1115_CONFIG_MUX_DIFF_1_3; 
             break;
         case 3: 
-            //// ADC0 single-ended (Bat+)
             // ADC0 - ADC3 (voltage between battery positive and negative output)
-            config |= ADS1115_CONFIG_PGA_1_024V | ADS1115_CONFIG_MUX_DIFF_0_3;
+            config |= ADS1115_CONFIG_MUX_DIFF_0_3;
             break;
-        // case 4:
-        //     // ADC2 single-ended (Output+)
-        //     config |= ADS1115_CONFIG_PGA_4_096V | ADS1115_CONFIG_MUX_SINGLE_2;
-        //     break;
     }
 
     dev->state = ADS1115_STATE_WRITE_CONFIG;
@@ -178,8 +184,13 @@ void ads1115_irq_handler(ads1115_t *dev) {
             
             if (dev->state == ADS1115_STATE_WRITE_CONFIG) {
                 dev->state = ADS1115_STATE_WAIT_CONVERSION;
-                // Wait for conversion to complete (128 SPS = 7.8ms, so 10ms is safe)
-                add_alarm_in_ms(9, ads1115_conversion_timer_callback, dev, true);
+                // Wait for conversion to complete
+                add_alarm_in_ms(
+                    ADS1115_CONVERSION_TIME_MS + ADS1115_CONVERSION_TIME_EXTRA_MS,
+                    ads1115_conversion_timer_callback, 
+                    dev, 
+                    true
+                );
             } else if (dev->state == ADS1115_STATE_READ_CONVERSION_REG_PTR) {
                 // Now start the read part
                 dev->state = ADS1115_STATE_READ_CONVERSION_DATA;
@@ -210,10 +221,10 @@ void ads1115_irq_handler(ads1115_t *dev) {
             
             if (dev->state == ADS1115_STATE_READ_CONVERSION_DATA) {
                 const int16_t sample = (int16_t)((dev->async_buf[0] << 8) | dev->async_buf[1]);
-                sampler_add(&samples[dev->current_channel], (int32_t)sample, 8, 0);
-
-                // ads1115_samples[dev->current_channel] = (dev->async_buf[0] << 8) | dev->async_buf[1];
-                // ads1115_sample_millis[dev->current_channel] = millis();
+                if(sample==0) {
+                    printf("ADS1115 read zero sample!\n");
+                }
+                sampler_add(&samples[dev->current_channel], (int32_t)sample, ADS1115_OVERSAMPLING, 0);
                 
                 dev->current_channel++;
                 if (dev->current_channel < 4) {
@@ -244,13 +255,6 @@ static bool ads1115_periodic_timer_callback(struct repeating_timer *t) {
     ads1115_t *dev = (ads1115_t *)t->user_data;
     ads1115_start_sampling(dev);
     return true;
-}
-
-int16_t ads1115_get_sample(int channel) {
-    //printf("ADS1115 sample ch %d: %d (range %ld)\n", channel, (int16_t)samples[channel].value, samples[channel].max_value - samples[channel].min_value);
-
-    return (int16_t)samples[channel].value;
-    //return ads1115_samples[channel];
 }
 
 int16_t ads1115_get_sample_range(int channel) {

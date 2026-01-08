@@ -6,7 +6,16 @@
 #define CELL_VOLTAGE_SOFT_MIN_mV 3000
 #define CELL_VOLTAGE_SOFT_MAX_mV 4200
 
-#define NUM_CELLS 106
+// Cell presence bitmask (1 = present, 0 = not present, 32-bit groups, LSB = cell 0)
+#define CELL_PRESENCE_MASK {0, 0, 0, 0x7FFF}
+// Number of 1s in the above bitmask
+#define NUM_CELLS 15
+
+// Options: 
+// - we could load in the cellvoltages as they come in, and use the presence mask for decoding
+// - or use the presence mask to load in the cellvoltages (and modify the balance mask)
+// i guess we check them more often (every model tick) vs BMB comms every 1s... so second option
+
 
 #define BATTERY_VOLTAGE_HARD_MAX_mV (NUM_CELLS * CELL_VOLTAGE_HARD_MAX_mV)
 #define BATTERY_VOLTAGE_HARD_MIN_mV (NUM_CELLS * CELL_VOLTAGE_HARD_MIN_mV)
@@ -15,6 +24,8 @@
 
 // Is voltage derating of current limits feasible, given the steepness of the
 // voltage curves at top of charge? Probably not?
+
+
 
 // So we stop at 4200mV. 90% SoC is about 4150mV, so we have about 50mV of
 // 

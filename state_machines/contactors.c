@@ -18,7 +18,7 @@
 // How long to wait after a failed contactor test (to avoid rapid cycling)
 #define CONTACTORS_FAILED_TEST_TIMEOUT_MS 20000
 // Max voltage across a contactor to consider it closed
-#define CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV 1000
+#define CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV 2000
 // Min voltage across a contactor to consider it open
 #define CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV 5000
 
@@ -245,6 +245,44 @@ bool confirm_contactor_pos_seems_open(bms_model_t *model) {
     );
 }
 
+bool confirm_contactors_staying_closed(bms_model_t *model) {
+    if(!confirm(
+        millis_recent_enough(model->pos_contactor_voltage_millis, STALENESS_THRESHOLD_MS),
+        ERR_CONTACTOR_POS_UNEXPECTED_OPEN,
+        LEVEL_CRITICAL,
+        0x1000000000000000
+    )) {
+        return false;
+    }
+
+    if(!confirm(
+        millis_recent_enough(model->neg_contactor_voltage_millis, STALENESS_THRESHOLD_MS),
+        ERR_CONTACTOR_NEG_UNEXPECTED_OPEN,
+        LEVEL_CRITICAL,
+        0x2000000000000000
+    )) {
+        return false;
+    }
+
+    int32_t pos_voltage = abs_int32(model->pos_contactor_voltage_mV);
+    if(!confirm(
+        pos_voltage <= CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV,
+        ERR_CONTACTOR_POS_UNEXPECTED_OPEN,
+        LEVEL_CRITICAL,
+        pos_voltage
+    )) {
+        return false;
+    }
+
+    int32_t neg_voltage = abs_int32(model->neg_contactor_voltage_mV);
+    return confirm(
+        neg_voltage <= CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV,
+        ERR_CONTACTOR_NEG_UNEXPECTED_OPEN,
+        LEVEL_CRITICAL,
+        neg_voltage
+    );
+}
+
 void contactor_sm_tick(bms_model_t *model) {
     contactors_sm_t *contactor_sm = &(model->contactor_sm);
     switch(contactor_sm->state) {
@@ -280,18 +318,21 @@ void contactor_sm_tick(bms_model_t *model) {
             }
             break;
         case CONTACTORS_STATE_CLOSED:
-             contactors_set_pos_pre_neg(true, false, true);
+            contactors_set_pos_pre_neg(true, false, true);
 
-             if((
+            // TODO - start graceful open if this fails?
+            confirm_contactors_staying_closed(model);
+
+            if((
                 model->contactor_req == CONTACTORS_REQUEST_OPEN && (
                     check_current_is_below(model, CONTACTORS_INSTANT_OPEN_MA)
                     || (check_current_is_below(model, CONTACTORS_DELAYED_OPEN_MA) && state_timeout((sm_t*)contactor_sm, CONTACTORS_OPEN_TIMEOUT_MS)))
-             ) || model->contactor_req == CONTACTORS_REQUEST_FORCE_OPEN) {
+            ) || model->contactor_req == CONTACTORS_REQUEST_FORCE_OPEN) {
                  model->contactor_req = CONTACTORS_REQUEST_NULL;
                  state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_OPEN);
-             }
+            }
              
-             break;
+            break;
         case CONTACTORS_STATE_PRECHARGE_FAILED:
             contactors_set_pos_pre_neg(false, false, false);
             // wait for the precharge to cool down

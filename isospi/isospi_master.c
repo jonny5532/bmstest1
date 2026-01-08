@@ -89,8 +89,10 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
         rx_buf[i - skip] = byte;
 
         // an inter-byte delay gives the other end time to process
-        sleep_us(2);
+        //sleep_us(2);
     }
+
+    sleep_us(1);
 
     // perform final ending chip select
     isospi_master_cs(false);
@@ -103,7 +105,12 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
 
 void isospi_send_wakeup_cs_blocking() {
     isospi_master_cs(false);
-    sleep_us(20);
+
+    // No subsequent delay is necessary for reads to the first BMB, it is
+    // unclear whether it will be necessary to wait longer to avoid the other
+    // BMBs missing the next command.
+
+    //sleep_us(0);
 }
 
 

@@ -45,7 +45,6 @@ typedef struct bms_model {
 
     charging_sm_t charging_sm;
     
-
     balancing_sm_t balancing_sm;
 
     // Battery

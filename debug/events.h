@@ -56,8 +56,9 @@ typedef enum {
     ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
     ERR_CONTACTOR_PRECHARGE_CURRENT_TOO_HIGH,
     ERR_CONTACTOR_PRECHARGE_NEG_OPEN,
+    ERR_CONTACTOR_POS_UNEXPECTED_OPEN,
+    ERR_CONTACTOR_NEG_UNEXPECTED_OPEN,
     ERR_BATTERY_VOLTAGE_STALE,
-    ERR_BATTERY_VOLTAGE_OUT_OF_RANGE,
     ERR_BATTERY_TEMPERATURE_STALE,
     ERR_BATTERY_TEMPERATURE_OUT_OF_RANGE,
     ERR_CURRENT_STALE,
@@ -77,6 +78,10 @@ void print_bms_events();
 
 
 
+// Checks whether the first argument is true.
+// If not, logs an event of the specified type and level, with the provided data.
+// If the condition is true, clears any existing event of that type.
+// Returns the value of the condition.
 static inline bool confirm(bool success, bms_event_type_t event_type, bms_event_level_t level, uint64_t data) {
     if(!success) {
         log_bms_event(
@@ -91,16 +96,8 @@ static inline bool confirm(bool success, bms_event_type_t event_type, bms_event_
     return success;
 }
 
+// Like confirm(), but only logs/clears the event if do_confirm is true.
 static inline bool check_or_confirm(bool success, bool do_confirm, bms_event_type_t event_type, bms_event_level_t level, uint64_t data) {
-    if(!success && do_confirm) {
-        log_bms_event(
-            event_type,
-            level,
-            data
-        );
-    } else if(success && do_confirm) {
-        clear_bms_event(event_type);
-    }
-
+    if(do_confirm) return confirm(success, event_type, level, data);
     return success;
 }

@@ -50,6 +50,9 @@ print(list((hex(crc8_2f(bytes([n, 0]))) for n in range(0x47, 0x4C+10))))
 #define BMB3Y_CMD_WRITE_CONFIG 0x112F        // Write config
 #define BMB3Y_CMD_READ_TEMPS   0x0E1B
 
+
+void bmb3y_tick(bms_model_t *model);
+
 void bmb3y_send_command_blocking(uint16_t cmd_word);
 bool bmb3y_get_data_blocking(uint32_t cmd, uint8_t *buf, int len);
 
@@ -57,4 +60,5 @@ void bmb3y_wakeup_blocking(void);
 void bmb3y_request_snapshot_blocking();
 bool bmb3y_read_test_blocking(uint32_t cmd, int cells);
 bool bmb3y_read_cell_voltages_blocking(bms_model_t *model);
+bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index);
 void bmb3y_send_balancing(bms_model_t *model);

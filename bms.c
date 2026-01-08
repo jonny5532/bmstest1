@@ -51,35 +51,30 @@ void read_inputs(bms_model_t *model) {
     // ADS1115 voltage readings
 
     // For differential readings, full scale should be 436V
+    const int32_t full_scale_mv = 436000;
 
-    // Read battery voltage from ADS1115 channel 0
-    int16_t raw_batt = ads1115_get_sample(0);
-    millis_t raw_batt_millis = ads1115_get_sample_millis(0);
-    model->battery_voltage_mV = raw_batt * 436000 / 32768 / 8;
-    model->battery_voltage_range_mV = ads1115_get_sample_range(0) * 436000 / 32768;
-    model->battery_voltage_millis = raw_batt_millis;
+    model->battery_voltage_millis = ads1115_get_sample_millis(0);
+    model->battery_voltage_mV = ads1115_scaled_sample(0, full_scale_mv);
+    model->battery_voltage_range_mV = ads1115_scaled_sample_range(0, full_scale_mv);
 
-    // Read output voltage from ADS1115 channel 1
-    int16_t raw_out = ads1115_get_sample(1);
-    millis_t raw_out_millis = ads1115_get_sample_millis(1);
-    model->output_voltage_mV = raw_out * 436000 / 32768 / 8;
-    model->output_voltage_range_mV = ads1115_get_sample_range(1) * 436000 / 32768;
-    model->output_voltage_millis = raw_out_millis;
+    millis_t output_voltage_millis = ads1115_get_sample_millis(1);
+    int32_t output_voltage_mV = ads1115_scaled_sample(1, full_scale_mv);
+    model->output_voltage_millis = output_voltage_millis;
+    model->output_voltage_mV = output_voltage_mV;
+    model->output_voltage_range_mV = ads1115_scaled_sample_range(1, full_scale_mv);
 
-    int16_t raw_neg_ctr = ads1115_get_sample(2);
-    millis_t raw_neg_ctr_millis = ads1115_get_sample_millis(2);
-    model->neg_contactor_voltage_mV = raw_neg_ctr * 436000 / 32768 / 8;
-    model->neg_contactor_voltage_range_mV = ads1115_get_sample_range(2) * 436000 / 32768;
-    model->neg_contactor_voltage_millis = raw_neg_ctr_millis;
+    model->neg_contactor_voltage_millis = ads1115_get_sample_millis(2);
+    model->neg_contactor_voltage_mV = ads1115_scaled_sample(2, full_scale_mv);
+    model->neg_contactor_voltage_range_mV = ads1115_scaled_sample_range(2, full_scale_mv);
 
     // Positive contactor voltage has to be derived from the difference between (battery+
     // to output-) and (output+ to output-), since we can't sample relative to battery+.
 
-    int16_t raw_bat_plus_to_out_neg = ads1115_get_sample(3);
-    millis_t raw_bat_plus_to_out_neg_millis = ads1115_get_sample_millis(3);
-    model->pos_contactor_voltage_mV = (raw_bat_plus_to_out_neg - raw_out) * 436000 / 32768 / 8;
-    model->pos_contactor_voltage_range_mV = (ads1115_get_sample_range(3) * 436000 / 32768)/2 + (ads1115_get_sample_range(1) * 436000 / 32768)/2;
-    model->pos_contactor_voltage_millis = raw_bat_plus_to_out_neg_millis < raw_out_millis ? raw_bat_plus_to_out_neg_millis : raw_out_millis;
+    millis_t raw_bat_pos_to_out_neg_millis = ads1115_get_sample_millis(3);
+    int32_t raw_bat_plus_to_out_neg_mV = ads1115_scaled_sample(3, full_scale_mv);
+    model->pos_contactor_voltage_millis = raw_bat_pos_to_out_neg_millis < output_voltage_millis ? raw_bat_pos_to_out_neg_millis : output_voltage_millis;
+    model->pos_contactor_voltage_mV = raw_bat_plus_to_out_neg_mV - output_voltage_mV;
+    model->pos_contactor_voltage_range_mV = ads1115_scaled_sample_range(3, full_scale_mv)/2 + ads1115_scaled_sample_range(1, full_scale_mv)/2;
 
         
     //     * 436000 / 32768 / 8;
@@ -138,6 +133,7 @@ void tick() {
     }
 
     read_inputs(&model);
+    bmb3y_tick(&model);
 
     // Phase 2: Update model
 
@@ -160,57 +156,6 @@ void tick() {
     inverter_tick(&model);
     internal_serial_tick();
     hmi_serial_tick(&model);
-    
-
-    // We talk to the BMB3Y every 64 ticks (about once per second)
-    if((timestep() & 0x3f) == 31) {
-        uint32_t start = time_us_32();
-
-        bmb3y_wakeup_blocking();
-        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        //bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
-        bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
-
-        // 70 sometimes isn't enough time, 100  seems ok
-        sleep_us(100);
-
-        bmb3y_read_cell_voltages_blocking(&model);
-
-        uint32_t end = time_us_32();
-        printf("BMB3Y test took %ld us\n", end - start);
-
-        
-
-        //bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
-        //bmb3y_set_balancing(bitmap_set, even_counter & 8);
-        // even_counter++;
-        // bmb3y_set_balancing(bitmap_set, even_counter & 8);
-        
-        if(false) {
-            // We need the balancing state machine to update here so that
-            // it updates in sync with the BMB sends. Otherwise the actual balancing won't be applied for as long as the state machine expects.
-            balancing_sm_tick(&model);
-
-            bmb3y_send_balancing(&model);
-        }
-    }
-
-    // if((timestep() & 0x7f) == 31) {
-    //     uint8_t rx_buf[100];
-
-    //     bmb3y_wakeup_blocking();
-    //     bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-    //     bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
-
-    //     sleep_us(100);
-
-    //     bmb3y_get_data_blocking(BMB3Y_CMD_READ_CONFIG, rx_buf, 50);
-    //     for(int i=0; i<50; i++) {
-    //         printf("%02X ", rx_buf[i]);
-    //     }
-    //     printf("\n");
-    //     isosnoop_print_buffer();
-    // }
 
 
     if((timestep() & 0x3f) == 32) {
@@ -225,7 +170,7 @@ void tick() {
     if((timestep() & 31) == 0) {
         // every 64 ticks, output stuff
         //isosnoop_print_buffer();
-        print_bms_events();
+        //print_bms_events();
 
         printf("Temp: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
             get_temperature_c_times10(),
@@ -252,19 +197,6 @@ void tick() {
             model.soc / 100.0f
 
         );
-
-        
-        // printf("ADS1115 Battery voltage: %d (%d)\n", ads1115_get_sample(0), ads1115_get_sample_millis(0));
-        // printf("ADS1115 Output voltage: %d (%d)\n", ads1115_get_sample(1), ads1115_get_sample_millis(1));
-        // printf("ADS1115 Across neg ctr: %d (%d)\n", ads1115_get_sample(2), ads1115_get_sample_millis(2));
-        // printf("ADS1115 Bat+: %d (%d)\n", ads1115_get_sample(3), ads1115_get_sample_millis(3));
-        // printf("ADS1115 Out+: %d (%d)\n", ads1115_get_sample(4), ads1115_get_sample_millis(4));
-
-        // printf("INA228 Current: %ld raw\n", ina228_get_current_raw());
-        // printf("INA228 Charge: %ld raw\n", ina228_get_charge_raw());
-        // for(int i = 0; i < 5; i++) {
-        //     printf("ADS1115 Channel %d: %d (%d)\n", i, ads1115_get_sample(i), ads1115_get_sample_millis(i));
-        // }
     }
 }
 

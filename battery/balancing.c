@@ -2,7 +2,7 @@
 
 #include "../model.h"
 
-#define AUTO_BALANCING_PERIOD_MS 60000 // how long to wait between auto-balancing sessions
+#define AUTO_BALANCING_PERIOD_MS 30000 // how long to wait between auto-balancing sessions
 #define PERIODS_PER_MV 1 // how many balancing periods per mV above minimum
 #define BALANCE_MIN_OFFSET_MV 3 // minimum voltage difference to balance
 
