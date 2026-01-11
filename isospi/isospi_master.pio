@@ -16,10 +16,16 @@
 .define PUBLIC CS_PULSE_LEN_B   14
 .define DATA_PULSE_LEN   15
 
+
+; symmetrical timings result in an asymmetrical pulse due to weird transmitter
+; lags, so bias to fix
+.define FIRST_PULSE_LEN 17
+.define SECOND_PULSE_LEN 13
+
 ; the reply sampling points (multiplied by 6.7ns)
 
-.define SAMPLE_POS_1  10   ; 5 - 16 works
-.define SAMPLE_POS_2  25
+.define SAMPLE_POS_1  3   ; 5 - 16 works
+.define SAMPLE_POS_2  17
 
 ; how long to wait for the reply (multiplied by 20ns)
 
@@ -39,9 +45,13 @@ do_bit:
 
     ; output a 1
   PUBLIC data_high_1:
-    set pins, TX_HIGH side 0 [DATA_PULSE_LEN-1]
+    ;set pins, TX_HIGH side 0 [DATA_PULSE_LEN-1]
+    set pins, TX_HIGH side 0 [FIRST_PULSE_LEN-5]
+    nop side 0 [3]
+    ;set pins, TX_LOW side 0 [SECOND_PULSE_LEN-1]
   PUBLIC data_low_1:
-    set pins, TX_LOW side 0 [DATA_PULSE_LEN-1]
+    ;set pins, TX_LOW side 0 [DATA_PULSE_LEN-1]
+    set pins, TX_LOW side 0 [SECOND_PULSE_LEN-1]
     jmp done side 0
 
     ; cheeky void space
@@ -49,15 +59,20 @@ do_bit:
 zero_bit:
     ; output a 0
   PUBLIC data_low_2:
-    set pins, TX_LOW side 0 [DATA_PULSE_LEN-1]
+    ;set pins, TX_LOW side 0 [DATA_PULSE_LEN-1]
+    set pins, TX_LOW side 0 [FIRST_PULSE_LEN-5]
+    nop side 0 [3]
   PUBLIC data_high_2:
-    set pins, TX_HIGH side 0 [DATA_PULSE_LEN-1]
+    ;set pins, TX_HIGH side 0 [DATA_PULSE_LEN-1]
+    set pins, TX_HIGH side 0 [SECOND_PULSE_LEN-1]
 
 done:
     ; go idle and wait for the lines to settle
   PUBLIC pre_rx:
-    set pins, TX_IDLE side 0 [10] ; min 10?, too long and we miss the reply
+    set pins, TX_IDLE side 0 [15] ; min 10?, too long and we miss the reply
     ; at 300mhz, 6 - 14 works
+
+    ; if our holdoff is too short, the edge detector ends up triggering on the end of our transmission. if the holdoff is too long we miss the reply. avoiding delays inside the edge detector does at least mean it can recover in time even if it does trigger early.
 
     ; start the timer
     irq set 1 side 0
@@ -116,7 +131,10 @@ done:
     irq wait 3
 
     wait 1 pin 0
-    irq set 0  [20] ; [3]
+    ; a delay here slows the recovery (which could avoid retriggering on
+    ; something immediately), although is actually unhelpful since it means if
+    ; we do trigger on noise, we then miss the real data
+    irq set 0 ; [20] ; [3]
     wait 0 pin 0; [12]
 .wrap
 
@@ -192,10 +210,11 @@ void isospi_master_program_init(PIO pio, uint tx_pin_base, uint rx_pin_base) {
     sm_config_set_in_pin_base(&master_config, rx_pin_base);
     sm_config_set_in_pin_count(&master_config, 2);
 
-    //int sampling_pin = 22; // just after the TX pins
-    //pio_gpio_init(pio, sampling_pin);
-    //pio_sm_set_consecutive_pindirs(pio, 0, sampling_pin, 1, true);
-    //sm_config_set_sideset_pins(&master_config, sampling_pin);
+    gpio_init(31);
+    int sampling_pin = 31; // just after the TX pins
+    pio_gpio_init(pio, sampling_pin);
+    pio_sm_set_consecutive_pindirs(pio, 0, sampling_pin, 1, true);
+    sm_config_set_sideset_pins(&master_config, sampling_pin);
 
     //sm_config_set_clkdiv_int_frac8(&c, 1, 120);
     sm_config_set_clkdiv_int_frac8(&master_config, 1, 0);

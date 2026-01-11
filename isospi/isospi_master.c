@@ -44,8 +44,12 @@ void isospi_master_flush() {
 bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, size_t skip) {
     isospi_master_cs(true);
 
-    // 14 ok 15 always fails crc, 30 is better
+    // 14 ok 15 always fails crc, 30 is better ??
+
     sleep_us(1);
+
+    // xtra
+    //sleep_us(5);
 
     //char log[1000];
 
@@ -67,6 +71,7 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
         if(i < skip) {
             // skip receiving this byte
             rx_buf[i] = 0;
+            sleep_us(5);
             continue;
         }
 
@@ -83,6 +88,7 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
                 byte = (byte << 1) | 0x0;
             } else {
                 // invalid
+                printf("Invalid isoSPI nibble 0x%X on byte %d bit %d\n", nibble, (int)i, r);
                 valid = false;
                 byte = (byte << 1) | 0x0;
             }
@@ -91,6 +97,10 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
 
         // an inter-byte delay gives the other end time to process
         //sleep_us(2);
+
+        // xtra
+        sleep_us(5);
+
     }
 
     sleep_us(1);

@@ -24,7 +24,7 @@ void bmb3y_send_command_blocking(uint16_t cmd_word) {
     tx[0] = (cmd_word >> 8) & 0xFF;
     tx[1] = cmd_word & 0xFF;
     
-    isospi_write_read_blocking(tx, rx, 2, 0);
+    isospi_write_read_blocking(tx, rx, 2, 2);
 }
 
 bool bmb3y_long_command_get_data_blocking(uint32_t cmd, uint8_t *response, int response_len) {
@@ -252,8 +252,16 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
 bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
     uint8_t rx_buf[90];
 
-    if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_TEMPS, rx_buf, 60)) {
+    //isosnoop_flush();
+
+    if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_TEMPS3, rx_buf, 8)) {
         printf("BMB3Y temperature read failed\n");
+        // printf("temptest failed hex: ");
+        // for(int i=0;i<8;i++) {
+        //     printf("%02X ", rx_buf[i]);
+        // }
+        // printf("\n");
+        // isosnoop_print_buffer();
         return false;
     }
 
@@ -261,9 +269,24 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
     for(int module=0; module<NUM_MODULE_TEMPS; module++) {
         // Each module has 8 bytes: 6 bytes data, 2 bytes CRC
         // The temp is in bytes 2 and 3 (little-endian)
-
+        
         uint16_t module_crc = (uint16_t)(rx_buf[module * 8 + 6] << 8) | (uint16_t)(rx_buf[module * 8 + 7]);
         uint16_t calc_crc = crc14(&rx_buf[module * 8], 6, 0x0010);
+
+        // printf("temptest gooded hex: ");
+        // for(int i=0;i<8;i++) {
+        //     printf("%02X ", rx_buf[module * 8 + i]);
+        // }
+        // printf("\n");
+        //isosnoop_print_buffer();
+
+        // ridiculous hack to deal with dodgy first bit
+        // if(module_crc != calc_crc) {
+        //     rx_buf[module * 8 + 0] ^= 0x80;
+        //     calc_crc = crc14(&rx_buf[module * 8], 6, 0x0010);
+        //     printf("temptest fixing...\n");
+        // }
+
 
         if(module_crc != calc_crc) {
             printf("Bad Temp CRC on module %d: msg 0x%04X calc 0x%04X\n", module, module_crc, calc_crc);
@@ -271,19 +294,23 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
             continue;
         }
 
-        // printf("Temp hex: ");
-        // for(int i=0;i<8;i++) {
-        //     printf("%02X ", rx_buf[module * 8 + i]);
-        // }
+        // D/T's algorithm:
+        // // Unlike everything else, temps are little-endian??
+        // int16_t raw_temp = 
+        //     (int16_t)(rx_buf[module * 8 + 2]) |
+        //     (int16_t)(rx_buf[module * 8 + 3] << 8);
 
-
-        // Unlike everything else, temps are little-endian??
+        // // is this in dC? is the offset right? what about negative temps?
+        // model->module_temperatures_dC[module] = raw_temp - 1131;
+        
         int16_t raw_temp = 
-            (int16_t)(rx_buf[module * 8 + 2]) |
-            (int16_t)(rx_buf[module * 8 + 3] << 8);
+             (int16_t)(rx_buf[module * 8 + 0]) |
+             (int16_t)(rx_buf[module * 8 + 1] << 8);
 
-        // is this in dC? is the offset right? what about negative temps?
-        model->module_temperatures_dC[module] = raw_temp - 1131;
+        // super-crude cal, 28c = 0x4300, 100c = 0x6e00
+        // FIXME - do proper thermistor conversion
+        model->module_temperatures_dC[module] = ((raw_temp - 0x4300) * (1000 - 280)) / (0x6e00 - 0x4300) + 280;
+
 
         //printf("Module %d temp raw %d converted %d dC\n", module, raw_temp, model->module_temperatures_dC[module]);
 
@@ -296,7 +323,7 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
     return crc_ok;
 }
 
-bool last_read_crc_ok = false;
+bool last_read_crc_failed = false;
 
 void bmb3y_tick(bms_model_t *model) {
     // TODO - maybe split this in half, into separate 'read' and 'write' phases?
@@ -310,18 +337,29 @@ void bmb3y_tick(bms_model_t *model) {
 
     //uint32_t start = time_us_32();
 
+    // if(step==1) {
+    //     bmb3y_send_wakeup_cs_blocking();
+
+    //     bmb3y_read_temperatures_blocking(model);
+
+    // }
+    // return;
+
+
     if(step==0) {
         // Wake up and request snapshot
+
         bmb3y_send_wakeup_cs_blocking();
 
-        // The data read packets include CRC14s, although sometimes they
-        // misbehave and consistently fail, even though the data seems fine.
-        // It is possible to 'fix' this by sending extra IDLE_WAKE commands before
-        // the SNAPSHOT command, for some reason.
+        // The data packets received include CRC14s, although sometimes the BMB
+        // gets into a state where the CRCs are all invalid (they're not even
+        // CRC14s as they have higher bits set), even though the data looks
+        // fine. It is possible to 'fix' this by sending extra IDLE_WAKE
+        // commands before the SNAPSHOT command, for unknown reasons.
 
-        // However this depends on whether the balancing registers are being
-        // written - if they are, then two IDLE_WAKEs usually works. If however
-        // it gets 'out of sync', sending one IDLE_WAKE seems to fix it.
+        // However this also depends on whether the balancing registers are
+        // being written - if they are, then two IDLE_WAKEs usually works. If
+        // however it gets 'out of sync', sending one IDLE_WAKE seems to fix it.
 
         // So current best strategy:
         // - always write balancing config after reading
@@ -339,36 +377,34 @@ void bmb3y_tick(bms_model_t *model) {
         // }
         // printf("\n");
 
-        if(last_read_crc_ok) {
-            // Normal case - two IDLE_WAKEs keep the CRCs happy
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+        if(last_read_crc_failed) {
+            // Last read failed - try a single IDLE_WAKE to re-sync
             bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         } else {
-            // Last read failed - try a single IDLE_WAKE to re-sync
+            // Normal case - two IDLE_WAKEs keep the CRCs happy
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
             bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         }
 
 
-        last_read_crc_ok = true;
+        last_read_crc_failed = false;
         bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
 
         // As we wait longer than 5ms before the next command, the BMB will go
-        // to sleep and need a wakeup. A single CS wakeup seems to work fine, no
-        // need for extra IDLE_WAKEs.
+        // to sleep and need a wakeup. A single CS wakeup each time seems to work
+        // fine, although need to check how multiple BMBs affect things.
 
         // uint32_t end = time_us_32();
         // printf("BMB3Y snapshot took %ld us\n", end - start);
     } else if(step>=1 && step <= 5) {
         // Read one of the five banks depending on the step number
+
         bmb3y_send_wakeup_cs_blocking();
 
         if(!bmb3y_read_cell_voltage_bank_blocking(model, step - 1)) {
             // Read failed
-            last_read_crc_ok = false;
-            //bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            //bmb3y_read_cell_voltage_bank_blocking(model, step - 1);
-        } else if(step==5 && last_read_crc_ok) {
+            last_read_crc_failed = true;
+        } else if(step==5 && !last_read_crc_failed) {
             // All banks read successfully
             model->cell_voltage_millis = millis();
         }
@@ -377,9 +413,24 @@ void bmb3y_tick(bms_model_t *model) {
         // printf("BMB3Y bank %d read took %ld us\n", step - 1, end - start);
     } else if(step==6) {
         // Module temperatures
+
         bmb3y_send_wakeup_cs_blocking();
 
         bmb3y_read_temperatures_blocking(model);
+
+        // See what is in F...
+        if(false) {
+            uint8_t rx_buf[100];
+            bmb3y_long_command_get_data_blocking(BMB3Y_CMD_READ_F, rx_buf, 20);
+            printf("F hex: ");
+            // supposedly bytes 2-3 (LE) might contain voltage, reads 0xabff at 56468mV tho
+            // could be /0.8? pr *1.2825? or 12328mV offset? who knows...
+            for(int i=0;i<20;i++) {
+                printf("%02X ", rx_buf[i]);
+            }
+            printf("\n");
+        }
+
     } else if(step==7) {
         // Enable/disable per-cell balancing as needed.
 

@@ -161,3 +161,7 @@ void isosnoop_print_buffer() {
 
     printf("\n");
 }
+
+void isosnoop_flush() {
+    last_write_addr = dma_chan->write_addr;
+}
