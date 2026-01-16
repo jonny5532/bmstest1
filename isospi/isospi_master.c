@@ -71,7 +71,6 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
         if(i < skip) {
             // skip receiving this byte
             rx_buf[i] = 0;
-            sleep_us(5);
             continue;
         }
 
@@ -97,9 +96,6 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
 
         // an inter-byte delay gives the other end time to process
         //sleep_us(2);
-
-        // xtra
-        sleep_us(5);
 
     }
 

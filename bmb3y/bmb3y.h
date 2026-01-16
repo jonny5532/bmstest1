@@ -100,6 +100,7 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 
 
 void bmb3y_tick(bms_model_t *model);
+void bmb3y_clear_balancing(bms_model_t *model);
 
 void bmb3y_send_command_blocking(uint16_t cmd_word);
 bool bmb3y_get_data_blocking(uint32_t cmd, uint8_t *buf, int len);

@@ -16,6 +16,9 @@
 #define PIN_CAN_TX 19
 #define PIN_CAN_RX 20
 
+#define PIN_INTERCAN_TX 4
+#define PIN_INTERCAN_RX 5
+
 #define PIN_MCU_CHECK 0
 #define PIN_LED 25
 
@@ -32,7 +35,7 @@
 #define PIN_ISOSPI_RX_AND 30
 #define PIN_ISOSPI_RX_DEBUG 31
 #define PIN_ISOSNOOP_RX_DEBUG 32
-#define PIN_ISOSNOOP_TIMER_DISABLE 5 // spare GPIO that isn't used for anything else
+#define PIN_ISOSNOOP_TIMER_DISABLE 3 // spare GPIO that isn't used for anything else
 
 
 /* ADS1115 inputs:

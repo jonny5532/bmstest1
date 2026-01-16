@@ -1,0 +1,8 @@
+#pragma once
+
+#include <stdint.h>
+
+uint16_t calculate_cell_voltage_charge_current_limit(uint32_t cell_voltage_min_mV, uint32_t cell_voltage_max_mV);
+uint16_t calculate_cell_voltage_discharge_current_limit(uint32_t cell_voltage_min_mV, uint32_t cell_voltage_max_mV);
+uint16_t calculate_temperature_charge_current_limit(int16_t temperature_min_dC, int16_t temperature_max_dC);
+uint16_t calculate_temperature_discharge_current_limit(int16_t temperature_min_dC, int16_t temperature_max_dC);

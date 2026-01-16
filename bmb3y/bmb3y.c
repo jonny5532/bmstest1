@@ -113,6 +113,15 @@ bool bmb3y_set_balancing(uint8_t bitmap[16], bool even) {
     return true;
 }
 
+void bmb3y_clear_balancing(bms_model_t *model) {
+    balancing_sm_t *balancing_sm = &model->balancing_sm;
+
+    // Clear all balancing requests
+    for(int i=0; i<4; i++) {
+        balancing_sm->balance_request_mask[i] = 0;
+    }
+}
+
 void bmb3y_send_balancing(bms_model_t *model) {
     balancing_sm_t *balancing_sm = &model->balancing_sm;
 
@@ -333,18 +342,15 @@ void bmb3y_tick(bms_model_t *model) {
     // We do a full communication cycle every 64 ticks (1.28s).
     // We offset the steps by 5 to interleave with other BMS tasks.
 
-    int step = (timestep() & 0x3f) - 5; // was 3f
+    // Slow mode samples less frequently to reduce battery self-drain in low
+    // voltage situations. It only takes effect once we have a valid reading,
+    // and aren't having CRC issues.
+    bool use_slow_mode = model->cell_voltage_slow_mode && model->cell_voltage_millis > 0 &&
+        !last_read_crc_failed;
 
-    //uint32_t start = time_us_32();
-
-    // if(step==1) {
-    //     bmb3y_send_wakeup_cs_blocking();
-
-    //     bmb3y_read_temperatures_blocking(model);
-
-    // }
-    // return;
-
+    // 81.92s in slow mode, 1.28s in normal mode
+    int period = use_slow_mode ? 0xfff : 0x3f;
+    int step = (timestep() & period) - 5; // was 3f
 
     if(step==0) {
         // Wake up and request snapshot
@@ -366,8 +372,8 @@ void bmb3y_tick(bms_model_t *model) {
         // - if any last read failed, do one IDLE_WAKE next time
         // - otherwise do two IDLE_WAKEs
 
-        // Also seems to depend on how long we wait between cycles - 1.28s works
-        // with this strategy, 5.12s doesn't...
+        // The situation changes if you want too long between cycles - the above
+        // works for 1.28s cycles, but slow mode requires a different pattern.
         
         // read config
         //uint8_t rx_buf[72];
@@ -377,7 +383,20 @@ void bmb3y_tick(bms_model_t *model) {
         // }
         // printf("\n");
 
-        if(last_read_crc_failed) {
+        if(use_slow_mode) {
+            // In slow mode we have to set balancing config first, and use a
+            // different wakeup pattern, else we get bad CRCs back on the
+            // subsequent reads.
+
+            // Forcibly prevent balancing in slow mode
+            bmb3y_clear_balancing(model);
+            bmb3y_send_balancing(model);
+
+            // Three wakes for some reason
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+        } else if(last_read_crc_failed) {
             // Last read failed - try a single IDLE_WAKE to re-sync
             bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         } else {
@@ -391,8 +410,8 @@ void bmb3y_tick(bms_model_t *model) {
         bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
 
         // As we wait longer than 5ms before the next command, the BMB will go
-        // to sleep and need a wakeup. A single CS wakeup each time seems to work
-        // fine, although need to check how multiple BMBs affect things.
+        // to comms-idle and need a wakeup. A single CS wakeup each time seems
+        // to work fine, although need to check how multiple BMBs affect things.
 
         // uint32_t end = time_us_32();
         // printf("BMB3Y snapshot took %ld us\n", end - start);
@@ -406,6 +425,7 @@ void bmb3y_tick(bms_model_t *model) {
             last_read_crc_failed = true;
         } else if(step==5 && !last_read_crc_failed) {
             // All banks read successfully
+            printf("CRC: GOOD!!!\n");
             model->cell_voltage_millis = millis();
         }
         
@@ -434,7 +454,7 @@ void bmb3y_tick(bms_model_t *model) {
     } else if(step==7) {
         // Enable/disable per-cell balancing as needed.
 
-        if(true) {
+        if(!use_slow_mode) {
             bmb3y_send_wakeup_cs_blocking();
             balancing_sm_tick(model);
             bmb3y_send_balancing(model);

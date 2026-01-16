@@ -1,7 +1,8 @@
 #include "model.h"
 
-#include "../limits.h"
-#include "../lib/math.h"
+#include "battery/current_limits.h"
+#include "limits.h"
+#include "lib/math.h"
 
 bms_model_t model = {0};
 
@@ -39,29 +40,24 @@ static void model_process_cell_voltages(bms_model_t *model) {
         }
         if(volt > model->cell_voltage_max_mV) {
             model->cell_voltage_max_mV = volt;
-        }   
+        }
     }
 }
 
 static void model_calculate_cell_current_limits(bms_model_t *model) {
-    model->cell_voltage_charge_current_limit_dA = 0xFFFF;
-    model->cell_voltage_discharge_current_limit_dA = 0xFFFF;
-
-    if(model->cell_voltage_max_mV > CELL_VOLTAGE_SOFT_MAX_mV) {
-        // Above max cell voltage, stop charging and limit discharge
-        model->cell_voltage_charge_current_limit_dA = 0;
-        model->cell_voltage_discharge_current_limit_dA = OVERCHARGE_DISCHARGE_CURRENT_LIMIT_dA;
-    }
-    if(model->cell_voltage_min_mV < CELL_VOLTAGE_SOFT_MIN_mV) {
-        // Hit min cell voltage, stop discharging and limit charge
-        model->cell_voltage_discharge_current_limit_dA = 0;
-        model->cell_voltage_charge_current_limit_dA = OVERDISCHARGE_CHARGE_CURRENT_LIMIT_dA;
-    }
+    model->cell_voltage_charge_current_limit_dA =calculate_cell_voltage_charge_current_limit(
+        model->cell_voltage_min_mV,
+        model->cell_voltage_max_mV
+    );
+    model->cell_voltage_discharge_current_limit_dA = calculate_cell_voltage_discharge_current_limit(
+        model->cell_voltage_min_mV,
+        model->cell_voltage_max_mV
+    );
 }
 
 static void model_apply_current_limits(bms_model_t *model) {
-    uint16_t charge_limit = 0xFFFF;
-    uint16_t discharge_limit = 0xFFFF;
+    uint16_t charge_limit = CHARGE_MAX_CURRENT_dA;
+    uint16_t discharge_limit = DISCHARGE_MAX_CURRENT_dA;
 
     // Temperature limits
     if(charge_limit > model->temp_charge_current_limit_dA) {
@@ -72,12 +68,12 @@ static void model_apply_current_limits(bms_model_t *model) {
     }
 
     // Pack voltage limits
-    if(charge_limit > model->pack_voltage_charge_current_limit_dA) {
-        charge_limit = model->pack_voltage_charge_current_limit_dA;
-    }
-    if(discharge_limit > model->pack_voltage_discharge_current_limit_dA) {
-        discharge_limit = model->pack_voltage_discharge_current_limit_dA;
-    }
+    // if(charge_limit > model->pack_voltage_charge_current_limit_dA) {
+    //     charge_limit = model->pack_voltage_charge_current_limit_dA;
+    // }
+    // if(discharge_limit > model->pack_voltage_discharge_current_limit_dA) {
+    //     discharge_limit = model->pack_voltage_discharge_current_limit_dA;
+    // }
 
     // Cell voltage limits
     if(charge_limit > model->cell_voltage_charge_current_limit_dA) {
@@ -88,12 +84,12 @@ static void model_apply_current_limits(bms_model_t *model) {
     }
 
     // User limits
-    if(charge_limit > model->user_charge_current_limit_dA) {
-        charge_limit = model->user_charge_current_limit_dA;
-    }
-    if(discharge_limit > model->user_discharge_current_limit_dA) {
-        discharge_limit = model->user_discharge_current_limit_dA;
-    }
+    // if(charge_limit > model->user_charge_current_limit_dA) {
+    //     charge_limit = model->user_charge_current_limit_dA;
+    // }
+    // if(discharge_limit > model->user_discharge_current_limit_dA) {
+    //     discharge_limit = model->user_discharge_current_limit_dA;
+    // }
 
     model->charge_current_limit_dA = charge_limit;
     model->discharge_current_limit_dA = discharge_limit;
@@ -162,23 +158,14 @@ static void model_check_soft_limit_charge_accumulation(bms_model_t *model) {
 
 
 static void model_calculate_temperature_current_limits(bms_model_t *model) {
-    // Charge current limit derating
-    if(model->temperature_max_dC >= MAX_CHARGE_TEMPERATURE_LIMIT_dC || model->temperature_min_dC <= MIN_CHARGE_TEMPERATURE_LIMIT_dC) {
-        model->temp_charge_current_limit_dA = 0;
-    } else {
-        uint16_t upper_charge_limit = (MAX_CHARGE_TEMPERATURE_LIMIT_dC - model->temperature_max_dC) * CHARGE_TEMPERATURE_DERATE_dA_PER_dC;
-        uint16_t lower_charge_limit = (model->temperature_min_dC - MIN_CHARGE_TEMPERATURE_LIMIT_dC) * CHARGE_TEMPERATURE_DERATE_dA_PER_dC;
-        model->temp_charge_current_limit_dA = (upper_charge_limit < lower_charge_limit) ? upper_charge_limit : lower_charge_limit;
-    }
-
-    // Discharge current limit derating
-    if(model->temperature_max_dC >= MAX_DISCHARGE_TEMPERATURE_LIMIT_dC || model->temperature_min_dC <= MIN_DISCHARGE_TEMPERATURE_LIMIT_dC) {
-        model->temp_discharge_current_limit_dA = 0;
-    } else {
-        uint16_t upper_discharge_limit = (MAX_DISCHARGE_TEMPERATURE_LIMIT_dC - model->temperature_max_dC) * DISCHARGE_TEMPERATURE_DERATE_dA_PER_dC;
-        uint16_t lower_discharge_limit = (model->temperature_min_dC - MIN_DISCHARGE_TEMPERATURE_LIMIT_dC) * DISCHARGE_TEMPERATURE_DERATE_dA_PER_dC;
-        model->temp_discharge_current_limit_dA = (upper_discharge_limit < lower_discharge_limit) ? upper_discharge_limit : lower_discharge_limit;
-    }
+    model->temp_charge_current_limit_dA = calculate_temperature_charge_current_limit(
+        model->temperature_min_dC,
+        model->temperature_max_dC
+    );
+    model->temp_discharge_current_limit_dA = calculate_temperature_discharge_current_limit(
+        model->temperature_min_dC,
+        model->temperature_max_dC
+    );
 }
 
 

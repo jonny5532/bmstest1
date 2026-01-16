@@ -26,7 +26,6 @@ include_directories(vendor/can2040/src)
 add_executable(bms
     bms.c
     init.c
-    kalman.c
     model.c
     hw/actuators/contactors.c
     hw/sensors/internal_adc.c
@@ -42,8 +41,13 @@ add_executable(bms
     bmb3y/bmb3y.c
     bmb3y/crc.c
     battery/balancing.c
+    battery/current_limits.c
     battery/safety_checks.c
     calibration/offline.c
+    estimators/basic_count.c
+    estimators/fancy_count.c
+    estimators/kalman.c
+    estimators/voltage_based.c
     monitoring/counters.c
     monitoring/events.c
     inverter/byd_can.c

@@ -109,7 +109,13 @@ typedef enum {
 void log_bms_event(bms_event_type_t event_type, uint64_t data);
 void clear_bms_event(bms_event_type_t type);
 void print_bms_events();
+uint16_t get_highest_event_level();
 
+static inline int16_t event_count(bms_event_type_t type) {
+    extern bms_event_slot_t bms_event_slots[];
+    if(type >= ERR_HIGHEST) return 0;
+    return bms_event_slots[type].count;
+}
 
 
 // Checks whether the first argument is true.

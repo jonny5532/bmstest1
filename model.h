@@ -36,8 +36,12 @@ typedef struct bms_model {
     millis_t neg_contactor_voltage_millis;
     int32_t neg_contactor_voltage_range_mV;
 
-    uint32_t soc; // state of charge in 0.01% units (0=0%, 10000=100.00%)
-    uint32_t soh; // state of health in 0.01% units (0=0%, 10000=100.00%)
+    uint16_t soc; // state of charge in 0.01% units (0=0%, 10000=100.00%)
+    uint16_t soh; // state of health in 0.01% units (0=0%, 10000=100.00%)
+
+    uint16_t soc_voltage_based;
+    uint16_t soc_basic_count;
+    uint16_t soc_fancy_count;
 
     system_sm_t system_sm;
     system_requests_t system_req;
@@ -60,6 +64,7 @@ typedef struct bms_model {
     int16_t cell_voltage_mV[120];
     int32_t cell_voltage_total_mV;
     millis_t cell_voltage_millis;
+    bool cell_voltage_slow_mode; // only request BMB data infrequently
 
     // The calculated pack voltage limits
     uint16_t max_voltage_limit_dV;

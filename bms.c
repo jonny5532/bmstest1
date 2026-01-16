@@ -11,6 +11,7 @@
 #include "battery/balancing.h"
 #include "inverter/inverter.h"
 #include "monitoring/events.h"
+#include "limits.h"
 #include "model.h"
 
 #include "bmb3y/bmb3y.h"
@@ -25,7 +26,7 @@
 
 #define CRC16_INIT                  ((uint16_t)-1l)
 void memcpy_with_crc16(uint8_t *dest, const uint8_t *src, size_t len, uint16_t *crc16);
-
+uint32_t kalman_update(int32_t charge_mC, int32_t current_mA, int32_t voltage_mV);
 
 extern uint16_t adc_samples_raw[8];
 extern uint32_t adc_samples_smooth_accum[8];
@@ -142,6 +143,7 @@ void tick() {
     // }
 
     read_inputs(&model);
+    model.cell_voltage_slow_mode = true;
     bmb3y_tick(&model);
 
     // Phase 2: Update model
@@ -150,9 +152,15 @@ void tick() {
     model.soc = kalman_update(
         ((model.charge_raw - last_charge_raw) * 132736) / 1000000,
         model.current_mA,
-        model.battery_voltage_mV
+        //model.battery_voltage_mV
+        model.cell_voltage_total_mV / NUM_CELLS
     );
     last_charge_raw = model.charge_raw;
+
+    model.soc_voltage_based = voltage_based_soc_estimate(&model);
+    model.soc_basic_count = basic_count_soc_estimate(&model);
+    model.soc_fancy_count = fancy_count_soc_estimate(&model);
+
 
     model_tick(&model);
     confirm_battery_safety(&model);
@@ -209,11 +217,13 @@ void tick() {
             model.pos_contactor_voltage_range_mV
         );
         int64_t charge_mC = (model.charge_raw * 132736) / 1000000;
-        printf("Current: %6ld mA | Charge: %lld mC | SoC: %2.2f %%\n",
+        printf("Current: %6ld mA | Charge: %lld mC | SoC: %2.2f %% | SoC(VB): %2.2f %% | SoC(BC): %2.2f %% | SoC(FC): %2.2f %%\n\n",
             model.current_mA,
             charge_mC,
-            model.soc / 100.0f
-
+            model.soc / 100.0f,
+            model.soc_voltage_based / 100.0f,
+            model.soc_basic_count / 100.0f,
+            model.soc_fancy_count / 100.0f
         );
     }
 }

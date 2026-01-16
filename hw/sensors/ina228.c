@@ -257,6 +257,11 @@ static int32_t div_round_closest(const int32_t n, const int32_t d)
   return ((n < 0) == (d < 0)) ? ((n + d/2)/d) : ((n - d/2)/d);
 }
 
+//#define SAMPLING_PERIOD_SMOOTHING 2048
+uint32_t last_sample_us = 0;
+//uint32_t average_sampling_period_us = 530000; //530944; // Initial estimate based on INA228 datasheet
+float average_sampling_period_us = 530944.0f; // Initial estimate based on INA228 datasheet
+
 // Read current from the INA228 (blocking)
 bool ina228_read_current_blocking(ina228_t *dev) {
     int32_t current_raw;
@@ -273,50 +278,37 @@ bool ina228_read_current_blocking(ina228_t *dev) {
         return false;
     }
     
-    // board values: 15 with tesla shunt
-
     current_corrected = current_raw - model.current_offset;
-    //dev->null_offset;
-    model.current_mA = current_corrected / 4;
+    // Invert so that positive current means charging.
+    model.current_mA = div_round_closest(-current_corrected, 4);
 
     // Was a new conversion
     if(diag_alert & 0x0002) {
         model.current_millis = millis();
 
+        uint32_t now_us = time_us_32();
+        uint32_t elapsed_us = now_us - last_sample_us;
+
+        if(last_sample_us != 0) {
+            average_sampling_period_us = (average_sampling_period_us * 0.99999f) + ((float)elapsed_us * 0.00001f);
+        }
+
+        // average_sampling_period_us = (average_sampling_period_us * (SAMPLING_PERIOD_SMOOTHING - 1) + elapsed_us) / SAMPLING_PERIOD_SMOOTHING;
+        last_sample_us = now_us;
+        printf("avg: %.2f us\n", average_sampling_period_us);
+
         // Is a new conversion, update charge
-        model.charge_raw += (int64_t)current_corrected;
+        model.charge_raw -= (int64_t)current_corrected;
         model.charge_millis = model.current_millis;
 
         // charge_raw is in units equivalent to 0.132736mC (0.25mA LSB, 530.944ms per sample)
 
+        // We sample at the same rate as the INA228 conversions, which has a
+        // clock accurate to 1% - we would do better to use the crystal instead,
+        // but the jitter would probably outweigh the accuracy improvement.
+
         dev->null_accumulator += current_raw;
         dev->null_counter++;
-
-        // TODO, do this elsewhere, track contactors, etc
-        // if(dev->null_counter < 64) {
-        //     dev->null_accumulator += current_raw;
-        //     dev->null_counter++;
-        //     if(dev->null_counter == 64) {
-        //         dev->null_offset = div_round_closest(dev->null_accumulator, 256);
-        //         model.charge_raw = 0;
-        //         printf("INA228: Null offset established: %ld\n", dev->null_offset);
-        //     }
-        // }
-
-
-        //     // Accumulate null offset
-        //     dev->null_accumulator = ((dev->null_accumulator * 127) + current_raw * 256) / 128;
-        //     dev->null_offset = div_round_closest(dev->null_accumulator, 256);
-
-        //     // dev->null_counter++;
-        //     // if(dev->null_counter == 256) {
-        //     //     dev->null_offset = div_round_closest(dev->null_accumulator, 256);
-        //     //     model.charge_raw = 0;
-        //     //     printf("INA228: Null offset established: %ld\n", dev->null_offset);
-        //     // }
-        //     //printf("INA228: Null offset accumulating: %ld (%u/256)\n", dev->null_accumulator, dev->null_counter);
-        //     printf("INA228: Null offset is %ld\n", dev->null_offset);
-        // //}
     }
     
     return true;

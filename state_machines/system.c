@@ -67,7 +67,11 @@ void system_sm_tick(bms_model_t *model) {
             break;
         case SYSTEM_STATE_CALIBRATING:
             // TODO - use explicit set/clear flags rather than checking state?
-            if(model->offline_calibration_sm.state == OFFLINE_CALIBRATION_STATE_IDLE) {
+            if(get_highest_event_level() == LEVEL_FATAL) {
+                // go to fault state
+                model->contactor_req = CONTACTORS_REQUEST_FORCE_OPEN;
+                state_transition((sm_t*)system_sm, SYSTEM_STATE_FAULT);
+            } else if(model->offline_calibration_sm.state == OFFLINE_CALIBRATION_STATE_IDLE) {
                 // Calibration complete
                 model->contactor_req = CONTACTORS_REQUEST_OPEN;
                 state_transition((sm_t*)system_sm, SYSTEM_STATE_INACTIVE);
@@ -80,11 +84,16 @@ void system_sm_tick(bms_model_t *model) {
         case SYSTEM_STATE_INACTIVE:
             // Currently, the supervisor takes a few seconds to start up, so we
             // need a 2s delay before trying to close contactors.
-            if(model->system_req == SYSTEM_REQUEST_RUN && state_timeout((sm_t*)system_sm, 2000)) {
+            if(get_highest_event_level() == LEVEL_FATAL) {
+                // go to fault state
+                model->contactor_req = CONTACTORS_REQUEST_FORCE_OPEN;
+                state_transition((sm_t*)system_sm, SYSTEM_STATE_FAULT);
+            } else if(model->system_req == SYSTEM_REQUEST_RUN && state_timeout((sm_t*)system_sm, 2000)) {
                 // leave request asserted?
                 //model->system_req = SYSTEM_REQUEST_NULL;
                 state_transition((sm_t*)system_sm, SYSTEM_STATE_OPERATING);
             }
+
             break;
         case SYSTEM_STATE_OPERATING:
             // Keep trying to close? (TODO: check failure count?)
@@ -94,8 +103,7 @@ void system_sm_tick(bms_model_t *model) {
                 // go to fault state
                 model->contactor_req = CONTACTORS_REQUEST_FORCE_OPEN;
                 state_transition((sm_t*)system_sm, SYSTEM_STATE_FAULT);
-            }
-            if(model->system_req == SYSTEM_REQUEST_STOP) {
+            } else if(model->system_req == SYSTEM_REQUEST_STOP) {
                 model->system_req = SYSTEM_REQUEST_NULL;
                 // do we need a wait-for-open state?
                 model->contactor_req = CONTACTORS_REQUEST_OPEN;
