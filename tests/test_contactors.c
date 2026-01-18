@@ -149,7 +149,7 @@ static void test_precharge_failure_timeout(void **state) {
     
     tick_sm(&model, 10001);
 
-    assert_int_equal(event_count(ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH), 1);
+    assert_int_equal(get_event_count(ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH), 1);
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_PRECHARGE_FAILED);
 }
 
@@ -171,7 +171,7 @@ static void test_pos_weld_failure_detection(void **state) {
     
     tick_sm(&model, 2100);
 
-    assert_int_equal(event_count(ERR_CONTACTOR_POS_STUCK_CLOSED), 1);
+    assert_int_equal(get_event_count(ERR_CONTACTOR_POS_STUCK_CLOSED), 1);
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
 }
 

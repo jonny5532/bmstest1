@@ -351,11 +351,16 @@ void contactor_sm_tick(bms_model_t *model) {
                 model->contactor_req = CONTACTORS_REQUEST_NULL;
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_OPEN);
             } else if(state_timeout((sm_t*)contactor_sm, 1000) && check_precharge_successful(model, false)) {
-                // successful precharge
+                // Successful precharge
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_CLOSED);
             } else if(state_timeout((sm_t*)contactor_sm, 10000)) {
-                // failed to precharge
+                // Failed to precharge!
+                // Log the reason
                 check_precharge_successful(model, true);
+                count_bms_event(
+                    ERR_CONTACTOR_CLOSING_FAILED,
+                    0x1000000000000000
+                );
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGE_FAILED);
             }
             break;
@@ -406,6 +411,10 @@ void contactor_sm_tick(bms_model_t *model) {
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_CLOSED);
                 } else {
                     // fault detected
+                    count_bms_event(
+                        ERR_CONTACTOR_CLOSING_FAILED,
+                        0x2000000000000000
+                    );
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_FAILED);
                 }
             }
@@ -419,6 +428,10 @@ void contactor_sm_tick(bms_model_t *model) {
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_POS_OPEN);
                 } else {
                     // fault detected
+                    count_bms_event(
+                        ERR_CONTACTOR_CLOSING_FAILED,
+                        0x3000000000000000
+                    );
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_FAILED);
                 }
             }
@@ -432,6 +445,10 @@ void contactor_sm_tick(bms_model_t *model) {
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_POS_CLOSED);
                 } else {
                     // fault detected
+                    count_bms_event(
+                        ERR_CONTACTOR_CLOSING_FAILED,
+                        0x4000000000000000
+                    );
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_FAILED);
                 }
             }
@@ -446,6 +463,10 @@ void contactor_sm_tick(bms_model_t *model) {
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING_NEG);
                 } else {
                     // fault detected
+                    count_bms_event(
+                        ERR_CONTACTOR_CLOSING_FAILED,
+                        0x5000000000000000
+                    );
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_FAILED);
                 }
             }

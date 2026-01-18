@@ -157,7 +157,7 @@ void tick() {
     // For debugging, prepare for restart (zero current) if 'R' received on USB stdio
     if(stdio_getchar_timeout_us(0) == 'R') {
         printf("Preparing to restart due to 'R' on USB stdio\n");
-        log_bms_event(ERR_RESTARTING, 1);
+        count_bms_event(ERR_RESTARTING, 1);
     }
 
     // Phase 2: Update model

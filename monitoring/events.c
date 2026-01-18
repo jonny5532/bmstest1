@@ -48,7 +48,7 @@ static void recalculate_highest_level() {
     }
 }
 
-void log_bms_event(bms_event_type_t type, uint64_t data) {
+void record_bms_event(bms_event_type_t type, uint64_t data, bool repeat) {
     if (type >= ERR_HIGHEST) return;
 
     bms_event_slot_t *slot = &bms_event_slots[type];
@@ -56,14 +56,19 @@ void log_bms_event(bms_event_type_t type, uint64_t data) {
 
     slot->timestamp = now;
     slot->data64 = data;
-    if(slot->level == LEVEL_NONE) {
-        // Only increment count if this is being asserted from a cleared state
+    if(slot->level == LEVEL_NONE || repeat) {
+        // Only increment count if new event or repeating
         slot->count = sadd_u16(slot->count, 1);
     }
 
     bms_event_level_t new_level = EVENT_TYPE_LEVELS[type];
 
-    if(slot->level != new_level) {
+    if(new_level == LEVEL_WARNING && EVENT_TYPE_LEEWAY[type] > 0 && slot->count >= EVENT_TYPE_LEEWAY[type]) {
+        // Escalate if warning event has occurred too many times
+        new_level = LEVEL_FATAL;
+    }
+
+    if(slot->level == LEVEL_NONE) {
         slot->level = new_level;
         recalculate_highest_level();
     }
@@ -105,10 +110,15 @@ void events_tick() {
     bool escalated = false;
     for(int i = 0; i < ERR_HIGHEST; i++) {
         bms_event_slot_t *slot = &bms_event_slots[i];
+        if(EVENT_TYPE_LEVELS[i] != LEVEL_CRITICAL) {
+            // Only critical type events can escalate
+            continue;
+        }
+
         uint16_t max_accumulator = EVENT_TYPE_LEEWAY[i];
         if(slot->level == LEVEL_CRITICAL) {
             // event currently critical, increment the accumulator
-            if(slot->accumulator + elapsed_ds >= max_accumulator) {
+            if(sadd_u16(slot->accumulator, elapsed_ds) >= max_accumulator) {
                 // we've hit the leeway limit, escalate
                 slot->accumulator = max_accumulator;
                 slot->level = LEVEL_FATAL;

@@ -59,16 +59,18 @@ typedef enum {
 
 // Pass a macro in as X to render the event list in different ways
 //
-// Format: X(name, default_level, critical_to_fault_delay_ms)
+// Format: X(name, default_level, escalate_after)
 //
 // where:
 //  - name is the event name (ERR_ is prepended to the enum value)
 //  - default_level is the default level for the event (although can be
 //    overridden)
-//  - critical_to_fault_ds is how long after a critical level the event
-//    automatically escalates to a fatal level (0 means instant). If
-//    the event clears the counter decrements (rather than resetting) to stop
-//    serious but noisy events never escalating. Should be a multiple of 100ms. Maximum 6553s.
+//  - escalate_after has different functions depending on level:
+//    - for WARNING level events, it's the number of occurrences before
+//      escalating to CRITICAL (zero means never escalate)
+//    - for CRITICAL level events, it's the active time in milliseconds before
+//      escalating to FATAL (zero means instant). Should be a multiple of 100ms.
+//      Maximum 6553s.
 
 // Todo - also have a max-warnings-before-critical counter?
 
@@ -81,6 +83,7 @@ typedef enum {
     X(CONTACTOR_PRECHARGE_CURRENT_TOO_HIGH, LEVEL_CRITICAL, 0)  \
     X(CONTACTOR_POS_UNEXPECTED_OPEN, LEVEL_WARNING, 0)          \
     X(CONTACTOR_NEG_UNEXPECTED_OPEN, LEVEL_WARNING, 0)          \
+    X(CONTACTOR_CLOSING_FAILED, LEVEL_WARNING, 20)               \
     X(SUPPLY_VOLTAGE_STALE, LEVEL_CRITICAL, 2000)               \
     X(BATTERY_VOLTAGE_STALE, LEVEL_CRITICAL, 2000)              \
     X(BATTERY_TEMPERATURE_STALE, LEVEL_CRITICAL, 20000)         \
@@ -119,18 +122,29 @@ typedef enum {
 } bms_event_type_t;
 
 
-void log_bms_event(bms_event_type_t event_type, uint64_t data);
+void record_bms_event(bms_event_type_t event_type, uint64_t data, bool repeat);
 void clear_bms_event(bms_event_type_t type);
 void print_bms_events();
 uint16_t get_highest_event_level();
 void events_tick();
 
-static inline int16_t event_count(bms_event_type_t type) {
+static inline int16_t get_event_count(bms_event_type_t type) {
     extern bms_event_slot_t bms_event_slots[];
     if(type >= ERR_HIGHEST) return 0;
     return bms_event_slots[type].count;
 }
 
+// Logs an event of the specified type with the provided data. Once raised,
+// subsequent calls will not increase the count.
+static inline void raise_bms_event(bms_event_type_t type, uint64_t data) {
+    record_bms_event(type, data, false);
+}
+
+// Logs an event of the specified type with the provided data. Each call
+// will increase the count.
+static inline void count_bms_event(bms_event_type_t type, uint64_t data) {
+    record_bms_event(type, data, true);
+}
 
 // Checks whether the first argument is true.
 // If not, logs an event of the specified type and level, with the provided data.
@@ -138,7 +152,7 @@ static inline int16_t event_count(bms_event_type_t type) {
 // Returns the value of the condition.
 static inline bool confirm(bool success, bms_event_type_t event_type, uint64_t data) {
     if(!success) {
-        log_bms_event(
+        raise_bms_event(
             event_type,
             data
         );
