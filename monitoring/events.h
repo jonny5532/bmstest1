@@ -112,6 +112,13 @@ typedef enum {
     X(BATTERY_TEMPERATURE_VERY_HIGH, LEVEL_CRITICAL, 1000)      \
     X(BATTERY_TEMPERATURE_LOW, LEVEL_WARNING, 0)                \
     X(BATTERY_TEMPERATURE_VERY_LOW, LEVEL_CRITICAL, 1000)       \
+                                                                \
+    X(BMB_READ_ERROR, LEVEL_WARNING, 0)                         \
+    X(BMB_CRC_MISMATCH, LEVEL_WARNING, 0)                       \
+                                                                \
+    X(BOOT_NORMAL, LEVEL_INFO, 0)                               \
+    X(BOOT_WATCHDOG, LEVEL_WARNING, 0)                          \
+    X(LOOP_OVERRUN, LEVEL_WARNING, 0)                           \
     X(RESTARTING, LEVEL_FATAL, 0)
 
 typedef enum {
@@ -128,8 +135,9 @@ void print_bms_events();
 uint16_t get_highest_event_level();
 void events_tick();
 
+extern bms_event_slot_t bms_event_slots[];
+
 static inline int16_t get_event_count(bms_event_type_t type) {
-    extern bms_event_slot_t bms_event_slots[];
     if(type >= ERR_HIGHEST) return 0;
     return bms_event_slots[type].count;
 }

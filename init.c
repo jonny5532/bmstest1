@@ -10,6 +10,7 @@
 #include "isospi/isosnoop.h"
 #include "isospi/isospi_master.h"
 #include "state_machines/contactors.h"
+#include "limits.h"
 #include "model.h"
 
 ina228_t ina228_dev = {0};
@@ -18,6 +19,7 @@ ads1115_t ads1115_dev = {0};
 void init_hw() {
     init_watchdog();
 
+    // Use a strapped pin to check we are running on the correct MCU
     gpio_init(PIN_MCU_CHECK);
     gpio_set_dir(PIN_MCU_CHECK, GPIO_IN);
     bool mcu_check = gpio_get(PIN_MCU_CHECK);
@@ -34,7 +36,6 @@ void init_hw() {
     init_pwm_pin(PIN_CONTACTOR_POS);
     init_pwm_pin(PIN_CONTACTOR_PRE);
     init_pwm_pin(PIN_CONTACTOR_NEG);
-
 
     if(!ina228_init(&ina228_dev, 0x40, 0.001, 100.0f)) {
         printf("INA228 init failed!\n");
@@ -75,6 +76,8 @@ void init_model() {
     } else {
         printf("No calibration data in NVM\n");
     }
+
+    model.capacity_mC = BATTERY_CAPACITY_AH * 3600 * 1000; // in mC
 }
 
 void init() {

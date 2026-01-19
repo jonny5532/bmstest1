@@ -113,27 +113,32 @@ int32_t internal_adc_read(uint8_t channel) {
 static const float fudge_factor = 0.935465f;
 
 int32_t internal_adc_read_3v3_mv() {
-    return samples[INTERNAL_ADC_3V3_INDEX].value / (int32_t)(
-        1.0 / ((1.0/256.0)*(3300.0/4096.0)*(1/0.5))
-    );
+    return (samples[INTERNAL_ADC_3V3_INDEX].value * 18) / 2878;
+    // / (int32_t)(
+    //    1.0 / ((1.0/256.0)*(3300.0/4096.0)*(1/0.5))
+    //);
 }
 
 int32_t internal_adc_read_5v_mv() {
-    return samples[INTERNAL_ADC_5V_INDEX].value / (int32_t)(
-        1.0 / ((1.0/256.0)*(3300.0/4096.0)*(1.0/0.294118)*fudge_factor)
-    );
+    return (samples[INTERNAL_ADC_5V_INDEX].value * 5) / 468;
+    //  / (int32_t)(
+    //     94
+    //     //1.0 / ((1.0/256.0)*(3300.0/4096.0)*(1.0/0.294118))
+    // );
 }
 
 int32_t internal_adc_read_12v_mv() {
-    return samples[INTERNAL_ADC_12V_INDEX].value / (int32_t)(
-        1.0 / ((1.0/256.0)*(3300.0/4096.0)*(1.0/0.083326)*fudge_factor)
-    );
+    return (samples[INTERNAL_ADC_12V_INDEX].value * 40) / 1179;
+   //  / (int32_t)(
+//        1.0 / ((1.0/256.0)*(3300.0/4096.0)*(1.0/0.083326))
+//    );
 }
 
 int32_t internal_adc_read_contactor_mv() {
-    return samples[INTERNAL_ADC_CONTACTOR_INDEX].value / (int32_t)(
-        1.0 / ((1.0/256.0)*(3300.0/4096.0)*(1.0/0.083326)*fudge_factor)
-    );
+    return (samples[INTERNAL_ADC_CONTACTOR_INDEX].value * 40) / 1179;
+    //      / (int32_t)(
+    //     1.0 / ((1.0/256.0)*(3300.0/4096.0)*(1.0/0.083326))
+    // );
 }
 
 

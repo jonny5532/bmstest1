@@ -3,6 +3,7 @@
 
 #include "../limits.h"
 #include "../model.h"
+#include "../monitoring/events.h"
 #include "../isospi/isospi_master.h"
 
 #include "pico/stdlib.h"
@@ -201,6 +202,7 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
     uint32_t cmd = READ_COMMANDS[bank_index];
     if (!bmb3y_long_command_get_data_blocking(cmd, rx_buf, 72)) {
         printf("BMB3Y read failed for cmd 0x%02lX\n", cmd);
+        count_bms_event(ERR_BMB_READ_ERROR, 0x0100000000000000 | bank_index);
         return false;
     }
 
@@ -226,6 +228,7 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
                 rx_buf[module * 9 + 8],
                 calc_crc
             );
+            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | (module_crc << 16) | calc_crc);
         }
 
         if(module==0 && module_crc != calc_crc) {
@@ -265,6 +268,7 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
 
     if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_TEMPS3, rx_buf, 8)) {
         printf("BMB3Y temperature read failed\n");
+        count_bms_event(ERR_BMB_READ_ERROR, 0x0200000000000000);
         // printf("temptest failed hex: ");
         // for(int i=0;i<8;i++) {
         //     printf("%02X ", rx_buf[i]);
@@ -300,6 +304,7 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
         if(module_crc != calc_crc) {
             printf("Bad Temp CRC on module %d: msg 0x%04X calc 0x%04X\n", module, module_crc, calc_crc);
             crc_ok = false;
+            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
             continue;
         }
 

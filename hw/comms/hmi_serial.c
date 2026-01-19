@@ -5,6 +5,7 @@
 #include "../chip/time.h"
 #include "../sensors/ina228.h"
 #include "../../model.h"
+#include "../../monitoring/events.h"
 
 #include "pico/stdlib.h"
 #include "pico/unique_id.h"
@@ -119,8 +120,8 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
             idx += hmi_buf_append_uint64(&buf[idx], millis());
             break;
         case HMI_REG_SOC:
-            buf[idx++] = HMI_TYPE_UINT32;
-            idx += hmi_buf_append_uint32(&buf[idx], model->soc);
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->soc);
             break;
         case HMI_REG_CURRENT:
             buf[idx++] = HMI_TYPE_INT32;
@@ -169,6 +170,22 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
         case HMI_REG_CONTACTORS_STATE:
             buf[idx++] = HMI_TYPE_UINT8;
             buf[idx++] = (uint8_t)model->contactor_sm.state;
+            break;
+        case HMI_REG_SOC_VOLTAGE_BASED:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->soc_voltage_based);
+            break;
+        case HMI_REG_SOC_BASIC_COUNT:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->soc_basic_count);
+            break;
+        case HMI_REG_SOC_EKF:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->soc_ekf);
+            break;
+        case HMI_REG_CAPACITY:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], model->capacity_mC);
             break;
         default:
             if (reg_id >= HMI_REG_CELL_VOLTAGES_START && reg_id <= HMI_REG_CELL_VOLTAGES_END) {
@@ -268,13 +285,19 @@ static void hmi_handle_write_registers(const uint8_t *rx_buf, size_t len, bms_mo
         uint8_t size = hmi_get_type_size(type);
         if (rx_idx + size > len) break;
 
-        // Perform write if applicable
-        if (reg_id == HMI_REG_SOC && type == HMI_TYPE_UINT32) {
-            model->soc = hmi_buf_get_uint32(&rx_buf[rx_idx]);
-        } else if (reg_id == HMI_REG_SYSTEM_REQUEST && type == HMI_TYPE_UINT8) {
-            model->system_req = (system_requests_t)rx_buf[rx_idx];
+        if(type == HMI_TYPE_UINT8) {
+            switch(reg_id) {
+                case HMI_REG_SYSTEM_REQUEST:
+                    model->system_req = (system_requests_t)rx_buf[rx_idx];
+                    break;
+            }
+        } else if(type == HMI_TYPE_UINT32) {
+            switch(reg_id) {
+                case HMI_REG_CAPACITY:
+                    model->capacity_mC = hmi_buf_get_uint32(&rx_buf[rx_idx]);
+                    break;
+            }
         }
-        // Add more writable registers here as needed
 
         rx_idx += size;
         
@@ -325,6 +348,51 @@ static void hmi_handle_read_cell_voltages(const uint8_t *rx_buf, size_t len, bms
     duart_send_packet(&HMI_SERIAL_DUART, tx_buf, tx_idx);
 }
 
+static void hmi_handle_read_events(const uint8_t *rx_buf, size_t len, bms_model_t *model) {
+    if (len < 4) return;
+    uint8_t addr = rx_buf[1];
+    if (addr != device_address) return;
+
+    uint16_t start_index = hmi_buf_get_uint16(&rx_buf[2]);
+    if (start_index > ERR_HIGHEST) start_index = ERR_HIGHEST;
+
+    uint8_t tx_buf[256];
+    uint16_t tx_idx = 0;
+
+    tx_buf[tx_idx++] = HMI_MSG_READ_EVENTS_RESPONSE;
+    tx_buf[tx_idx++] = device_address;
+    
+    // next_index and number of events in this packet
+    uint16_t next_index_ptr = tx_idx;
+    tx_idx += 2;
+    uint16_t count_ptr = tx_idx;
+    tx_idx += 2;
+
+    uint16_t count = 0;
+    uint16_t i;
+    for (i = start_index; i < ERR_HIGHEST; i++) {
+        bms_event_slot_t *slot = &bms_event_slots[i];
+        if (slot->count > 0) {
+            // event_type (2), level (2), count (2), timestamp (8), data (8) = 22 bytes
+            if (tx_idx + 22 > 250) {
+                break;
+            }
+
+            tx_idx += hmi_buf_append_uint16(&tx_buf[tx_idx], i);
+            tx_idx += hmi_buf_append_uint16(&tx_buf[tx_idx], slot->level);
+            tx_idx += hmi_buf_append_uint16(&tx_buf[tx_idx], slot->count);
+            tx_idx += hmi_buf_append_uint64(&tx_buf[tx_idx], slot->timestamp);
+            tx_idx += hmi_buf_append_uint64(&tx_buf[tx_idx], slot->data64);
+            count++;
+        }
+    }
+
+    hmi_buf_append_uint16(&tx_buf[next_index_ptr], i);
+    hmi_buf_append_uint16(&tx_buf[count_ptr], count);
+
+    duart_send_packet(&HMI_SERIAL_DUART, tx_buf, tx_idx);
+}
+
 void hmi_serial_tick(bms_model_t *model) {
     uint8_t rx_buf[256];
 
@@ -353,6 +421,9 @@ void hmi_serial_tick(bms_model_t *model) {
                 break;
             case HMI_MSG_READ_CELL_VOLTAGES:
                 hmi_handle_read_cell_voltages(rx_buf, len, model);
+                break;
+            case HMI_MSG_READ_EVENTS:
+                hmi_handle_read_events(rx_buf, len, model);
                 break;
             default:
                 // Ignore other messages (responses or unknown)

@@ -1,5 +1,6 @@
 #include "ekf.h"
 #include "../hw/chip/time.h"
+#include "../model.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -339,7 +340,7 @@ uint32_t ekf_tick(int32_t charge_mC, int32_t current_mA, int32_t voltage_mV) {
             initial_soc += (voltage_volts - soc_to_ocv(initial_soc)); // Simple convergence
         }
 
-        float initial_capacity_ah = 2.0f; // Example initial capacity
+        float initial_capacity_ah = model.capacity_mC / 3600000; // in Ah
         ekf_init(&ekf_instance, initial_soc, initial_capacity_ah);
 
         initialized = true;

@@ -44,6 +44,8 @@ typedef struct bms_model {
     uint16_t soc_basic_count;
     uint16_t soc_fancy_count;
 
+    uint32_t capacity_mC; // battery capacity in mC
+
     system_sm_t system_sm;
     system_requests_t system_req;
 

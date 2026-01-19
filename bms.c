@@ -273,6 +273,7 @@ void synchronize_time() {
     } else {
         // took too long!
         printf("Warning: loop overran (%ld ms)\n", delta);
+        count_bms_event(ERR_LOOP_OVERRUN, delta);
     }
     update_millis();
     update_timestep();
@@ -281,10 +282,8 @@ void synchronize_time() {
 int main() {
     stdio_usb_init();
 
-    // Deliberate delay to:
-    // 1) allow time for USB to enumerate so that we can catch early prints
-    // 2) allow early reprogramming, in case the program hangs later on
-    sleep_ms(4000);
+    // Give a chance for USB to enumerate before we start printing
+    sleep_ms(1000);
 
     multicore_launch_core1(core1_entry);
 

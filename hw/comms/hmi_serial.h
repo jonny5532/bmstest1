@@ -9,6 +9,9 @@
 #define HMI_MSG_READ_CELL_VOLTAGES   0x05
 #define HMI_MSG_READ_CELL_VOLTAGES_RESPONSE 0x85
 
+#define HMI_MSG_READ_EVENTS          0x06
+#define HMI_MSG_READ_EVENTS_RESPONSE 0x86
+
 #define HMI_ANNOUNCE_DEVICE_TYPE_BMS 0x01
 
 #define HMI_TYPE_UINT8  0x11
@@ -25,7 +28,7 @@
 
 #define HMI_REG_SERIAL                  1 // uint64
 #define HMI_REG_MILLIS                  2 // uint64
-#define HMI_REG_SOC                     3 // uint32
+#define HMI_REG_SOC                     3 // uint16
 #define HMI_REG_CURRENT                 4 // int32 (mA)
 #define HMI_REG_CHARGE                  5 // int64 (mC)
 #define HMI_REG_BATTERY_VOLTAGE         6 // int32 (mV)
@@ -39,6 +42,10 @@
 #define HMI_REG_SYSTEM_REQUEST         14 // uint8
 #define HMI_REG_SYSTEM_STATE           15 // uint8
 #define HMI_REG_CONTACTORS_STATE       16 // uint8
+#define HMI_REG_SOC_VOLTAGE_BASED      17 // uint16
+#define HMI_REG_SOC_BASIC_COUNT        18 // uint16
+#define HMI_REG_SOC_EKF                19 // uint16
+#define HMI_REG_CAPACITY               20 // uint32 (mC)
 #define HMI_REG_CELL_VOLTAGES_START 0x100
 #define HMI_REG_CELL_VOLTAGES_END   0x1FF
 
@@ -129,6 +136,31 @@ request from the HMI. The format is:
 <register 2 id (2 bytes)>
 <register 2 type (1 byte)>
 <register 2 value (N bytes)>
+...
+
+2.6. Read events (from HMI to BMS)
+
+The read events message is used by the HMI to request active or previous events
+from the BMS. The format is:
+
+<message type byte = HMI_MSG_READ_EVENTS (0x06)>
+<device address (1 byte)>
+<start index (2 bytes)>
+
+2.7. Read events response (from BMS to HMI)
+
+The read events response is sent by the BMS in response to a read events request.
+The format is:
+
+<message type byte = HMI_MSG_READ_EVENTS_RESPONSE (0x86)>
+<device address (1 byte)>
+<next index (2 bytes)>
+<event count in packet (2 bytes)>
+<event 1 type (2 bytes)>
+<event 1 level (2 bytes)>
+<event 1 count (2 bytes)>
+<event 1 timestamp (8 bytes)>
+<event 1 data (8 bytes)>
 ...
 
 */

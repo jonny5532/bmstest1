@@ -6,7 +6,6 @@
 static int32_t last_charge_raw = 0;
 
 static float charge_counter_mC;
-static float capacity_mC = 2.0f * 3600.0f * 1000.0f; // 2Ah in mC
 
 static bool initialized = false;
 
@@ -25,7 +24,7 @@ uint16_t basic_count_soc_estimate(bms_model_t *model) {
     charge_counter_mC -= charge;
     if(charge_counter_mC < 0.0f) {
         charge_counter_mC = 0.0f;
-    } else if(charge_counter_mC > capacity_mC) {
+    } else if(charge_counter_mC > model->capacity_mC) {
         // maybe expand capacity? or record measured capacity?
         //charge_counter_mC = capacity_mC;
     }
@@ -35,12 +34,12 @@ uint16_t basic_count_soc_estimate(bms_model_t *model) {
         // Initialize SOC estimate based on OCV
         float soc = nmc_ocv_to_soc((float)model->battery_voltage_mV / (NUM_CELLS * 1000.0f));
 
-        charge_counter_mC = (1.0f - soc) * capacity_mC;
+        charge_counter_mC = (1.0f - soc) * model->capacity_mC;
 
         initialized = true;
     }
 
-    float soc = 1.0f - (charge_counter_mC / capacity_mC);
+    float soc = 1.0f - (charge_counter_mC / (float)model->capacity_mC);
     if(soc < 0.0f) {
         soc = 0.0f;
     } else if(soc > 1.0f) {

@@ -83,6 +83,8 @@
 // How many modules of temps to read
 #define NUM_MODULE_TEMPS 1
 
+#define BATTERY_CAPACITY_AH 2
+
 // Options: 
 // - we could load in the cellvoltages as they come in, and use the presence mask for decoding
 // - or use the presence mask to load in the cellvoltages (and modify the balance mask)
