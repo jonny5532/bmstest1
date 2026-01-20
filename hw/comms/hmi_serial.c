@@ -97,6 +97,14 @@ static bool hmi_register_is_available(uint16_t reg_id, bms_model_t *model) {
         case HMI_REG_CELL_VOLTAGE_MIN:
         case HMI_REG_CELL_VOLTAGE_MAX:
             return model->cell_voltage_millis > 0;
+        case HMI_REG_SUPPLY_VOLTAGE_3V3:
+            return model->supply_voltage_3V3_millis > 0;
+        case HMI_REG_SUPPLY_VOLTAGE_5V:
+            return model->supply_voltage_5V_millis > 0;
+        case HMI_REG_SUPPLY_VOLTAGE_12V:
+            return model->supply_voltage_12V_millis > 0;
+        case HMI_REG_SUPPLY_VOLTAGE_CTR:
+            return model->supply_voltage_contactor_millis > 0;
     }
     return true;
 }
@@ -186,6 +194,22 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
         case HMI_REG_CAPACITY:
             buf[idx++] = HMI_TYPE_UINT32;
             idx += hmi_buf_append_uint32(&buf[idx], model->capacity_mC);
+            break;
+        case HMI_REG_SUPPLY_VOLTAGE_3V3:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->supply_voltage_3V3_mV);
+            break;
+        case HMI_REG_SUPPLY_VOLTAGE_5V:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->supply_voltage_5V_mV);
+            break;
+        case HMI_REG_SUPPLY_VOLTAGE_12V:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->supply_voltage_12V_mV);
+            break;
+        case HMI_REG_SUPPLY_VOLTAGE_CTR:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->supply_voltage_contactor_mV);
             break;
         default:
             if (reg_id >= HMI_REG_CELL_VOLTAGES_START && reg_id <= HMI_REG_CELL_VOLTAGES_END) {
@@ -402,7 +426,8 @@ void hmi_serial_tick(bms_model_t *model) {
         hmi_send_announce_device();
     }
 
-    // message handling+response seems to take 50-100us
+    // Handling a message seems to take 50-100us. We handle one message per tick
+    // (giving a max effective throughput of ~100kbps with 256 byte messages).
 
     size_t len = duart_read_packet(&HMI_SERIAL_DUART, rx_buf, sizeof(rx_buf));
     if(len > 0) {
@@ -413,7 +438,8 @@ void hmi_serial_tick(bms_model_t *model) {
                 break;
             case HMI_MSG_READ_REGISTERS:
                 hmi_handle_read_registers(rx_buf, len, model);
-                // Postpone the next announce
+                // Postpone the next announce, so that if we are polled
+                // frequently enough we never risk causing a collision.
                 next_announce_timestep = timestep() + announce_period;
                 break;
             case HMI_MSG_WRITE_REGISTERS:

@@ -116,6 +116,12 @@ typedef struct bms_model {
 
     bool balancing_enabled;
     int16_t balancing_voltage_threshold_mV; // Only balance cells above this voltage
+
+    bool estop_pressed;
+    // whether we have performed a slow operation this tick and possibly missed
+    // the deadline (we allow such slow operations occasionally, as long as they
+    // are spaced out)
+    bool ignore_missed_deadline;
   
 } bms_model_t;
 

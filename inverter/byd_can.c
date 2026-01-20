@@ -1,5 +1,6 @@
 #include "../hw/allocations.h"
 #include "../hw/pins.h"
+#include "../monitoring/events.h"
 #include "../model.h"
 
 #include "can2040.h"
@@ -75,7 +76,12 @@ static void can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *
             return;
     }
 
+    if(!inverter_present) {
+        count_bms_event(ERR_INVERTER_DETECTED, 0);
+    }
+
     inverter_present = true;
+
 
     // TODO: store last received time for timeout detection
 }

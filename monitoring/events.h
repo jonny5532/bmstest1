@@ -72,8 +72,6 @@ typedef enum {
 //      escalating to FATAL (zero means instant). Should be a multiple of 100ms.
 //      Maximum 6553s.
 
-// Todo - also have a max-warnings-before-critical counter?
-
 #define EVENT_TYPES(X)                                          \
     X(CONTACTOR_POS_STUCK_OPEN, LEVEL_CRITICAL, 0)              \
     X(CONTACTOR_POS_STUCK_CLOSED, LEVEL_CRITICAL, 0)            \
@@ -116,6 +114,10 @@ typedef enum {
                                                                 \
     X(BMB_READ_ERROR, LEVEL_WARNING, 0)                         \
     X(BMB_CRC_MISMATCH, LEVEL_WARNING, 0)                       \
+                                                                \
+    X(INVERTER_DETECTED, LEVEL_INFO, 0)                         \
+                                                                \
+    X(ESTOP_PRESSED, LEVEL_CRITICAL, 500)                       \
                                                                 \
     X(BOOT_NORMAL, LEVEL_INFO, 0)                               \
     X(BOOT_WATCHDOG, LEVEL_WARNING, 0)                          \

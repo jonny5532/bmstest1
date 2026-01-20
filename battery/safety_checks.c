@@ -115,4 +115,11 @@ void confirm_battery_safety(bms_model_t *model) {
             ((uint64_t)model->cell_voltage_total_mV << 32) | (uint32_t)expected_total
         );
     }
+
+    // TODO: definitely not the right place for this
+    confirm(
+        !model->estop_pressed,
+        ERR_ESTOP_PRESSED,
+        0
+    );
 }

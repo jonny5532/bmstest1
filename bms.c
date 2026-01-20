@@ -133,6 +133,8 @@ void read_inputs(bms_model_t *model) {
     model->supply_voltage_12V_millis = internal_adc_read_12v_millis();
     model->supply_voltage_contactor_mV = internal_adc_read_contactor_mv();
     model->supply_voltage_contactor_millis = internal_adc_read_contactor_millis();
+
+    model->estop_pressed = gpio_get(PIN_ESTOP);
 }
 
 void tick() {
@@ -270,11 +272,14 @@ void synchronize_time() {
     int32_t delta = millis() - prev;
     if(delta <= 20) {
         sleep_ms(20 - delta);
+    } else if(model.ignore_missed_deadline) {
+        printf("Notice: loop overran but ignored (%ld ms)\n", delta);
     } else {
         // took too long!
         printf("Warning: loop overran (%ld ms)\n", delta);
         count_bms_event(ERR_LOOP_OVERRUN, delta);
     }
+    model.ignore_missed_deadline = false;
     update_millis();
     update_timestep();
 }

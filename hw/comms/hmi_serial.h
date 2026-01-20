@@ -46,6 +46,10 @@
 #define HMI_REG_SOC_BASIC_COUNT        18 // uint16
 #define HMI_REG_SOC_EKF                19 // uint16
 #define HMI_REG_CAPACITY               20 // uint32 (mC)
+#define HMI_REG_SUPPLY_VOLTAGE_3V3     21 // uint16 (mV)
+#define HMI_REG_SUPPLY_VOLTAGE_5V      22 // uint16 (mV)
+#define HMI_REG_SUPPLY_VOLTAGE_12V     23 // uint16 (mV)
+#define HMI_REG_SUPPLY_VOLTAGE_CTR     24 // uint16 (mV)
 #define HMI_REG_CELL_VOLTAGES_START 0x100
 #define HMI_REG_CELL_VOLTAGES_END   0x1FF
 

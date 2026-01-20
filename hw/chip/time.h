@@ -15,6 +15,11 @@ extern millis_t stored_millis;
 extern uint32_t stored_timestep;
 
 void update_millis();
+
+// Return the current time in milliseconds since boot, as of the start of the
+// current tick. This should change by approximately TIMESTEP_PERIOD_MS each
+// tick, although might jump if a slow operation (such as a flash write) causes
+// a larger delay.
 static inline millis_t millis() {
     return stored_millis;
 }
@@ -32,23 +37,21 @@ static inline bool millis_recent_enough(millis_t t, uint32_t delta_ms) {
 
 void update_timestep();
 
-// Return the current timestep. The timestep is incremented every main loop tick, never skipping values.
+// Return the current timestep. The timestep is incremented every main loop
+// tick, never skipping values. Unless a strict schedule is required, it is
+// better to distribute operations based on timesteps, as this makes it possible
+// to explicitly separate operations into different ticks, avoiding the problem
+// of the tick after a slow operation itself taking longer than expected due to
+// every timer having expired at once.
 static inline uint32_t timestep() {
     return stored_timestep;
 }
 
-// static inline bool timestep_period_ms(uint32_t period_ms, uint32_t offset_ticks) {
-//     uint32_t ticks_per_period = period_ms / TIMESTEP_PERIOD_MS;
-//     if(ticks_per_period == 0) {
-//         ticks_per_period = 1;
-//     }
-//     return ((timestep() + offset_ticks) % ticks_per_period) == 0;
-// }
-
-// Check if the given period in ms has elapsed. Minimum resolution is
-// TIMESTEP_PERIOD_MS. Needs passing a pointer to a uint32_t which is used to
-// store the last timestep. The initial value of the last timestep can be offset
-// slightly, to stagger regular routines.
+// Check if the given period in ms has elapsed, by counting the equivalent
+// number of timesteps. Minimum resolution is TIMESTEP_PERIOD_MS. Needs passing
+// a pointer to a uint32_t which is used to store the last timestep. The initial
+// value of the last timestep can be offset slightly, to stagger regular
+// routines.
 static inline bool timestep_every_ms(uint32_t period_ms, uint32_t *last_timestep) {
     uint32_t ticks_per_period = period_ms / TIMESTEP_PERIOD_MS;
     if(timestep() >= *last_timestep + ticks_per_period) {

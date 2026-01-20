@@ -438,13 +438,14 @@ size_t duart_read_packet(duart *u, uint8_t *buf, size_t buf_size) {
             memcpy_with_crc16(&buf[first_part], &data[0], second_part, &crc16);
 
             // print message bytes
-            //printf("DUART rx2: FF %02X ", payload_len - 1);
+            // printf("DUART rx2: FF %02X ", payload_len - 1);
             // for(size_t i=0; i<payload_len; i++) {
             //     printf("%02X ", buf[i]);
             // }
 
-            //printf("%02X %02X", data[second_part], data[second_part + 1]);
-            //printf("\n");
+            // printf("%02X %02X second_part is %d", data[second_part], data[second_part + 1], second_part);
+            // printf("%02X %02X", data[second_part], data[second_part + 1]);
+            // printf("\n");
 
             // Read CRC16 from message
             uint16_t msg_crc16 = data[second_part] | (data[second_part + 1] << 8);
@@ -454,7 +455,7 @@ size_t duart_read_packet(duart *u, uint8_t *buf, size_t buf_size) {
 
             if(crc16 != msg_crc16) {
                 // CRC mismatch
-                printf("DUART crc err2: %d calc %04x msg %04x\n", payload_len, crc16, msg_crc16);
+                printf("DUART crc err2: %d calc %04x msg %04x sp %d\n", payload_len, crc16, msg_crc16, second_part);
                 if(u==&duart0) {
                     debug_counters.uart0_crc_errors++;
                 } else {

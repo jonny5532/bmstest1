@@ -37,6 +37,10 @@ void init_hw() {
     init_pwm_pin(PIN_CONTACTOR_PRE);
     init_pwm_pin(PIN_CONTACTOR_NEG);
 
+    gpio_init(PIN_ESTOP);
+    gpio_set_dir(PIN_ESTOP, GPIO_IN);
+    gpio_pull_down(PIN_ESTOP);
+
     if(!ina228_init(&ina228_dev, 0x40, 0.001, 100.0f)) {
         printf("INA228 init failed!\n");
     }
@@ -92,9 +96,12 @@ void init() {
     update_millis();
 
     int boot_count = update_boot_count();
+    // NVM operations can be slow, so allow a missed deadline
+    model.ignore_missed_deadline = true;
     if (boot_count >= 0) {
         printf("Boot count from LittleFS: %d\n", boot_count);
     } else {
         printf("Failed to update boot count in LittleFS\n");
     }
+
 }

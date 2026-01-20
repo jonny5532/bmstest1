@@ -60,3 +60,12 @@ be automatically disconnected whilst it is still in the soft-limit region, and
 can then be safely discharged/charged back into normal service after manual
 intervention.
 
+
+### Response time
+
+The main loop of the BMS runs every 20 milliseconds. It will therefore take at least 20ms for the BMS to react to a change, up to several multiples of 20ms if the signal propagates through the model in stages.
+
+Most operations performed in the main loop should easily complete within the 20ms deadline. However the BMS performs occasional flash memory writes which can take much longer (the worst case block-erase time of the SPI flash chip is 2 seconds). The normal WARNING that occurs if a loop tick overruns is suppressed when flash memory operations are performed.
+
+A system-wide watchdog timer is set up with a 5 second deadline, which gets reset every tick. If the main loop stalls for more than 5 seconds, the chip will reboot and raise a WARNING event.
+
