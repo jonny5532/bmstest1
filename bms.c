@@ -155,6 +155,7 @@ void tick() {
     // Phase 1: Read sensors
 
     read_inputs(&model);
+    //model.cell_voltage_slow_mode = true;
     bmb3y_tick(&model);
 
     // For debugging, prepare for restart (zero current) if 'R' received on USB stdio
@@ -218,7 +219,7 @@ void tick() {
     if((timestep() & 0x3f) == 32) {
         //isosnoop_print_buffer();
         uint32_t total = 0;
-        for(int i=0; i<15; i++) {
+        for(int i=0; i<NUM_CELLS; i++) {
             printf("[c%3d]: %4d mV | ", i, model.cell_voltages_mV[i]);
             total += model.cell_voltages_mV[i];
             if((i % 5) == 4) {

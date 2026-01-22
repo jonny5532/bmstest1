@@ -50,6 +50,15 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 #define BMB3Y_CMD_READ_CONFIG  0x50009400    // Config register
 #define BMB3Y_CMD_WRITE_CONFIG 0x112F        // Write config
 
+#define BMB3Y_CMD_READ_A_SHORT 0x0763
+#define BMB3Y_CMD_READ_B_SHORT 0x08F9
+#define BMB3Y_CMD_READ_C_SHORT 0x09D6
+#define BMB3Y_CMD_READ_D_SHORT 0x0AA7
+#define BMB3Y_CMD_READ_E_SHORT 0x0B88
+#define BMB3Y_CMD_READ_F_SHORT 0x0C45
+
+
+
 #define BMB3Y_CMD_READ_TEMPS   0x0E1B
 #define BMB3Y_CMD_READ_TEMPS2  0x0F34 // returns 4 + CRC?
   // Temp hex: FF 40 C0 93 15 AF FF FF 
@@ -98,9 +107,35 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 
 //#define BMB3Y_CMD_READ_TEMPS   0x0E1B0000
 
+// extra RE'd ones:
+
+// 10 00 seems to be a config read as well?
+// 07 63 seems to read 6 bytes + CRC over 8 modules, values mostly 51130-51137 etc - oh, it is cells!
+//    ba c7 bf c7 b8 c7 62 39 
+//    c1 c7 c0 c7 bb c7 11 a6 
+//    ca c7 c4 c7 bd c7 8e f2 
+//    e4 c7 e7 c7 e8 c7 be 09 
+//    b9 c7 b6 c7 bd c7 27 37 
+//    b4 c7 b1 c7 bb c7 a8 74 
+//    c6 c7 c1 c7 c6 c7 08 f7 
+//    b6 c7 b5 c7 a6 c7 64 26 01
+// 08 f9 is more cells
+// 09 d6 likewise
+// 0a a7 more cells
+// 0b 88 more
+// 0c 45 has extraneous stuff
+// 0f 34
+
+//various writes:
+// 14 bc  (four data bytes (all zero) + CRC, for each module)
+// 15 93  ditto
+// 11 2f  looks like write config - yes it is
+
+// 27 10  is interesting, gets sent before every IDLE_WAKE
+
 
 void bmb3y_tick(bms_model_t *model);
-void bmb3y_clear_balancing(bms_model_t *model);
+//void bmb3y_clear_balancing(bms_model_t *model);
 
 void bmb3y_send_command_blocking(uint16_t cmd_word);
 bool bmb3y_get_data_blocking(uint32_t cmd, uint8_t *buf, int len);

@@ -22,6 +22,13 @@
 #define CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV 1500
 // Min voltage across a contactor to consider it open
 #define CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV 5000 // was 5000
+// Pos contactor has wider tolerances due to the way it is measured
+#define CONTACTORS_POS_CLOSED_VOLTAGE_THRESHOLD_MV 5000
+#define CONTACTORS_POS_OPEN_VOLTAGE_THRESHOLD_MV 10000
+
+
+// TODO : more compensation for ADC resistor discrepancies, to avoid lopsided readings?
+// could just calibrate it? seems to specifically be a problem for pos due to it being a derived reading
 
 // Precharge constants
 
@@ -63,6 +70,10 @@ bool check_current_is_below(bms_model_t *model, int32_t threshold_ma) {
         return false;
     }
     
+    if(abs_int32(model->current_mA) <= threshold_ma) {
+        printf("Yes, current %d mA is below threshold %d mA\n", model->current_mA, threshold_ma);
+    }
+
     return abs_int32(model->current_mA) <= threshold_ma;
 
     // if(abs_int32(model->current_mA)<=threshold_ma) {
@@ -212,7 +223,7 @@ bool confirm_contactor_pos_seems_closed(bms_model_t *model) {
 
     int32_t voltage = abs_int32(model->pos_contactor_voltage_mV);
     return confirm(
-        voltage <= CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV,
+        voltage <= CONTACTORS_POS_CLOSED_VOLTAGE_THRESHOLD_MV,
         ERR_CONTACTOR_POS_STUCK_OPEN,
         voltage
     );
@@ -232,7 +243,7 @@ bool confirm_contactor_pos_seems_open(bms_model_t *model) {
 
     int32_t voltage = abs_int32(model->pos_contactor_voltage_mV);
     return confirm(
-        voltage >= CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV,
+        voltage >= CONTACTORS_POS_OPEN_VOLTAGE_THRESHOLD_MV,
         ERR_CONTACTOR_POS_STUCK_CLOSED,
         voltage
     );
@@ -453,6 +464,9 @@ void contactor_sm_tick(bms_model_t *model) {
             // Both positive and precharge (since this actually leaves the precharge open due to the inverted logic)
             contactors_set_pos_pre_neg(true, true, false);
 
+            // int32_t voltage = abs_int32(model->pos_contactor_voltage_mV);
+            // printf("Pos contactor voltage: %d mV\n", voltage);
+
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
                 if(confirm_contactor_pos_seems_closed(model)) {
                     // all tests passed, go to precharging
@@ -521,21 +535,21 @@ void contactor_sm_tick(bms_model_t *model) {
         case CONTACTORS_STATE_CALIBRATING:
             contactors_set_pos_pre_neg(false, false, false);
 
-            if(state_timeout((sm_t*)contactor_sm, 500)) {
+            if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_CALIBRATING_CLOSE_NEG);
             }
             break;
         case CONTACTORS_STATE_CALIBRATING_CLOSE_NEG:
             // Close negative contactor first
             contactors_set_pos_pre_neg(false, false, true);
-            if(state_timeout((sm_t*)contactor_sm, 500)) {
+            if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_CALIBRATING_PRECHARGE);
             }
             break;
         case CONTACTORS_STATE_CALIBRATING_PRECHARGE:
             // Now precharge
             contactors_set_pos_pre_neg(false, true, true);
-            if(state_timeout((sm_t*)contactor_sm, 500)) {
+            if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
                 // There should be no real precharging as nothing should be
                 // attached. We need a margin to accommodate for uncalibrated
                 // values however.

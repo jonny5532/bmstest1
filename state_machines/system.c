@@ -61,7 +61,7 @@ void system_sm_tick(bms_model_t *model) {
         case SYSTEM_STATE_INITIALIZING:
             if(successfully_initialized(model)) {
                 // wait a few seconds for supervisor
-                if(state_timeout((sm_t*)system_sm, 5000)) {
+                if(state_timeout((sm_t*)system_sm, 10000)) {
                     // TODO - have a better check for calibration status?
                     if(model->neg_contactor_offset_mV) {
                         // already calibrated

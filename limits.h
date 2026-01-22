@@ -75,15 +75,28 @@
 
 
 // Cell presence bitmask (1 = present, 0 = not present, 32-bit groups, LSB = cell 0)
-#define CELL_PRESENCE_MASK {0, 0, 0, 0x7FFF}
-// Number of 1s in the above bitmask
-#define NUM_CELLS 15
-// Number of modules of voltages to read
-#define NUM_MODULE_VOLTAGES 1
-// How many modules of temps to read
-#define NUM_MODULE_TEMPS 1
+// #define CELL_PRESENCE_MASK { 0x7FFF, 0, 0, 0 }
+// #define NUM_CELLS 15
+// #define NUM_MODULE_VOLTAGES 1
+// #define NUM_MODULE_TEMPS 1
 
-#define BATTERY_CAPACITY_AH 2
+// for the 96-cell NMC pack:
+#define CELL_PRESENCE_MASK { 0xc7ff8f7f, 0xf3ffe3ff, 0xfcfff8ff, 0x1ffe3d }
+#define NUM_CELLS 96
+#define NUM_MODULE_VOLTAGES 8
+#define NUM_MODULE_TEMPS 8
+#define BATTERY_CAPACITY_AH 200
+
+// includes the extra zero every 15 cells
+//#define BALANCE_PRESENCE_MASK { 0xfff0f7f, 0x1fff0fff, 0x1fff0fff, 0xfff0f7f }
+
+// Number of 1s in the above bitmask
+// Number of modules of voltages to read
+//#define NUM_MODULE_VOLTAGES 8
+// How many modules of temps to read
+//#define NUM_MODULE_TEMPS 8
+
+
 
 // Options: 
 // - we could load in the cellvoltages as they come in, and use the presence mask for decoding
@@ -157,7 +170,8 @@
         : CELL_TEMPERATURE_STALE_THRESHOLD_MS )
 
 // We only sample every 1.28s, and could have isospi/CRC issues, so be generous
-#define CELL_VOLTAGE_STALE_THRESHOLD_MS 5000
+// (also allow long enough for stable readings during balancing, which pauses every 12.8s)
+#define CELL_VOLTAGE_STALE_THRESHOLD_MS 15000
 // In slow mode we only sample every 81.92s, allow two bad reads
 #define CELL_VOLTAGE_STALE_THRESHOLD_SLOW_MS 270000
 #define CELL_TEMPERATURE_STALE_THRESHOLD_MS 5000

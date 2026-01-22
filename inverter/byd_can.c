@@ -76,6 +76,8 @@ static void can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *
             return;
     }
 
+    //printf("Got CAN message %03X DLC %d\n", msg->id, msg->dlc);
+
     if(!inverter_present) {
         count_bms_event(ERR_INVERTER_DETECTED, 0);
     }
@@ -228,8 +230,8 @@ static int send_150(bms_model_t *model) {
     msg.dlc = 8;
     
     //const uint16_t soc = 5000; // 50.00%
-    msg.data[0] = (model->soc >> 8) & 0xFF;
-    msg.data[1] = model->soc & 0xFF;
+    msg.data[0] = (model->soc_ekf >> 8) & 0xFF;
+    msg.data[1] = model->soc_ekf & 0xFF;
     // TODO: workaround for Deye?
     //const uint16_t soh = 10000; // 100.00%
     const uint16_t soh = 9900; // 99.00%
@@ -320,7 +322,7 @@ void inverter_tick(bms_model_t *model) {
 
     if(!inverter_present) {
         // We haven't received any CAN messages from the inverter yet
-        //return;
+        return;
     }
 
     if(!inverter_initialized) {

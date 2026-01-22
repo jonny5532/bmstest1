@@ -114,19 +114,20 @@ bool bmb3y_set_balancing(uint8_t bitmap[16], bool even) {
     return true;
 }
 
-void bmb3y_clear_balancing(bms_model_t *model) {
-    balancing_sm_t *balancing_sm = &model->balancing_sm;
+// void bmb3y_clear_balancing(bms_model_t *model) {
+//     balancing_sm_t *balancing_sm = &model->balancing_sm;
+//     pause_balancing();
 
-    // Clear all balancing requests
-    for(int i=0; i<4; i++) {
-        balancing_sm->balance_request_mask[i] = 0;
-    }
-}
+//     // // Clear all balancing requests
+//     // for(int i=0; i<4; i++) {
+//     //     balancing_sm->balance_request_mask[i] = 0;
+//     // }
+// }
 
 void bmb3y_send_balancing(bms_model_t *model) {
     balancing_sm_t *balancing_sm = &model->balancing_sm;
 
-    uint8_t tx_buf[50] = {0};
+    uint8_t tx_buf[150] = {0};
     
     tx_buf[0] = (BMB3Y_CMD_WRITE_CONFIG >> 8) & 0xFF;
     tx_buf[1] = BMB3Y_CMD_WRITE_CONFIG & 0xFF;
@@ -139,54 +140,144 @@ void bmb3y_send_balancing(bms_model_t *model) {
     necessary to re-pack the bits accordingly.
     */
 
-    uint64_t window = 0;
-    // We will throw away the top 8 bits of the first mask int.
-    int bits_in_window = -8;
-    int mask_idx = 4;
+    uint32_t cell_presence_mask[] = CELL_PRESENCE_MASK;
 
-    //printf("Sending mask ");
+    // balancing_sm->balance_request_mask[0] = 0;
+    // balancing_sm->balance_request_mask[1] = 0;
+    // balancing_sm->balance_request_mask[2] = 1<<20;
+    // balancing_sm->balance_request_mask[3] = 0;
 
-    for(int module=0; module<8; module++) {
-        tx_buf[2 + module*6] = 0xf3;
-        tx_buf[3 + module*6] = 0;
+    if(false) {
+        uint64_t window = 0;
+        // We will throw away the top 8 bits of the first mask int.
+        int bits_in_window = -8;
+        int mask_idx = 4;
 
-        // Pull more bits into the window if needed
-        while (bits_in_window < 15 && mask_idx > 0) {
-            window |= ((uint64_t)balancing_sm->balance_request_mask[--mask_idx]) << (32 - bits_in_window);
-            bits_in_window += 32;
+        //printf("Sending mask ");
+
+        for(int module=0; module<8; module++) {
+            tx_buf[2 + module*6] = 0xf3;
+            tx_buf[3 + module*6] = 0;
+
+            // Pull more bits into the window if needed
+            while (bits_in_window < 15 && mask_idx > 0) {
+                window |= ((uint64_t)balancing_sm->balance_request_mask[--mask_idx]) << (32 - bits_in_window);
+                bits_in_window += 32;
+            }
+
+            // Extract 15 bits for this module
+            uint16_t balance_bits = (uint16_t)(window >> 49);
+            window <<= 15;
+            bits_in_window -= 15;
+
+            tx_buf[2 + 2 + module*6] = (uint8_t)(balance_bits & 0xFF);
+            tx_buf[2 + 3 + module*6] = (uint8_t)((balance_bits >> 8) & 0xFF);
+            
+            /* old code (assumes 16 bits per module rather than 15) */
+            // int mask_idx2 = 3 - (module / 2);
+            // uint32_t mask = balancing_sm->balance_request_mask[mask_idx2];
+            // if (module % 2 == 0) {
+            //     tx_buf[4 + module*6] = (uint8_t)((mask >> 16) & 0xFF);
+            //     tx_buf[5 + module*6] = (uint8_t)((mask >> 24) & 0xFF);
+            // } else {
+            //     tx_buf[4 + module*6] = (uint8_t)(mask & 0xFF);
+            //     tx_buf[5 + module*6] = (uint8_t)((mask >> 8) & 0xFF);
+            // }
+
+            //printf("0x%02X%02X ", tx_buf[5 + module*6], tx_buf[4 + module*6]);
+
+            uint16_t calc_crc = crc14(&tx_buf[2 + module*6], 4, 0x0010);
+
+            tx_buf[6 + module*6] = (calc_crc >> 8) & 0xFF;
+            tx_buf[7 + module*6] = calc_crc & 0xFF;
+        }
+    } else {
+        int cell_index = 0;
+        for(int balance_index=0; balance_index<128; balance_index++) {
+            // The balancing register has an extra padding bit after every 15
+            // cells, compared to our cell presence mask.
+            
+            // How many padding bits have been added so far?
+            int padding_bits = balance_index / 16;
+            // Is the current index a padding bit?
+            int is_padding_bit = (balance_index % 16) == 15;
+
+            if(is_padding_bit) {
+                // Skip this bit
+                continue;
+            }
+
+            // Find the position in the cell presence mask (padding bits excluded)
+            int mask_word_index = (balance_index - padding_bits) / 32;
+            int bit_index = (balance_index - padding_bits) % 32;
+            if(!(cell_presence_mask[mask_word_index] & (1 << bit_index))) {
+                // This cell is not present, skip it
+                continue;
+            }
+
+        // for(int balance_index=0; balance_index<128; balance_index++) {
+        //     int mask_word_index = balance_index / 32;
+        //     int bit_index = balance_index % 32;
+        //     if(!(balance_presence_mask[mask_word_index] & (1 << bit_index))) {
+        //         // This cell is not present, skip it
+        //         continue;
+        //     }
+
+            if(balancing_sm->balance_request_mask[cell_index / 32] & (1 << (cell_index % 32))) {
+                // This cell is to be balanced
+
+                int module = 7 - (balance_index / 16);
+                int module_cell_index = balance_index % 16;
+
+                //printf("Balancing cell %d (mod %d mci %d)\n", cell_index, module, module_cell_index);
+
+                if(module_cell_index < 8) {
+                    tx_buf[2 + 2 + module*6] |= (1 << module_cell_index);
+                } else {
+                    tx_buf[2 + 3 + module*6] |= (1 << (module_cell_index - 8));
+                }
+            }
+
+            cell_index++;
         }
 
-        // Extract 15 bits for this module
-        uint16_t balance_bits = (uint16_t)(window >> 49);
-        window <<= 15;
-        bits_in_window -= 15;
+        // Fill in config bytes and calculate CRCs
+        for(int module=0; module<8; module++) {
+            tx_buf[2 + 0 + module*6] = 0xf3;
+            tx_buf[2 + 1 + module*6] = 0;
 
-        tx_buf[4 + module*6] = (uint8_t)(balance_bits & 0xFF);
-        tx_buf[5 + module*6] = (uint8_t)((balance_bits >> 8) & 0xFF);
-        
-        /* old code (assumes 16 bits per module rather than 15) */
-        // int mask_idx2 = 3 - (module / 2);
-        // uint32_t mask = balancing_sm->balance_request_mask[mask_idx2];
-        // if (module % 2 == 0) {
-        //     tx_buf[4 + module*6] = (uint8_t)((mask >> 16) & 0xFF);
-        //     tx_buf[5 + module*6] = (uint8_t)((mask >> 24) & 0xFF);
-        // } else {
-        //     tx_buf[4 + module*6] = (uint8_t)(mask & 0xFF);
-        //     tx_buf[5 + module*6] = (uint8_t)((mask >> 8) & 0xFF);
+            // bytes 2, 3 are already filled in by the loop above
+
+            uint16_t calc_crc = crc14(&tx_buf[2 + 0 + module*6], 4, 0x0010);
+
+            tx_buf[2 + 4 + module*6] = (calc_crc >> 8) & 0xFF;
+            tx_buf[2 + 5 + module*6] = calc_crc & 0xFF;
+        }
+
+        // testing
+        // for(int module=0; module<8; module++) {
+        //     tx_buf[2 + module*6] = 0xf3;
+        //     tx_buf[3 + module*6] = 0;
+
+        //     // Just balance one cell per module for testing
+        //     tx_buf[4 + module*6] = module==7 ? 1 : 0;
+        //     tx_buf[5 + module*6] = 0;
+
+        //     uint16_t calc_crc = crc14(&tx_buf[2 + module*6], 4, 0x0010);
+        //     tx_buf[6 + module*6] = (calc_crc >> 8) & 0xFF;
+        //     tx_buf[7 + module*6] = calc_crc & 0xFF;
         // }
-
-        //printf("0x%02X%02X ", tx_buf[5 + module*6], tx_buf[4 + module*6]);
-
-        uint16_t calc_crc = crc14(&tx_buf[2 + module*6], 4, 0x0010);
-
-        tx_buf[6 + module*6] = (calc_crc >> 8) & 0xFF;
-        tx_buf[7 + module*6] = calc_crc & 0xFF;
     }
 
-    //printf("\n");
+    model->balancing_active = balancing_sm->balance_request_mask[0] != 0 ||
+                  balancing_sm->balance_request_mask[1] != 0 ||
+                  balancing_sm->balance_request_mask[2] != 0 ||
+                  balancing_sm->balance_request_mask[3] != 0;
 
     // We skip all of the response bytes
     isospi_write_read_blocking(tx_buf, NULL, 50, 50);
+
+    
 }
 
 static const uint32_t READ_COMMANDS[] = {
@@ -197,6 +288,40 @@ static const uint32_t READ_COMMANDS[] = {
     BMB3Y_CMD_READ_E
 };
 
+static const uint16_t SHORT_READ_COMMANDS[] = {
+    BMB3Y_CMD_READ_A_SHORT,
+    BMB3Y_CMD_READ_B_SHORT,
+    BMB3Y_CMD_READ_C_SHORT,
+    BMB3Y_CMD_READ_D_SHORT,
+    BMB3Y_CMD_READ_E_SHORT
+};
+
+/* weird CRC xor patterns 
+0x425b 
+0xc6ed
+*/
+
+bool crc_matches(uint16_t received_crc, uint16_t calculated_crc) {
+    if(received_crc == calculated_crc) {
+        printf("CRC matched directly\n");
+        return true;
+    }
+    if((received_crc ^ 0x425b) == calculated_crc) {
+        printf("CRC matched with 0x425b xor\n");
+        return true;
+    }
+    if((received_crc ^ 0xc6ed) == calculated_crc) {
+        printf("CRC matched with 0xc6ed xor\n");
+        return true;
+    }
+    if((received_crc ^ 0x84b6) == calculated_crc) {
+        printf("CRC matched with 0x84b6 xor\n");
+        return true;
+    }
+    printf("CRC mismatch, xor: %04X\n", received_crc ^ calculated_crc);
+    return false;
+}
+
 bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
     uint8_t rx_buf[72];
     uint32_t cmd = READ_COMMANDS[bank_index];
@@ -205,16 +330,24 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
         count_bms_event(ERR_BMB_READ_ERROR, 0x0100000000000000 | bank_index);
         return false;
     }
+    // uint16_t cmd = SHORT_READ_COMMANDS[bank_index];
+    // if (!bmb3y_short_command_get_data_blocking(cmd, rx_buf, 72)) {
+    //     printf("BMB3Y read failed for cmd 0x%02X\n", cmd);
+    //     count_bms_event(ERR_BMB_READ_ERROR, 0x0100000000000000 | bank_index);
+    //     return false;
+    // }
 
     uint8_t cell_offset = bank_index * 3;
+    uint32_t cell_presence_mask[] = CELL_PRESENCE_MASK;
     bool ret = true;
 
     for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
         uint16_t module_crc = (uint16_t)(rx_buf[module * 9 + 6] << 8) | (uint16_t)(rx_buf[module * 9 + 7]);
         uint16_t calc_crc = crc14(&rx_buf[module * 9], 6, 0x1000);
 
-        if(module==0 && module_crc != calc_crc) {
-            printf("CRC: %s %d %02X %02X %02X %02X %02X %02X %02X %02X %02X calc %04X\n",
+        if(!crc_matches(module_crc, calc_crc)) {
+        //if(module==0 && module_crc != calc_crc) {
+            printf("CRC: %s %d %02X %02X %02X %02X %02X %02X %02X %02X %02X calc %04X xor %04X or %04X\n",
                 module_crc == calc_crc ? "OK" : "FAIL",
                 bank_index,
                 rx_buf[module * 9 + 0],
@@ -226,17 +359,20 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
                 rx_buf[module * 9 + 6],
                 rx_buf[module * 9 + 7],
                 rx_buf[module * 9 + 8],
-                calc_crc
+                calc_crc,
+                calc_crc ^ 0x425b,
+                calc_crc ^ 0xc6ed
             );
-            if(millis64() > 2000) {
+            //if(millis64() > 2000) {
                 // Ignore early CRC errors during startup
                 count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | (module_crc << 16) | calc_crc);
-            }
-        }
-
-        if(module==0 && module_crc != calc_crc) {
+            //}
             ret = false;
         }
+
+        // if(module==0 && module_crc != calc_crc) {
+        //     ret = false;
+        // }
 
         // If some modules have fewer than 3 cells per bank, we will need to:
         //   detect/skip them (we probably still need to read them even if unset?)
@@ -244,7 +380,21 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
 
         // Go through each cell (three per bank)
         for(int cell=0; cell<3; cell++) {
-            int cell_index = (module * 15) + cell_offset + cell;
+            int raw_cell_index = (module * 15) + cell_offset + cell;
+
+            uint8_t cell_index = 0;
+            // TODO, do this better
+            for(int bit=0;bit<128;bit++) {
+                uint32_t mask_word = cell_presence_mask[bit / 32];
+                if(mask_word & (1 << (bit % 32))) {
+                    if(bit == raw_cell_index) {
+                        break;
+                    }
+                    cell_index++;
+                }
+            }
+
+            //CELL_PRESENCE_MASK
 
             uint16_t voltage = 
                 (uint16_t)(rx_buf[module * 9 + cell * 2]) |
@@ -259,17 +409,21 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
             } else {
                 model->cell_voltages_mV[cell_index] = (voltage * 2) / 25;
             }
+            cell_index++;
         }
     }
     return ret;
 }
 
-bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
+bool bmb3y_read_temperatures_blocking(bms_model_t *model, int module_crc_checks) {
     uint8_t rx_buf[90];
 
     //isosnoop_flush();
+    
+    // LFP seems to have a temp value in BMB3Y_CMD_READ_TEMPS3 0:1
+    // NMC seems to use TEMPS and 2:3 like D/T's code
 
-    if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_TEMPS3, rx_buf, 8)) {
+    if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_TEMPS, rx_buf, 64)) {
         printf("BMB3Y temperature read failed\n");
         count_bms_event(ERR_BMB_READ_ERROR, 0x0200000000000000);
         // printf("temptest failed hex: ");
@@ -303,32 +457,42 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
         //     printf("temptest fixing...\n");
         // }
 
-
-        if(module_crc != calc_crc) {
-            printf("Bad Temp CRC on module %d: msg 0x%04X calc 0x%04X\n", module, module_crc, calc_crc);
-            crc_ok = false;
-            if(millis64() > 2000) {
-                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
-            }
-            continue;
+        if(!crc_matches(module_crc, calc_crc)) {
+        //if(module_crc != calc_crc) {
+            // FIXME - can't get good CRCs on modules 1-6???
+            //if(module_crc_checks & (1 << module)) {
+                printf("Bad Temp CRC on module %d: msg 0x%04X calc 0x%04X xor %04x or %04x\n", 
+                    module, module_crc, calc_crc, calc_crc ^ 0x425b, calc_crc ^ 0xc6ed);
+                crc_ok = false;
+                if(millis64() > 2000) {
+                    count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
+                }
+                continue;
+            //}
         }
 
-        // D/T's algorithm:
-        // // Unlike everything else, temps are little-endian??
-        // int16_t raw_temp = 
-        //     (int16_t)(rx_buf[module * 8 + 2]) |
-        //     (int16_t)(rx_buf[module * 8 + 3] << 8);
+        // D/T's algorithm: (TEMPS)
+        if(true) {
+            // // Unlike everything else, temps are little-endian??
+            int16_t raw_temp = 
+                (int16_t)(rx_buf[module * 8 + 2]) |
+                (int16_t)(rx_buf[module * 8 + 3] << 8);
 
-        // // is this in dC? is the offset right? what about negative temps?
-        // model->module_temperatures_dC[module] = raw_temp - 1131;
+            model->module_temperatures_dC[module] = raw_temp - 1131;
+            //printf("module temp %d is %d dC\n", module, model->module_temperatures_dC[module]);
+        }
+
         
-        int16_t raw_temp = 
-             (int16_t)(rx_buf[module * 8 + 0]) |
-             (int16_t)(rx_buf[module * 8 + 1] << 8);
+        // LFP algo: (TEMPS3)
+        if(false) {
+            int16_t raw_temp = 
+                (int16_t)(rx_buf[module * 8 + 0]) |
+                (int16_t)(rx_buf[module * 8 + 1] << 8);
 
-        // super-crude cal, 28c = 0x4300, 100c = 0x6e00
-        // FIXME - do proper thermistor conversion
-        model->module_temperatures_dC[module] = ((raw_temp - 0x4300) * (1000 - 280)) / (0x6e00 - 0x4300) + 280;
+            // super-crude cal, 28c = 0x4300, 100c = 0x6e00
+            // FIXME - do proper thermistor conversion
+            model->module_temperatures_dC[module] = ((raw_temp - 0x4300) * (1000 - 280)) / (0x6e00 - 0x4300) + 280;
+        }
 
 
         //printf("Module %d temp raw %d converted %d dC\n", module, raw_temp, model->module_temperatures_dC[module]);
@@ -395,8 +559,8 @@ void bmb3y_tick(bms_model_t *model) {
 
         if(model->cell_voltages_millis && model->cell_voltage_min_mV < CELL_VOLTAGE_SOFT_MIN_mV && !model->cell_voltage_slow_mode && !last_read_crc_failed) {
             // We're not in slow mode yet, but a cell is low - switch to slow mode
-            model->cell_voltage_slow_mode = true;
-            use_slow_mode = true;
+            // model->cell_voltage_slow_mode = true;
+            // use_slow_mode = true;
         }
 
 
@@ -406,16 +570,16 @@ void bmb3y_tick(bms_model_t *model) {
             // subsequent reads.
 
             // Forcibly prevent balancing in slow mode
-            bmb3y_clear_balancing(model);
+            pause_balancing(&model->balancing_sm);
             bmb3y_send_balancing(model);
 
             // Three wakes for some reason
             bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
             bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
             bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        } else if(last_read_crc_failed) {
+        //} else if(last_read_crc_failed) {
             // Last read failed - try a single IDLE_WAKE to re-sync
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            //bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         } else {
             // Normal case - two IDLE_WAKEs keep the CRCs happy
             bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
@@ -424,6 +588,9 @@ void bmb3y_tick(bms_model_t *model) {
 
 
         last_read_crc_failed = false;
+        // muting doesn't seem to work? cellvoltages still bouncy during balance
+        // bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
+        // sleep_us(100);
         bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
 
         // As we wait longer than 5ms before the next command, the BMB will go
@@ -432,8 +599,31 @@ void bmb3y_tick(bms_model_t *model) {
 
         // uint32_t end = time_us_32();
         // printf("BMB3Y snapshot took %ld us\n", end - start);
-    } else if(step>=1 && step <= 5) {
-        // Read one of the five banks depending on the step number
+    } else if(step==1) {
+        // Read the first of the five cellvoltage banks
+
+        bmb3y_send_wakeup_cs_blocking();
+
+        // Is balancing active? If so, our voltages are going to be unstable
+        if(model->balancing_active) {
+            model->cell_voltages_unstable = true;
+        }
+
+        last_read_crc_failed = true;
+        for(int attempt=0; attempt<5; attempt++) {
+            // Try up to five times to get a good read on bank 0
+            if(bmb3y_read_cell_voltage_bank_blocking(model, 0)) {
+                last_read_crc_failed = false;
+                break;
+            }
+
+            // Three idle-wakes seems to resync things
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+        }
+    } else if(step>=2 && step <= 5) {
+        // Read one of the remaining five banks depending on the step number
 
         bmb3y_send_wakeup_cs_blocking();
 
@@ -443,7 +633,17 @@ void bmb3y_tick(bms_model_t *model) {
         } else if(step==5 && !last_read_crc_failed) {
             // All banks read successfully
             //printf("CRC: GOOD!!!\n");
-            model->cell_voltages_millis = millis();
+
+            // If balancing is not active, voltages are now stable (having
+            // now replaced all of them)
+            if(!model->balancing_active) {
+                model->cell_voltages_unstable = false;
+                // The staleness threshold will need to be large enough to cope
+                // with stable reading gaps during balancing.
+                model->cell_voltages_millis = millis();
+            }
+
+            //printf("Voltages unstable? %d\n", model->cell_voltages_unstable);
         }
         
         // uint32_t end = time_us_32();
@@ -453,7 +653,17 @@ void bmb3y_tick(bms_model_t *model) {
 
         bmb3y_send_wakeup_cs_blocking();
 
-        bmb3y_read_temperatures_blocking(model);
+        // absurdly, if you do read/wake/read/wake/wake/read/wake, you get all 7
+        // valid-CRC temp reads amongst all the failed ones, and it seems
+        // reasonably stable.
+
+        bmb3y_read_temperatures_blocking(model, (1<<0) | (1<<7)); // 0,7 valid
+        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+        bmb3y_read_temperatures_blocking(model, (1<<1) | (1<<4) | (1<<6)); // 1, 4, 6 valid
+        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+        bmb3y_read_temperatures_blocking(model, (1<<2) | (1<<3) | (1<<5)); // 2, 3, 5 valid
+        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
 
         // See what is in F...
         if(false) {
@@ -475,6 +685,11 @@ void bmb3y_tick(bms_model_t *model) {
             bmb3y_send_wakeup_cs_blocking();
             balancing_sm_tick(model);
             bmb3y_send_balancing(model);
+
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         }
     // } else if(step > 7) {
     //     if(use_slow_mode && model->cell_voltages_millis && model->cell_voltage_min_mV >= CELL_VOLTAGE_SOFT_MIN_mV) {

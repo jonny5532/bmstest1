@@ -279,8 +279,8 @@ bool ina228_read_current_blocking(ina228_t *dev) {
     }
     
     current_corrected = current_raw - model.current_offset;
-    // Invert so that positive current means charging.
-    model.current_mA = div_round_closest(-current_corrected, 4);
+    // Positive current means charging.
+    model.current_mA = div_round_closest(current_corrected, 4);
 
     // Was a new conversion
     if(diag_alert & 0x0002) {
@@ -299,7 +299,7 @@ bool ina228_read_current_blocking(ina228_t *dev) {
         //printf("avg: %.2f us\n", average_sampling_period_us);
 
         // Is a new conversion, update charge
-        model.charge_raw -= (int64_t)current_corrected;
+        model.charge_raw += (int64_t)current_corrected;
         model.charge_millis = model.current_millis;
 
         // charge_raw is in units equivalent to 0.132736mC (0.25mA LSB, 530.944ms per sample)

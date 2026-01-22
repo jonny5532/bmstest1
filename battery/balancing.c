@@ -4,8 +4,9 @@
 #include "../model.h"
 
 #define AUTO_BALANCING_PERIOD_MS 30000 // how long to wait between auto-balancing sessions
-#define PERIODS_PER_MV 1 // how many balancing periods per mV above minimum
-#define BALANCE_MIN_OFFSET_MV 3 // minimum voltage difference to balance
+#define PERIODS_PER_MV 10 // how many balancing periods per mV above minimum
+#define BALANCE_MIN_OFFSET_MV 1 // minimum voltage difference to balance
+#define PAUSE_EVERY_N_PERIODS 8 // pause balancing every N periods to get good voltage readings
 
 static bool good_conditions_for_balancing(bms_model_t *model) {
     // Check if conditions are suitable for balancing
@@ -18,6 +19,7 @@ static bool good_conditions_for_balancing(bms_model_t *model) {
 
     // check for low current variance?
 
+    return true;
     return model->balancing_enabled;
     //return true;
 }
@@ -32,7 +34,7 @@ static void update_balance_requests(balancing_sm_t *balancing_sm, int16_t decrem
 
         if(balancing_sm->balance_time_remaining[cell] > 0 && (balancing_sm->even_cells == ((cell % 2) == 0))) {
             balancing_sm->balance_time_remaining[cell] -= decrement;
-            printf("Cell %d balance time remaining now: %d\n", cell, balancing_sm->balance_time_remaining[cell]);
+            //printf("Cell %d balance time remaining now: %d\n", cell, balancing_sm->balance_time_remaining[cell]);
             balancing_sm->balance_request_mask[mask_index] |= (1 << bit_index);
         } else {
             balancing_sm->balance_request_mask[mask_index] &= ~(1 << bit_index);
@@ -76,7 +78,7 @@ static bool start_balancing(bms_model_t *model) {
         threshold = MINIMUM_BALANCE_VOLTAGE_mV;
     }
 
-    for(int cell=0; cell<120; cell++) {
+    for(int cell=0; cell<NUM_CELLS; cell++) {
         // TODO - ignore unused cells
         if(model->cell_voltages_mV[cell] > 2500 && model->cell_voltages_mV[cell] < min_cell_voltage) {
             min_cell_voltage = model->cell_voltages_mV[cell];
@@ -85,7 +87,7 @@ static bool start_balancing(bms_model_t *model) {
 
     // Set balance times based on how far above minimum voltage each cell is
     
-    for(int cell=0; cell<120; cell++) {
+    for(int cell=0; cell<NUM_CELLS; cell++) {
         int16_t voltage = model->cell_voltages_mV[cell];
         // 3mV hysteresis, negatives will be ignored
         model->balancing_sm.balance_time_remaining[cell] = calculate_balance_time(voltage, min_cell_voltage);
@@ -100,11 +102,17 @@ static bool start_balancing(bms_model_t *model) {
     return true;
 }
 
-
 // Decrement balance times by one period, check if individual cells are done
 // balancing, and update the request mask accordingly.
 static void decrement_balance_times_and_update(balancing_sm_t *balancing_sm) {
     update_balance_requests(balancing_sm, 1);
+}
+
+void pause_balancing(balancing_sm_t *balancing_sm) {
+    // Clear all balancing requests
+    for(int i=0; i<4; i++) {
+        balancing_sm->balance_request_mask[i] = 0;
+    }
 }
 
 // Check if the there is any balancing still to be done.
@@ -144,6 +152,13 @@ void balancing_sm_tick(bms_model_t *model) {
             break;
 
         case BALANCING_STATE_ACTIVE:
+            if(PAUSE_EVERY_N_PERIODS>0 && (balancing_sm->pause_counter++) == PAUSE_EVERY_N_PERIODS) {
+                // Skip balancing this period
+                pause_balancing(balancing_sm);
+                balancing_sm->pause_counter = 0;
+                break;
+            }
+
             // Update the mask and decrement the times.
             update_balance_requests(balancing_sm, 1);
             // Switch even/odd cells for next time

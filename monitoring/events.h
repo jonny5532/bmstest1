@@ -73,9 +73,9 @@ typedef enum {
 //      Maximum 6553s.
 
 #define EVENT_TYPES(X)                                          \
-    X(CONTACTOR_POS_STUCK_OPEN, LEVEL_CRITICAL, 0)              \
+    X(CONTACTOR_POS_STUCK_OPEN, LEVEL_WARNING, 20)              \
     X(CONTACTOR_POS_STUCK_CLOSED, LEVEL_CRITICAL, 0)            \
-    X(CONTACTOR_NEG_STUCK_OPEN, LEVEL_CRITICAL, 0)              \
+    X(CONTACTOR_NEG_STUCK_OPEN, LEVEL_WARNING, 20)              \
     X(CONTACTOR_NEG_STUCK_CLOSED, LEVEL_CRITICAL, 0)            \
     X(CONTACTOR_PRE_STUCK_OPEN, LEVEL_CRITICAL, 0)              \
     X(CONTACTOR_PRE_STUCK_CLOSED, LEVEL_CRITICAL, 0)            \

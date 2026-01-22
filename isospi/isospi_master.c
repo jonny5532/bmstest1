@@ -113,11 +113,9 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
 void isospi_send_wakeup_cs_blocking() {
     isospi_master_cs(false);
 
-    // No subsequent delay is necessary for reads to the first BMB, it is
-    // unclear whether it will be necessary to wait longer to avoid the other
-    // BMBs missing the next command.
+    // 0us = first BMB fine
+    // 10/15us = first 6 BMBs ok, 7,8 partial
+    // 20us = all 8 BMBs ok
 
-    sleep_us(10);
+    sleep_us(20);
 }
-
-

@@ -8,6 +8,7 @@ uint16_t calculate_cell_voltage_charge_current_limit(uint32_t cell_voltage_min_m
     uint16_t charge_limit = 0xFFFF;
 
     if(cell_voltage_max_mV > 4000) {
+        // TODO - handle LFP or use EKF SoC?
         // We're onto the steeper part of the curve now, so SoC estimation is more accurate
         float soc = nmc_ocv_to_soc(cell_voltage_max_mV / 1000.0f);
         int32_t derate_dA = (int32_t)((1.0f - soc) * 100.0f * CHARGE_CELL_VOLTAGE_DERATE_dA_PER_SoC);
