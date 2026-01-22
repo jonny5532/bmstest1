@@ -78,12 +78,9 @@ static void can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *
 
     //printf("Got CAN message %03X DLC %d\n", msg->id, msg->dlc);
 
-    if(!inverter_present) {
-        count_bms_event(ERR_INVERTER_DETECTED, 0);
-    }
+    raise_bms_event(ERR_INVERTER_DETECTED, msg->id);
 
     inverter_present = true;
-
 
     // TODO: store last received time for timeout detection
 }

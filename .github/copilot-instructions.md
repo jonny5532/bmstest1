@@ -1,7 +1,7 @@
-# GitHub Copilot Instructions for RP2040 BMS Project
+# GitHub Copilot Instructions for RP2350 BMS Project
 
 ## Project Overview
-This is a C/C++ firmware project for a Battery Management System (BMS) running on the Raspberry Pi Pico (RP2040). It uses the Pico SDK and CMake build system.
+This is a C firmware project for a Battery Management System (BMS) running on the Raspberry Pi Pico (RP2350). It uses the Pico SDK and CMake build system.
 
 ## Architecture & Patterns
 

@@ -296,26 +296,29 @@ static const uint16_t SHORT_READ_COMMANDS[] = {
     BMB3Y_CMD_READ_E_SHORT
 };
 
-/* weird CRC xor patterns 
-0x425b 
-0xc6ed
-*/
-
+// For some reason, the returned BMB3Y CRCs often seem to be XORed with one of
+// three different patterns. It is unclear whether this is by design or not, and
+// it doesn't seem possible to predict which pattern will be used when it
+// happens. However this totally resolves all CRC mismatch issues and sequencing
+// workarounds.
 bool crc_matches(uint16_t received_crc, uint16_t calculated_crc) {
     if(received_crc == calculated_crc) {
-        printf("CRC matched directly\n");
+        //printf("CRC matched directly\n");
         return true;
     }
+    // This is the CRC14 polynomial (with the 15th bit set)
     if((received_crc ^ 0x425b) == calculated_crc) {
-        printf("CRC matched with 0x425b xor\n");
+        //printf("CRC matched with 0x425b xor\n");
         return true;
     }
-    if((received_crc ^ 0xc6ed) == calculated_crc) {
-        printf("CRC matched with 0xc6ed xor\n");
-        return true;
-    }
+    // This is the above, left shifted by 1
     if((received_crc ^ 0x84b6) == calculated_crc) {
-        printf("CRC matched with 0x84b6 xor\n");
+        //printf("CRC matched with 0x84b6 xor\n");
+        return true;
+    }
+    // This is the two previous patterns xored together
+    if((received_crc ^ 0xc6ed) == calculated_crc) {
+        //printf("CRC matched with 0xc6ed xor\n");
         return true;
     }
     printf("CRC mismatch, xor: %04X\n", received_crc ^ calculated_crc);
@@ -330,6 +333,7 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
         count_bms_event(ERR_BMB_READ_ERROR, 0x0100000000000000 | bank_index);
         return false;
     }
+    // Short commands need different CRC handling
     // uint16_t cmd = SHORT_READ_COMMANDS[bank_index];
     // if (!bmb3y_short_command_get_data_blocking(cmd, rx_buf, 72)) {
     //     printf("BMB3Y read failed for cmd 0x%02X\n", cmd);
@@ -339,14 +343,13 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
 
     uint8_t cell_offset = bank_index * 3;
     uint32_t cell_presence_mask[] = CELL_PRESENCE_MASK;
-    bool ret = true;
+    bool crc_ok = true;
 
     for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
         uint16_t module_crc = (uint16_t)(rx_buf[module * 9 + 6] << 8) | (uint16_t)(rx_buf[module * 9 + 7]);
         uint16_t calc_crc = crc14(&rx_buf[module * 9], 6, 0x1000);
 
         if(!crc_matches(module_crc, calc_crc)) {
-        //if(module==0 && module_crc != calc_crc) {
             printf("CRC: %s %d %02X %02X %02X %02X %02X %02X %02X %02X %02X calc %04X xor %04X or %04X\n",
                 module_crc == calc_crc ? "OK" : "FAIL",
                 bank_index,
@@ -363,20 +366,10 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
                 calc_crc ^ 0x425b,
                 calc_crc ^ 0xc6ed
             );
-            //if(millis64() > 2000) {
-                // Ignore early CRC errors during startup
-                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | (module_crc << 16) | calc_crc);
-            //}
-            ret = false;
+            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | (module_crc << 16) | calc_crc);
+            crc_ok = false;
+            continue;
         }
-
-        // if(module==0 && module_crc != calc_crc) {
-        //     ret = false;
-        // }
-
-        // If some modules have fewer than 3 cells per bank, we will need to:
-        //   detect/skip them (we probably still need to read them even if unset?)
-        //   calculate the stride (currently module*15) taking into account missing cells
 
         // Go through each cell (three per bank)
         for(int cell=0; cell<3; cell++) {
@@ -394,8 +387,6 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
                 }
             }
 
-            //CELL_PRESENCE_MASK
-
             uint16_t voltage = 
                 (uint16_t)(rx_buf[module * 9 + cell * 2]) |
                 (uint16_t)(rx_buf[module * 9 + cell * 2 + 1] << 8);
@@ -412,14 +403,12 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
             cell_index++;
         }
     }
-    return ret;
+    return crc_ok;
 }
 
-bool bmb3y_read_temperatures_blocking(bms_model_t *model, int module_crc_checks) {
+bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
     uint8_t rx_buf[90];
 
-    //isosnoop_flush();
-    
     // LFP seems to have a temp value in BMB3Y_CMD_READ_TEMPS3 0:1
     // NMC seems to use TEMPS and 2:3 like D/T's code
 
@@ -450,25 +439,14 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model, int module_crc_checks)
         // printf("\n");
         //isosnoop_print_buffer();
 
-        // ridiculous hack to deal with dodgy first bit
-        // if(module_crc != calc_crc) {
-        //     rx_buf[module * 8 + 0] ^= 0x80;
-        //     calc_crc = crc14(&rx_buf[module * 8], 6, 0x0010);
-        //     printf("temptest fixing...\n");
-        // }
-
         if(!crc_matches(module_crc, calc_crc)) {
-        //if(module_crc != calc_crc) {
-            // FIXME - can't get good CRCs on modules 1-6???
-            //if(module_crc_checks & (1 << module)) {
-                printf("Bad Temp CRC on module %d: msg 0x%04X calc 0x%04X xor %04x or %04x\n", 
-                    module, module_crc, calc_crc, calc_crc ^ 0x425b, calc_crc ^ 0xc6ed);
-                crc_ok = false;
-                if(millis64() > 2000) {
-                    count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
-                }
-                continue;
-            //}
+            printf("Bad Temp CRC on module %d: msg 0x%04X calc 0x%04X xor %04x or %04x\n", 
+                module, module_crc, calc_crc, calc_crc ^ 0x425b, calc_crc ^ 0xc6ed);
+            crc_ok = false;
+            if(millis64() > 2000) {
+                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
+            }
+            continue;
         }
 
         // D/T's algorithm: (TEMPS)
@@ -481,7 +459,6 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model, int module_crc_checks)
             model->module_temperatures_dC[module] = raw_temp - 1131;
             //printf("module temp %d is %d dC\n", module, model->module_temperatures_dC[module]);
         }
-
         
         // LFP algo: (TEMPS3)
         if(false) {
@@ -493,10 +470,6 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model, int module_crc_checks)
             // FIXME - do proper thermistor conversion
             model->module_temperatures_dC[module] = ((raw_temp - 0x4300) * (1000 - 280)) / (0x6e00 - 0x4300) + 280;
         }
-
-
-        //printf("Module %d temp raw %d converted %d dC\n", module, raw_temp, model->module_temperatures_dC[module]);
-
     }
 
     if(crc_ok) {
@@ -531,23 +504,18 @@ void bmb3y_tick(bms_model_t *model) {
 
         bmb3y_send_wakeup_cs_blocking();
 
-        // The data packets received include CRC14s, although sometimes the BMB
-        // gets into a state where the CRCs are all invalid (they're not even
-        // CRC14s as they have higher bits set), even though the data looks
-        // fine. It is possible to 'fix' this by sending extra IDLE_WAKE
-        // commands before the SNAPSHOT command, for unknown reasons.
+        // The BMB responses include CRC14s, but these often seem to be
+        // corrupted unless you perform the operations in a very particular
+        // sequence.
 
-        // However this also depends on whether the balancing registers are
-        // being written - if they are, then two IDLE_WAKEs usually works. If
-        // however it gets 'out of sync', sending one IDLE_WAKE seems to fix it.
+        // The corruption takes the form of a XOR with one of three patterns, so
+        // is easily reversible, at the cost of slightly reduced integrity.
 
-        // So current best strategy:
-        // - always write balancing config after reading
-        // - if any last read failed, do one IDLE_WAKE next time
-        // - otherwise do two IDLE_WAKEs
+        // Thus we don't bother with the sequencing anymore.
 
-        // The situation changes if you want too long between cycles - the above
-        // works for 1.28s cycles, but slow mode requires a different pattern.
+        // The sequencing changes also if you want too long between cycles -
+        // normally we use 1.28s cycles, but slow mode requires a different
+        // pattern.
         
         // read config
         //uint8_t rx_buf[72];
@@ -573,17 +541,17 @@ void bmb3y_tick(bms_model_t *model) {
             pause_balancing(&model->balancing_sm);
             bmb3y_send_balancing(model);
 
-            // Three wakes for some reason
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            // If attempting to keep the sequence, send three IDLE_WAKEs
+            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         //} else if(last_read_crc_failed) {
             // Last read failed - try a single IDLE_WAKE to re-sync
             //bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         } else {
             // Normal case - two IDLE_WAKEs keep the CRCs happy
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         }
 
 
@@ -591,6 +559,7 @@ void bmb3y_tick(bms_model_t *model) {
         // muting doesn't seem to work? cellvoltages still bouncy during balance
         // bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
         // sleep_us(100);
+        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
 
         // As we wait longer than 5ms before the next command, the BMB will go
@@ -599,33 +568,16 @@ void bmb3y_tick(bms_model_t *model) {
 
         // uint32_t end = time_us_32();
         // printf("BMB3Y snapshot took %ld us\n", end - start);
-    } else if(step==1) {
-        // Read the first of the five cellvoltage banks
+
+    } else if(step>=1 && step <= 5) {
+        // Read each of the five cellvoltage banks
 
         bmb3y_send_wakeup_cs_blocking();
 
-        // Is balancing active? If so, our voltages are going to be unstable
+        // If balancing is active, then our newly read voltages are going to be unstable.
         if(model->balancing_active) {
             model->cell_voltages_unstable = true;
         }
-
-        last_read_crc_failed = true;
-        for(int attempt=0; attempt<5; attempt++) {
-            // Try up to five times to get a good read on bank 0
-            if(bmb3y_read_cell_voltage_bank_blocking(model, 0)) {
-                last_read_crc_failed = false;
-                break;
-            }
-
-            // Three idle-wakes seems to resync things
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        }
-    } else if(step>=2 && step <= 5) {
-        // Read one of the remaining five banks depending on the step number
-
-        bmb3y_send_wakeup_cs_blocking();
 
         if(!bmb3y_read_cell_voltage_bank_blocking(model, step - 1)) {
             // Read failed
@@ -634,16 +586,14 @@ void bmb3y_tick(bms_model_t *model) {
             // All banks read successfully
             //printf("CRC: GOOD!!!\n");
 
-            // If balancing is not active, voltages are now stable (having
+            // If balancing was not active, voltages are now stable (having
             // now replaced all of them)
             if(!model->balancing_active) {
                 model->cell_voltages_unstable = false;
                 // The staleness threshold will need to be large enough to cope
-                // with stable reading gaps during balancing.
+                // with balancing, during which this won't get updated.
                 model->cell_voltages_millis = millis();
             }
-
-            //printf("Voltages unstable? %d\n", model->cell_voltages_unstable);
         }
         
         // uint32_t end = time_us_32();
@@ -653,17 +603,7 @@ void bmb3y_tick(bms_model_t *model) {
 
         bmb3y_send_wakeup_cs_blocking();
 
-        // absurdly, if you do read/wake/read/wake/wake/read/wake, you get all 7
-        // valid-CRC temp reads amongst all the failed ones, and it seems
-        // reasonably stable.
-
-        bmb3y_read_temperatures_blocking(model, (1<<0) | (1<<7)); // 0,7 valid
-        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        bmb3y_read_temperatures_blocking(model, (1<<1) | (1<<4) | (1<<6)); // 1, 4, 6 valid
-        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        bmb3y_read_temperatures_blocking(model, (1<<2) | (1<<3) | (1<<5)); // 2, 3, 5 valid
-        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+        bmb3y_read_temperatures_blocking(model);
 
         // See what is in F...
         if(false) {
@@ -685,11 +625,6 @@ void bmb3y_tick(bms_model_t *model) {
             bmb3y_send_wakeup_cs_blocking();
             balancing_sm_tick(model);
             bmb3y_send_balancing(model);
-
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
         }
     // } else if(step > 7) {
     //     if(use_slow_mode && model->cell_voltages_millis && model->cell_voltage_min_mV >= CELL_VOLTAGE_SOFT_MIN_mV) {

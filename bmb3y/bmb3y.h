@@ -50,13 +50,14 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 #define BMB3Y_CMD_READ_CONFIG  0x50009400    // Config register
 #define BMB3Y_CMD_WRITE_CONFIG 0x112F        // Write config
 
+// Sniffed BMS traffic seems to use these shorter commands for cellvoltage reads
+// rather than the longer ones. However the CRCs seem to work differently.
 #define BMB3Y_CMD_READ_A_SHORT 0x0763
 #define BMB3Y_CMD_READ_B_SHORT 0x08F9
 #define BMB3Y_CMD_READ_C_SHORT 0x09D6
 #define BMB3Y_CMD_READ_D_SHORT 0x0AA7
 #define BMB3Y_CMD_READ_E_SHORT 0x0B88
 #define BMB3Y_CMD_READ_F_SHORT 0x0C45
-
 
 
 #define BMB3Y_CMD_READ_TEMPS   0x0E1B
@@ -88,9 +89,6 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
   // but got hex: 43 42 2F FA 56 5D 19 1F
 // seems temp is in 0,1, LE - 0x6F00 if 100cish (3.99V), 0x4300 at 30ish (2.44V)
 // (divide by 7ish to get voltage, then solve for temp)
-// This regularly fails to read (missing response bits), which is strange.
-// unclear which bits those actually are, as the conversions seem ok generally.
-// need to snoop.
 
 #define BMB3Y_CMD_READ_TEMPS4  0x0C45 // 4 data + 2 byte CRC?
   // but got hex: 01 00 06 AC 24 A6 FF FF 

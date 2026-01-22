@@ -1,12 +1,13 @@
 #include "balancing.h"
 
+#include "../monitoring/events.h"
 #include "../limits.h"
 #include "../model.h"
 
 #define AUTO_BALANCING_PERIOD_MS 30000 // how long to wait between auto-balancing sessions
-#define PERIODS_PER_MV 10 // how many balancing periods per mV above minimum
-#define BALANCE_MIN_OFFSET_MV 1 // minimum voltage difference to balance
-#define PAUSE_EVERY_N_PERIODS 8 // pause balancing every N periods to get good voltage readings
+#define PERIODS_PER_MV 50 // how many balancing periods per mV above minimum
+#define BALANCE_MIN_OFFSET_MV 2 // minimum voltage difference to balance
+#define PAUSE_AFTER_N_PERIODS 9 // pause balancing for a pariod after N periods to get a good voltage reading
 
 static bool good_conditions_for_balancing(bms_model_t *model) {
     // Check if conditions are suitable for balancing
@@ -19,6 +20,11 @@ static bool good_conditions_for_balancing(bms_model_t *model) {
 
     // check for low current variance?
 
+    if(get_highest_event_level() == LEVEL_FATAL) {
+        // Don't balance if there are fatal faults
+        return false;
+    }
+
     return true;
     return model->balancing_enabled;
     //return true;
@@ -27,7 +33,13 @@ static bool good_conditions_for_balancing(bms_model_t *model) {
 // Update the balance request mask based on the remaining balance times and
 // whether even or odd cells are being balanced this cycle. Decrement the
 // remaining balance times by the given amount.
-static void update_balance_requests(balancing_sm_t *balancing_sm, int16_t decrement) {
+static void update_balance_requests(balancing_sm_t *balancing_sm, int16_t decrement, bool skipping) {
+    // Clear all balancing requests
+    for(int i=0; i<4; i++) {
+        balancing_sm->balance_request_mask[i] = 0;
+    }
+
+    bool any_balancing = false;
     for(int cell=0; cell<120; cell++) {
         int mask_index = cell / 32;
         int bit_index = cell % 32;
@@ -36,10 +48,19 @@ static void update_balance_requests(balancing_sm_t *balancing_sm, int16_t decrem
             balancing_sm->balance_time_remaining[cell] -= decrement;
             //printf("Cell %d balance time remaining now: %d\n", cell, balancing_sm->balance_time_remaining[cell]);
             balancing_sm->balance_request_mask[mask_index] |= (1 << bit_index);
-        } else {
-            balancing_sm->balance_request_mask[mask_index] &= ~(1 << bit_index);
+            any_balancing = true;
+        // } else {
+        //     balancing_sm->balance_request_mask[mask_index] &= ~(1 << bit_index);
         }
     }
+
+    if(!any_balancing && !skipping) {
+        // Nothing to balance on this cycle, skip to the next one
+        balancing_sm->even_cells = !balancing_sm->even_cells;
+        update_balance_requests(balancing_sm, decrement, true);
+        return;
+    }
+
     printf("Balance mask now: %08lX %08lX %08lX %08lX\n",
         balancing_sm->balance_request_mask[3],
         balancing_sm->balance_request_mask[2],
@@ -79,7 +100,6 @@ static bool start_balancing(bms_model_t *model) {
     }
 
     for(int cell=0; cell<NUM_CELLS; cell++) {
-        // TODO - ignore unused cells
         if(model->cell_voltages_mV[cell] > 2500 && model->cell_voltages_mV[cell] < min_cell_voltage) {
             min_cell_voltage = model->cell_voltages_mV[cell];
         }
@@ -89,7 +109,6 @@ static bool start_balancing(bms_model_t *model) {
     
     for(int cell=0; cell<NUM_CELLS; cell++) {
         int16_t voltage = model->cell_voltages_mV[cell];
-        // 3mV hysteresis, negatives will be ignored
         model->balancing_sm.balance_time_remaining[cell] = calculate_balance_time(voltage, min_cell_voltage);
         if(model->balancing_sm.balance_time_remaining[cell] > 0) {
             printf("Cell %d voltage %d mV, balancing for %d periods\n",
@@ -97,7 +116,7 @@ static bool start_balancing(bms_model_t *model) {
         }
     }
 
-    update_balance_requests(balancing_sm, 0);
+    update_balance_requests(balancing_sm, 0, false);
 
     return true;
 }
@@ -105,7 +124,7 @@ static bool start_balancing(bms_model_t *model) {
 // Decrement balance times by one period, check if individual cells are done
 // balancing, and update the request mask accordingly.
 static void decrement_balance_times_and_update(balancing_sm_t *balancing_sm) {
-    update_balance_requests(balancing_sm, 1);
+    update_balance_requests(balancing_sm, 1, false);
 }
 
 void pause_balancing(balancing_sm_t *balancing_sm) {
@@ -152,7 +171,14 @@ void balancing_sm_tick(bms_model_t *model) {
             break;
 
         case BALANCING_STATE_ACTIVE:
-            if(PAUSE_EVERY_N_PERIODS>0 && (balancing_sm->pause_counter++) == PAUSE_EVERY_N_PERIODS) {
+            if(get_highest_event_level() == LEVEL_FATAL) {
+                // Stop balancing
+                pause_balancing(balancing_sm);
+                state_transition((sm_t*)balancing_sm, BALANCING_STATE_IDLE);
+                return;
+            }
+
+            if(PAUSE_AFTER_N_PERIODS>0 && (balancing_sm->pause_counter++) == PAUSE_AFTER_N_PERIODS) {
                 // Skip balancing this period
                 pause_balancing(balancing_sm);
                 balancing_sm->pause_counter = 0;
@@ -160,7 +186,7 @@ void balancing_sm_tick(bms_model_t *model) {
             }
 
             // Update the mask and decrement the times.
-            update_balance_requests(balancing_sm, 1);
+            update_balance_requests(balancing_sm, 1, false);
             // Switch even/odd cells for next time
             balancing_sm->even_cells = !balancing_sm->even_cells;
 

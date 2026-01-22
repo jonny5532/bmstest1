@@ -66,7 +66,7 @@ typedef struct bms_model {
     millis_t cell_voltage_millis; // aggregated cell voltages
     int16_t cell_voltages_mV[120];
     millis_t cell_voltages_millis; // individial cell voltages
-    bool cell_voltages_unstable; // set when cell voltages are changing rapidly
+    bool cell_voltages_unstable; // if these voltages were queried during a balancing cycle
     bool cell_voltage_slow_mode; // only request BMB data infrequently
 
     // The calculated pack voltage limits
