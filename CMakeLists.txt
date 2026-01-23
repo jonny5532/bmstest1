@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_C_STANDARD 11)
 
-set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/boards)
+set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/bms/config/boards)
 set(PICO_BOARD bms_rp2354b)
 
 # Support for anonymous structs
@@ -21,53 +21,54 @@ set(PICO_FLASH_SIZE_BYTES 1572864)
 
 ######
 
-include_directories(vendor/can2040/src)
+include_directories(bms vendor/can2040/src)
 
 add_executable(bms
-    bms.c
-    init.c
-    model.c
-    hw/actuators/contactors.c
-    hw/sensors/internal_adc.c
-    hw/sensors/ina228.c
-    hw/sensors/ads1115.c
-    hw/comms/duart.c
-    hw/comms/hmi_serial.c
-    hw/comms/internal_serial.c
-    hw/chip/nvm.c
-    hw/chip/pwm.c
-    hw/chip/time.c
-    hw/chip/watchdog.c
-    hw/checks.c
-    bmb3y/bmb3y.c
-    bmb3y/crc.c
-    battery/balancing.c
-    battery/current_limits.c
-    battery/safety_checks.c
-    calibration/offline.c
-    estimators/basic_count.c
-    estimators/ekf.c
-    estimators/fancy_count.c
-    estimators/kalman.c
-    estimators/voltage_based.c
-    monitoring/counters.c
-    monitoring/events.c
-    inverter/byd_can.c
-    isospi/isospi_master.c
-    isospi/isosnoop.c
-    state_machines/base.c
-    state_machines/contactors.c
-    state_machines/system.c
-    util/sampler.c
+    bms/app/bms.c
+    bms/app/hardware_checks.c
+    bms/app/init.c
+    bms/app/model.c
+    bms/drivers/contactors/contactors.c
+    bms/drivers/sensors/internal_adc.c
+    bms/drivers/sensors/ina228.c
+    bms/drivers/sensors/ads1115.c
+    bms/drivers/comms/duart.c
+    bms/protocols/hmi_serial/hmi_serial.c
+    bms/protocols/internal_serial/internal_serial.c
+    bms/drivers/chip/nvm.c
+    bms/drivers/chip/pwm.c
+    bms/sys/time/time.c
+    bms/drivers/chip/watchdog.c
+    bms/drivers/bmb3y/bmb3y.c
+    bms/drivers/bmb3y/crc.c
+    bms/app/battery/balancing.c
+    bms/app/battery/current_limits.c
+    bms/app/battery/safety_checks.c
+    bms/app/calibration/offline.c
+    bms/app/estimators/basic_count.c
+    bms/app/estimators/ekf.c
+    bms/app/estimators/fancy_count.c
+    bms/app/estimators/kalman.c
+    bms/app/estimators/voltage_based.c
+    bms/app/monitoring/counters.c
+    bms/sys/events/events.c
+    bms/protocols/inverter/byd_can.c
+    bms/drivers/isospi/isospi_master.c
+    bms/drivers/isospi/isosnoop.c
+    bms/app/state_machines/base.c
+    bms/app/state_machines/contactors.c
+    bms/app/state_machines/system.c
+    bms/lib/sampler.c
     vendor/can2040/src/can2040.c
     vendor/littlefs/lfs.c
     vendor/littlefs/lfs_util.c
+    main.c
     )
 
 pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/vendor/can2040/pio/can2040.pio)
 
-pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/isospi/isospi_master.pio)
-pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/isospi/isosnoop.pio)
+pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/bms/drivers/isospi/isospi_master.pio)
+pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/bms/drivers/isospi/isosnoop.pio)
 #pico_generate_pio_header(isosnooper ${CMAKE_CURRENT_LIST_DIR}/isospi_scope.pio)
 #pico_generate_pio_header(isosnooper ${CMAKE_CURRENT_LIST_DIR}/isospi_device.pio)
 
