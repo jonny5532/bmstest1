@@ -464,8 +464,8 @@ void contactor_sm_tick(bms_model_t *model) {
             // Both positive and precharge (since this actually leaves the precharge open due to the inverted logic)
             contactors_set_pos_pre_neg(true, true, false);
 
-            // int32_t voltage = abs_int32(model->pos_contactor_voltage_mV);
-            // printf("Pos contactor voltage: %d mV\n", voltage);
+            int32_t voltage = abs_int32(model->pos_contactor_voltage_mV);
+            printf("Pos contactor voltage: %d mV\n", voltage);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
                 if(confirm_contactor_pos_seems_closed(model)) {

@@ -26,6 +26,7 @@ typedef struct {
     // Whether we're balancing even or odd cells this cycle.
     bool even_cells;
     uint16_t pause_counter;
+    bool is_pause_cycle;
 } balancing_sm_t;
 
 enum balancing_states {

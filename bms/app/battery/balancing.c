@@ -7,7 +7,7 @@
 #define AUTO_BALANCING_PERIOD_MS 30000 // how long to wait between auto-balancing sessions
 #define PERIODS_PER_MV 50 // how many balancing periods per mV above minimum
 #define BALANCE_MIN_OFFSET_MV 2 // minimum voltage difference to balance
-#define PAUSE_AFTER_N_PERIODS 9 // pause balancing for a pariod after N periods to get a good voltage reading
+#define PAUSE_AFTER_N_PERIODS 4 // pause balancing for a shortened period after N periods to get a good voltage reading
 
 static bool good_conditions_for_balancing(bms_model_t *model) {
     // Check if conditions are suitable for balancing
@@ -177,6 +177,8 @@ static bool finished_balancing(balancing_sm_t *balancing_sm) {
 void balancing_sm_tick(bms_model_t *model) {
     balancing_sm_t *balancing_sm = &model->balancing_sm;
 
+    balancing_sm->is_pause_cycle = false;
+
     switch(balancing_sm->state) {
         case BALANCING_STATE_IDLE:
             if(state_timeout((sm_t*)balancing_sm, AUTO_BALANCING_PERIOD_MS) && good_conditions_for_balancing(model)) {
@@ -199,6 +201,7 @@ void balancing_sm_tick(bms_model_t *model) {
                 // Skip balancing this period
                 pause_balancing(balancing_sm);
                 balancing_sm->pause_counter = 0;
+                balancing_sm->is_pause_cycle = true;
                 break;
             }
 

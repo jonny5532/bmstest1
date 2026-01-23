@@ -141,6 +141,5 @@ bool bmb3y_get_data_blocking(uint32_t cmd, uint8_t *buf, int len);
 void bmb3y_wakeup_blocking(void);
 void bmb3y_request_snapshot_blocking();
 bool bmb3y_read_test_blocking(uint32_t cmd, int cells);
-bool bmb3y_read_cell_voltages_blocking(bms_model_t *model);
 bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index);
 void bmb3y_send_balancing(bms_model_t *model);

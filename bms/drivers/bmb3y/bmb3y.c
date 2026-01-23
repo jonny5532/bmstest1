@@ -491,204 +491,260 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
     return crc_ok;
 }
 
-bool last_read_crc_failed = false;
+static void bmb3y_read_cell_voltages_blocking(bms_model_t *model) {
+    // Read all cell voltage banks in one go
 
-void bmb3y_tick(bms_model_t *model) {
-    // TODO - maybe split this in half, into separate 'read' and 'write' phases?
-    // Otherwise we're writing out balancing during the read phase, (even though
-    // it'll be related to data discovered on previous cycles anyway)
-
-    // We do a full communication cycle every 64 ticks (1.28s).
-    // We offset the steps by 5 to interleave with other BMS tasks.
-
-    // Slow mode samples less frequently to reduce battery self-drain in low
-    // voltage situations. It only takes effect once we have a valid reading,
-    // and aren't having CRC issues.
-    bool use_slow_mode = model->cell_voltage_slow_mode && model->cell_voltages_millis > 0 &&
-        !last_read_crc_failed;
-
-    // 81.92s in slow mode, 1.28s in normal mode
-    int period = use_slow_mode ? 0xfff : 0x3f;
-    int step = (timestep() & period) - 5; // was 3f
-
-    // We can 'MUTE' the BMBs which pauses the balancing, but we then have to
-    // wait for a while before requesting a snapshot for the voltages to settle:
-    //    without muting:
-    //     cell 23: 3958 - 4137 mV
-    //    with 1 timestep between mute and snapshot
-    //     cell 23: 4022 - 4107
-    //    2 timesteps:
-    //     cell 23: 4052 - 4094
-    //    3 timesteps:
-    //     cell 23: 4066 - 4086
-    //    4 timesteps:
-    //     cell 23: 4073 - 4083
-    //    5 timesteps:
-    //     cell 23: 4077 - 4081
-    //    6 timesteps:
-    //     cell 23: 4078 - 4081
-    //    7 timesteps:
-    //     cell 23: 4079 - 4080
-    //    8 timesteps:
-    //     cell 23: 4080 - 4080
-    //    9 timesteps:
-    //     cell 23: 4080 - 4080 (other cells still bouncing by 1mV)
-
-    // 9 timesteps is 180ms, a bit much to pause every 1.28s?
-    // alternatively, we could:
-    //   mute during a pair of balance cycles every so often (one odd, one even)
-    //     for say 6 timesteps each (120ms)
-    //   and average the readings from those two cycles
-    // could get down to 240ms every, say 5.12s, or 5% of the time, or whatever
-
-    int mute_steps = 0;
-
-    if(mute_steps>0 && step==0) {
-        // Wake up and stop balancing
-        bmb3y_send_wakeup_cs_blocking();
-        //pause_balancing(&model->balancing_sm);
-        //bmb3y_send_balancing(model);
-        bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
-
-    } else if(step==(mute_steps + 0)) {
-        // Wake up and request snapshot
-
-        bmb3y_send_wakeup_cs_blocking();
-
-        // The BMB responses include CRC14s, but these often seem to be
-        // corrupted unless you perform the operations in a very particular
-        // sequence.
-
-        // The corruption takes the form of a XOR with one of three patterns, so
-        // is easily reversible, at the cost of slightly reduced integrity.
-
-        // Thus we don't bother with the sequencing anymore.
-
-        // The sequencing changes also if you want too long between cycles -
-        // normally we use 1.28s cycles, but slow mode requires a different
-        // pattern.
-        
-        // read config
-        //uint8_t rx_buf[72];
-        //bmb3y_get_data_blocking(BMB3Y_CMD_READ_CONFIG, rx_buf, 72);
-        // for(int i=0; i<72; i++) {
-        //     printf("%02X ", rx_buf[i]);
-        // }
-        // printf("\n");
-
-        if(model->cell_voltages_millis && model->cell_voltage_min_mV < CELL_VOLTAGE_SOFT_MIN_mV && !model->cell_voltage_slow_mode && !last_read_crc_failed) {
-            // We're not in slow mode yet, but a cell is low - switch to slow mode
-            // model->cell_voltage_slow_mode = true;
-            // use_slow_mode = true;
-        }
-
-
-        if(use_slow_mode) {
-            // In slow mode we have to set balancing config first, and use a
-            // different wakeup pattern, else we get bad CRCs back on the
-            // subsequent reads.
-
-            // Forcibly prevent balancing in slow mode
-            pause_balancing(&model->balancing_sm);
-            bmb3y_send_balancing(model);
-
-            // If attempting to keep the sequence, send three IDLE_WAKEs
-            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        //} else if(last_read_crc_failed) {
-            // Last read failed - try a single IDLE_WAKE to re-sync
-            //bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        } else {
-            // Normal case - two IDLE_WAKEs keep the CRCs happy
-            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-            // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        }
-
-
-        last_read_crc_failed = false;
-        // muting doesn't seem to work? cellvoltages still bouncy during balance
-        // bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
-        // sleep_us(100);
-        if(mute_steps==0) {
-            bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-        } else {
-            bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
-        }
-        bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
-
-        // If muting, could wait 300us and wake now, which would give more
-        // balancing-enabled time...
-
-        // As we wait longer than 5ms before the next command, the BMB will go
-        // to comms-idle and need a wakeup. A single CS wakeup each time seems
-        // to work fine, although need to check how multiple BMBs affect things.
-
-        // uint32_t end = time_us_32();
-        // printf("BMB3Y snapshot took %ld us\n", end - start);
-
-    } else if(step>=(mute_steps+1) && step <= (mute_steps+5)) {
-        // Read each of the five cellvoltage banks
-
-        bmb3y_send_wakeup_cs_blocking();
-
-        // Resume balancing
-        bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-
-        if(!bmb3y_read_cell_voltage_bank_blocking(model, step - (mute_steps+1))) {
-            // Read failed
-            last_read_crc_failed = true;
-        } else if(step==(mute_steps+5) && !last_read_crc_failed) {
-            // All banks read successfully
-            //printf("CRC: GOOD!!!\n");
-
-            model->raw_cell_voltages_millis = millis();
-
-            // If balancing was not active, normal cell voltages have now been updated.
-            if(!model->balancing_active) {
-                // The staleness threshold will need to be large enough to cope
-                // with balancing, during which this won't get updated.
-                model->cell_voltages_millis = millis();
-            }
-        }
-        
-        // uint32_t end = time_us_32();
-        // printf("BMB3Y bank %d read took %ld us\n", step - 1, end - start);
-    } else if(step==(mute_steps+6)) {
-        // Module temperatures
-
-        bmb3y_send_wakeup_cs_blocking();
-
-        //bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
-
-        bmb3y_read_temperatures_blocking(model);
-
-        // See what is in F...
-        if(false) {
-            uint8_t rx_buf[100];
-            bmb3y_long_command_get_data_blocking(BMB3Y_CMD_READ_F, rx_buf, 20);
-            printf("F hex: ");
-            // supposedly bytes 2-3 (LE) might contain voltage, reads 0xabff at 56468mV tho
-            // could be /0.8? pr *1.2825? or 12328mV offset? who knows...
-            for(int i=0;i<20;i++) {
-                printf("%02X ", rx_buf[i]);
-            }
-            printf("\n");
-        }
-
-    } else if(step==(mute_steps+7)) {
-        // Enable/disable per-cell balancing as needed.
-
-        if(!use_slow_mode) {
-            bmb3y_send_wakeup_cs_blocking();
-            balancing_sm_tick(model);
-            bmb3y_send_balancing(model);
-        }
-    // } else if(step > 7) {
-    //     if(use_slow_mode && model->cell_voltages_millis && model->cell_voltage_min_mV >= CELL_VOLTAGE_SOFT_MIN_mV) {
-    //         // Exit slow mode
-    //         model->cell_voltage_slow_mode = false;
-    //         use_slow_mode = true;
-    //     }
+    bool all_crc_ok = true;
+    for(int bank=0; bank<5; bank++) {
+        all_crc_ok = bmb3y_read_cell_voltage_bank_blocking(model, bank) && all_crc_ok;
+    }
+    if(all_crc_ok && !model->balancing_active) {
+        model->cell_voltages_millis = millis();
     }
 }
+
+
+int bmb3y_timestep_offset = 0;
+// Cut balancing pause cycles short so we can get back to balancing sooner.
+const int PAUSE_CYCLE_PERIOD = 10;
+
+void bmb3y_tick(bms_model_t *model) {
+    int period_mask = 0x3f;
+    int step = ((timestep() + bmb3y_timestep_offset) & period_mask) - 5; // was 3f
+
+    uint32_t start = time_us_32();
+
+    if(step == 0) {
+        // Wake up BMBs, take snapshot
+        // Takes about 90us
+        bmb3y_send_wakeup_cs_blocking();
+        bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
+    } else if(step == 1) {
+        // Wake up BMBs, read voltages and temperatures, setup balancing
+        // Takes about 6ms
+        bmb3y_send_wakeup_cs_blocking();
+        bmb3y_read_cell_voltages_blocking(model);
+        bmb3y_read_temperatures_blocking(model);
+        balancing_sm_tick(model);
+        bmb3y_send_balancing(model);
+    } else if(step == PAUSE_CYCLE_PERIOD && model->balancing_sm.is_pause_cycle) {
+        // Cut the cycle short if we're in a pause cycle by adjusting the offset.
+        bmb3y_timestep_offset = (bmb3y_timestep_offset + (period_mask + 1) - PAUSE_CYCLE_PERIOD - 1) & period_mask;
+    } 
+}
+
+
+// bool last_read_crc_failed = false;
+// int balancing_pause_timer = 0;
+
+// void old_bmb3y_tick(bms_model_t *model) {
+//     // TODO - maybe split this in half, into separate 'read' and 'write' phases?
+//     // Otherwise we're writing out balancing during the read phase, (even though
+//     // it'll be related to data discovered on previous cycles anyway)
+
+//     // We do a full communication cycle every 64 ticks (1.28s).
+//     // We offset the steps by 5 to interleave with other BMS tasks.
+
+//     // Slow mode samples less frequently to reduce battery self-drain in low
+//     // voltage situations. It only takes effect once we have a valid reading,
+//     // and aren't having CRC issues.
+//     bool use_slow_mode = model->cell_voltage_slow_mode && model->cell_voltages_millis > 0 &&
+//         !last_read_crc_failed;
+
+//     // 81.92s in slow mode, 1.28s in normal mode
+//     int period = use_slow_mode ? 0xfff : 0x3f;
+//     int step = ((timestep() + bmb3y_timestep_offset) & period) - 5; // was 3f
+
+//     // We can 'MUTE' the BMBs which pauses the balancing, but we then have to
+//     // wait for a while before requesting a snapshot for the voltages to settle:
+//     //    without muting:
+//     //     cell 23: 3958 - 4137 mV
+//     //    with 1 timestep between mute and snapshot
+//     //     cell 23: 4022 - 4107
+//     //    2 timesteps:
+//     //     cell 23: 4052 - 4094
+//     //    3 timesteps:
+//     //     cell 23: 4066 - 4086
+//     //    4 timesteps:
+//     //     cell 23: 4073 - 4083
+//     //    5 timesteps:
+//     //     cell 23: 4077 - 4081
+//     //    6 timesteps:
+//     //     cell 23: 4078 - 4081
+//     //    7 timesteps:
+//     //     cell 23: 4079 - 4080
+//     //    8 timesteps:
+//     //     cell 23: 4080 - 4080
+//     //    9 timesteps:
+//     //     cell 23: 4080 - 4080 (other cells still bouncing by 1mV)
+
+//     // 9 timesteps is 180ms, a bit much to pause every 1.28s?
+//     // alternatively, we could:
+//     //   mute during a pair of balance cycles every so often (one odd, one even)
+//     //     for say 6 timesteps each (120ms)
+//     //   and average the readings from those two cycles
+//     // could get down to 240ms every, say 5.12s, or 5% of the time, or whatever
+
+//     int mute_steps = 0;
+
+//     uint32_t start = time_us_32();
+
+//     if(mute_steps>0 && step==0) {
+//         // Wake up and stop balancing
+//         bmb3y_send_wakeup_cs_blocking();
+//         //pause_balancing(&model->balancing_sm);
+//         //bmb3y_send_balancing(model);
+//         bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
+
+//     } else if(step==(mute_steps + 0)) {
+//         // Wake up and request snapshot
+
+//         bmb3y_send_wakeup_cs_blocking();
+
+//         // The BMB responses include CRC14s, but these often seem to be
+//         // corrupted unless you perform the operations in a very particular
+//         // sequence.
+
+//         // The corruption takes the form of a XOR with one of three patterns, so
+//         // is easily reversible, at the cost of slightly reduced integrity.
+
+//         // Thus we don't bother with the sequencing anymore.
+
+//         // The sequencing changes also if you want too long between cycles -
+//         // normally we use 1.28s cycles, but slow mode requires a different
+//         // pattern.
+        
+//         // read config
+//         //uint8_t rx_buf[72];
+//         //bmb3y_get_data_blocking(BMB3Y_CMD_READ_CONFIG, rx_buf, 72);
+//         // for(int i=0; i<72; i++) {
+//         //     printf("%02X ", rx_buf[i]);
+//         // }
+//         // printf("\n");
+
+//         if(model->cell_voltages_millis && model->cell_voltage_min_mV < CELL_VOLTAGE_SOFT_MIN_mV && !model->cell_voltage_slow_mode && !last_read_crc_failed) {
+//             // We're not in slow mode yet, but a cell is low - switch to slow mode
+//             // model->cell_voltage_slow_mode = true;
+//             // use_slow_mode = true;
+//         }
+
+
+//         if(use_slow_mode) {
+//             // In slow mode we have to set balancing config first, and use a
+//             // different wakeup pattern, else we get bad CRCs back on the
+//             // subsequent reads.
+
+//             // Forcibly prevent balancing in slow mode
+//             pause_balancing(&model->balancing_sm);
+//             bmb3y_send_balancing(model);
+
+//             // If attempting to keep the sequence, send three IDLE_WAKEs
+//             // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+//             // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+//             // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+//         //} else if(last_read_crc_failed) {
+//             // Last read failed - try a single IDLE_WAKE to re-sync
+//             //bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+//         } else {
+//             // Normal case - two IDLE_WAKEs keep the CRCs happy
+//             // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+//             // bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+//         }
+
+
+//         last_read_crc_failed = false;
+//         // muting doesn't seem to work? cellvoltages still bouncy during balance
+//         // bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
+//         // sleep_us(100);
+//         if(mute_steps==0) {
+//             bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+//         } else {
+//             bmb3y_send_command_blocking(BMB3Y_CMD_MUTE);
+//         }
+//         bmb3y_send_command_blocking(BMB3Y_CMD_SNAPSHOT);
+
+//         // If muting, could wait 300us and wake now, which would give more
+//         // balancing-enabled time...
+
+//         // As we wait longer than 5ms before the next command, the BMB will go
+//         // to comms-idle and need a wakeup. A single CS wakeup each time seems
+//         // to work fine, although need to check how multiple BMBs affect things.
+
+//         // uint32_t end = time_us_32();
+//         // printf("BMB3Y snapshot took %ld us\n", end - start);
+
+//     } else if(step>=(mute_steps+1) && step <= (mute_steps+5)) {
+//         // Read each of the five cellvoltage banks
+
+//         if(step==(mute_steps+1)) {
+//             bmb3y_send_wakeup_cs_blocking();
+
+//             // Resume balancing
+//             bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+
+//             for(int bank=0; bank<5; bank++) {
+//                 if(!bmb3y_read_cell_voltage_bank_blocking(model, bank)) {
+//                     // Read failed
+//                     last_read_crc_failed = true;
+//                 } else if(bank==4 && !last_read_crc_failed) {
+//                     // All banks read successfully
+//                     //printf("CRC: GOOD!!!\n");
+
+//                     model->raw_cell_voltages_millis = millis();
+
+//                     // If balancing was not active, normal cell voltages have now been updated.
+//                     if(!model->balancing_active) {
+//                         // The staleness threshold will need to be large enough to cope
+//                         // with balancing, during which this won't get updated.
+//                         model->cell_voltages_millis = millis();
+//                     }
+//                 }
+//             }
+            
+//             uint32_t end = time_us_32();
+//             printf("BMB3Y bank %d read took %ld us\n", step - 1, end - start);
+//         }
+//     } else if(step==(mute_steps+6)) {
+//         // Module temperatures
+
+//         bmb3y_send_wakeup_cs_blocking();
+
+//         //bmb3y_send_command_blocking(BMB3Y_CMD_IDLE_WAKE);
+
+//         bmb3y_read_temperatures_blocking(model);
+
+//         // See what is in F...
+//         if(false) {
+//             uint8_t rx_buf[100];
+//             bmb3y_long_command_get_data_blocking(BMB3Y_CMD_READ_F, rx_buf, 20);
+//             printf("F hex: ");
+//             // supposedly bytes 2-3 (LE) might contain voltage, reads 0xabff at 56468mV tho
+//             // could be /0.8? pr *1.2825? or 12328mV offset? who knows...
+//             for(int i=0;i<20;i++) {
+//                 printf("%02X ", rx_buf[i]);
+//             }
+//             printf("\n");
+//         }
+
+//         uint32_t end = time_us_32();
+//         printf("BMB3Y temp read took %ld us\n", end - start);
+
+//     } else if(step==(mute_steps+7)) {
+//         // Enable/disable per-cell balancing as needed.
+
+//         if(!use_slow_mode) {
+//             bmb3y_send_wakeup_cs_blocking();
+//             balancing_sm_tick(model);
+//             bmb3y_send_balancing(model);
+//         }
+
+//         uint32_t end = time_us_32();
+//         printf("BMB3Y balancing took %ld us\n", end - start);
+//     // } else if(step > 7) {
+//     //     if(use_slow_mode && model->cell_voltages_millis && model->cell_voltage_min_mV >= CELL_VOLTAGE_SOFT_MIN_mV) {
+//     //         // Exit slow mode
+//     //         model->cell_voltage_slow_mode = false;
+//     //         use_slow_mode = true;
+//     //     }
+//     }
+// }
