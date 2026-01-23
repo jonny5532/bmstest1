@@ -48,27 +48,23 @@ void confirm_battery_safety(bms_model_t *model) {
         ERR_CELL_VOLTAGES_STALE,
         0x1000000000000000
     )) {
-        check_or_confirm(
+        confirm(
             model->cell_voltage_max_mV <= CELL_VOLTAGE_SOFT_MAX_mV,
-            !model->cell_voltages_unstable,
             ERR_CELL_VOLTAGE_HIGH,
             model->cell_voltage_max_mV
         );
-        check_or_confirm(
+        confirm(
             model->cell_voltage_max_mV <= CELL_VOLTAGE_HARD_MAX_mV,
-            !model->cell_voltages_unstable,
             ERR_CELL_VOLTAGE_VERY_HIGH,
             model->cell_voltage_max_mV
         );
-        check_or_confirm(
+        confirm(
             model->cell_voltage_min_mV >= CELL_VOLTAGE_SOFT_MIN_mV,
-            !model->cell_voltages_unstable,
             ERR_CELL_VOLTAGE_LOW,
             model->cell_voltage_min_mV
         );
-        check_or_confirm(
+        confirm(
             model->cell_voltage_min_mV >= CELL_VOLTAGE_HARD_MIN_mV,
-            !model->cell_voltages_unstable,
             ERR_CELL_VOLTAGE_VERY_LOW,
             model->cell_voltage_min_mV
         );

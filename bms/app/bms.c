@@ -223,7 +223,11 @@ void bms_tick() {
                 printf("\n");
             }
         }
-        printf("Total: %lu mV | Temps: %ddC - %ddC\n\n", total, model.temperature_min_dC, model.temperature_max_dC);
+        printf("Total: %lu mV | Temps: %ddC - %ddC | Delta: %d mV\n\n", 
+            total, 
+            model.temperature_min_dC, model.temperature_max_dC, 
+            model.cell_voltage_max_mV - model.cell_voltage_min_mV
+        );
 
         //printf("Bal mask: %02X %02X\n", bitmap_set[14], bitmap_set[15]);
     }

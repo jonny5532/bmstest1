@@ -57,23 +57,30 @@ typedef struct bms_model {
     offline_calibration_sm_t offline_calibration_sm;
     offline_calibration_requests_t offline_calibration_req;
 
-    // Battery
+    // BATTERY DATA
+
     int16_t module_temperatures_dC[8];
     millis_t module_temperatures_millis;
+
+    // Aggregated cell voltage data
     int16_t cell_voltage_min_mV;
     int16_t cell_voltage_max_mV;
     int32_t cell_voltage_total_mV;
-    millis_t cell_voltage_millis; // aggregated cell voltages
+    millis_t cell_voltage_millis;
+    
+    // Individual cell voltages, which will remain static during balancing
     int16_t cell_voltages_mV[120];
     millis_t cell_voltages_millis; // individial cell voltages
+    // Individual raw cell voltages, which will bounce around during balancing
     int16_t raw_cell_voltages_mV[120]; // are unstable during balancing
     millis_t raw_cell_voltages_millis;
-    bool cell_voltages_unstable; // if these voltages were queried during a balancing cycle
+
     bool cell_voltage_slow_mode; // only request BMB data infrequently
 
     // The calculated pack voltage limits
     uint16_t max_voltage_limit_dV;
     uint16_t min_voltage_limit_dV;
+
 
     // Current limits (the lower of these limits will be used)
     uint16_t temp_charge_current_limit_dA; // in 0.1A units
@@ -118,7 +125,7 @@ typedef struct bms_model {
     int32_t current_offset;
 
     bool balancing_enabled;
-    bool balancing_active; // whether balancing was requested this BMB cycle
+    bool balancing_active; // whether balancing was requested during the past BMB cycle
     int16_t balancing_voltage_threshold_mV; // Only balance cells above this voltage
 
     bool estop_pressed;

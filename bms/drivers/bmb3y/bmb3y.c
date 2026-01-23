@@ -586,11 +586,6 @@ void bmb3y_tick(bms_model_t *model) {
 
         bmb3y_send_wakeup_cs_blocking();
 
-        // If balancing is active, then our newly read voltages are going to be unstable.
-        if(model->balancing_active) {
-            model->cell_voltages_unstable = true;
-        }
-
         if(!bmb3y_read_cell_voltage_bank_blocking(model, step - 1)) {
             // Read failed
             last_read_crc_failed = true;
@@ -600,10 +595,8 @@ void bmb3y_tick(bms_model_t *model) {
 
             model->raw_cell_voltages_millis = millis();
 
-            // If balancing was not active, voltages are now stable (having
-            // now replaced all of them)
+            // If balancing was not active, normal cell voltages have now been updated.
             if(!model->balancing_active) {
-                model->cell_voltages_unstable = false;
                 // The staleness threshold will need to be large enough to cope
                 // with balancing, during which this won't get updated.
                 model->cell_voltages_millis = millis();

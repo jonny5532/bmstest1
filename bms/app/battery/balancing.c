@@ -25,6 +25,23 @@ static bool good_conditions_for_balancing(bms_model_t *model) {
         return false;
     }
 
+    if(model->cell_voltage_max_mV > CELL_VOLTAGE_SOFT_MAX_mV) {
+        // Don't balance if any cell is above the soft max voltage
+
+        // TODO - maybe only restrict this if we're also charging? The balancing
+        // itself isn't the problem, it is the reduced frequency of voltage
+        // updates during balancing meaning we will react more slowly to an
+        // overvoltage (or recovery).
+
+        return false;
+    }
+
+    if(model->cell_voltage_min_mV < MINIMUM_BALANCE_VOLTAGE_mV) {
+        // Don't balance if any cell is below the minimum balancing voltage
+        return false;
+    }
+
+
     return true;
     return model->balancing_enabled;
     //return true;
@@ -171,8 +188,8 @@ void balancing_sm_tick(bms_model_t *model) {
             break;
 
         case BALANCING_STATE_ACTIVE:
-            if(get_highest_event_level() == LEVEL_FATAL) {
-                // Stop balancing
+        if(!good_conditions_for_balancing(model)) {
+                // Stop balancing if conditions are no longer good
                 pause_balancing(balancing_sm);
                 state_transition((sm_t*)balancing_sm, BALANCING_STATE_IDLE);
                 return;
@@ -201,51 +218,3 @@ void balancing_sm_tick(bms_model_t *model) {
             break;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-// Bleed resistors are 90 ohm, so balancing rate should be:
-// 11mC per volt per second
-// (but we have voltages in mV and time in ms, so scale accordingly)
-//#define BALANCE_RATE_NUMERATOR 11
-//#define BALANCE_RATE_DENOMINATOR 1000000
-
-
-
-// void update_balancing(bms_model_t *model) {
-//     // Work out how long has elapsed since last update
-//     uint32_t elapsed = millis() - model->balancing.last_update_millis;
-
-//     if(elapsed < 1000) {
-//         // only update every second
-//         return;
-//     }
-
-//     model->balancing.last_update_millis = millis();
-
-//     // Go through each cell in turn
-//     for(int i=0; i<120; i++) {
-//         // Look up whether balancing is active for this cell
-//         int mask_index = i / 32;
-//         int bit_index = i % 32;
-//         bool balancing_active = (model->balancing.balance_active_mask[mask_index] & (1 << bit_index)) != 0;
-
-//         if(balancing_active) {
-//             // Decrement the balance charge based on cell voltage and elapsed time.
-//             model->balancing.balance_charge_mC[i] -= (model->cell_voltage_mV[i] * elapsed * BALANCE_RATE_NUMERATOR) / BALANCE_RATE_DENOMINATOR;
-
-//             if(model->balancing.balance_charge_mC[i] <= 0) {
-//                 // Stop balancing this cell
-//                 model->balancing.balance_request_mask[mask_index] &= ~(1 << bit_index);
-//             }
-//         }
-//     }
-// }
