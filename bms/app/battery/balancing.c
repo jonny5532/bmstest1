@@ -41,6 +41,10 @@ static bool good_conditions_for_balancing(bms_model_t *model) {
         return false;
     }
 
+    if(model->cell_voltage_slow_mode) {
+        // Don't balance in slow mode
+        return false;
+    }
 
     return true;
     return model->balancing_enabled;

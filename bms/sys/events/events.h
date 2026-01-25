@@ -147,6 +147,12 @@ static inline int16_t get_event_count(bms_event_type_t type) {
     return bms_event_slots[type].count;
 }
 
+// Gets the current level of the specified event type.
+static inline bms_event_level_t get_event_level(bms_event_type_t type) {
+    if(type >= ERR_HIGHEST) return LEVEL_NONE;
+    return (bms_event_level_t)bms_event_slots[type].level;
+}
+
 // Logs an event of the specified type with the provided data. Once raised,
 // subsequent calls will not increase the count.
 static inline void raise_bms_event(bms_event_type_t type, uint64_t data) {

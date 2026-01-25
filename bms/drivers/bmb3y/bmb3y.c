@@ -594,6 +594,39 @@ static void bmb3y_read_cell_voltages_blocking(bms_model_t *model) {
     }
 }
 
+static bool should_stop(bms_model_t *model) {
+    // Determine whether we should stop communicating with the BMBs to save power.
+    (void)model;
+
+    if((get_event_level(ERR_BATTERY_VOLTAGE_LOW) == LEVEL_FATAL) ||
+       (get_event_level(ERR_CELL_VOLTAGE_VERY_LOW) == LEVEL_FATAL)) {
+        // Have locked out due to low battery/cell voltage
+        // (after stopping we will soon gain a cell-voltages-stale error also)
+        return true;
+    }
+
+    return false;
+}
+
+static bool should_use_slow_mode(bms_model_t *model) {
+    // Determine whether we should enter slow mode to reduce battery self-discharge.
+
+    if(model->system_sm.state == SYSTEM_STATE_INACTIVE && 
+       state_time(&model->system_sm) > 60000 && 
+       (model->cell_voltages_millis > 0 && model->cell_voltage_min_mV < MINIMUM_BALANCE_VOLTAGE_mV)) {
+        // Inactive (contactors open) for a minute, and too low to balance, enter slow mode
+        return true;
+    }
+
+    if(get_event_level(ERR_BATTERY_VOLTAGE_LOW) != LEVEL_NONE ||
+       get_event_level(ERR_CELL_VOLTAGE_LOW) != LEVEL_NONE) {
+        // Low battery/cell voltage - use slow mode
+        return true;
+    }
+
+    return false;
+}
+
 
 int bmb3y_timestep_offset = 0;
 // Cut balancing pause cycles short so we can get back to balancing sooner.
@@ -601,6 +634,19 @@ const int PAUSE_CYCLE_PERIOD = 10;
 
 void bmb3y_tick(bms_model_t *model) {
     int period_mask = 0x3f;
+
+    if(should_stop(model)) {
+        // Stop talking to the BMBs to save power
+        return;
+    } else if(should_use_slow_mode(model)) {
+        // In slow mode, sample less frequently
+        if(!model->cell_voltage_slow_mode) {
+            printf("BMB3Y entering slow mode\n");
+            model->cell_voltage_slow_mode = true;
+        }
+        period_mask = 0xfff;
+    }
+
     int step = ((timestep() + bmb3y_timestep_offset) & period_mask) - 5; // was 3f
 
     uint32_t start = time_us_32();
@@ -620,6 +666,12 @@ void bmb3y_tick(bms_model_t *model) {
         bmb3y_read_more_temps_blocking(model);
         balancing_sm_tick(model);
         bmb3y_send_balancing(model);
+
+        if(model->cell_voltage_slow_mode && !should_use_slow_mode(model)) {
+            // Exit slow mode now that we have fresh readings
+            model->cell_voltage_slow_mode = false;
+            printf("BMB3Y exiting slow mode\n");
+        }
     } else if(step == PAUSE_CYCLE_PERIOD && model->balancing_sm.is_pause_cycle) {
         // Cut the cycle short if we're in a pause cycle by adjusting the offset.
         bmb3y_timestep_offset = (bmb3y_timestep_offset + (period_mask + 1) - PAUSE_CYCLE_PERIOD - 1) & period_mask;

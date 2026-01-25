@@ -2,6 +2,11 @@
 #define NMC 2
 #define CHEMISTRY NMC
 
+#define BMS_DESK 1
+#define BMS_BLUETESLA 2
+
+#define BMS_PROFILE BMS_BLUETESLA
+
 // TODO - derate voltage limits based on temperature
 
 #if CHEMISTRY == LFP
@@ -73,19 +78,31 @@
     #error "Unsupported CHEMISTRY"
 #endif
 
-
 // Cell presence bitmask (1 = present, 0 = not present, 32-bit groups, LSB = cell 0)
 // #define CELL_PRESENCE_MASK { 0x7FFF, 0, 0, 0 }
 // #define NUM_CELLS 15
 // #define NUM_MODULE_VOLTAGES 1
 // #define NUM_MODULE_TEMPS 1
 
-// for the 96-cell NMC pack:
+#if BMS_PROFILE == BMS_DESK
+    // for the 96-cell NMC pack:
+#define CELL_PRESENCE_MASK { 0x7FFF, 0, 0, 0 }
+#define NUM_CELLS 15
+#define NUM_MODULE_VOLTAGES 1
+#define NUM_MODULE_TEMPS 1
+#define BATTERY_CAPACITY_AH 1
+    
+#elif BMS_PROFILE == BMS_BLUETESLA
+    // for the 96-cell NMC pack:
 #define CELL_PRESENCE_MASK { 0xc7ff8f7f, 0xf3ffe3ff, 0xfcfff8ff, 0x1ffe3d }
 #define NUM_CELLS 96
 #define NUM_MODULE_VOLTAGES 8
 #define NUM_MODULE_TEMPS 8
 #define BATTERY_CAPACITY_AH 200
+
+#else
+    #error "Unsupported BMS_PROFILE"
+#endif
 
 // for the 108-cell LFP pack:
 // #define CELL_PRESENCE_MASK { 0x87ffbfff, 0xffffefff, 0xf9fffbff, 0x3ffeff }
