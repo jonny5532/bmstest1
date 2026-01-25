@@ -33,9 +33,9 @@
 // Precharge constants
 
 // Largest allowable pack current to consider precharge successful
-#define PRECHARGE_SUCCESS_MAX_MA 2000
-// Minimum voltage difference to consider precharge successful
-#define PRECHARGE_SUCCESS_MIN_MV 5000
+#define PRECHARGE_SUCCESS_MAX_MA 1000
+// Maximum voltage difference to consider precharge successful
+#define PRECHARGE_SUCCESS_MAX_MV 3000
 
 // Contactor opening constants
 
@@ -144,7 +144,7 @@ bool check_precharge_successful(bms_model_t *model, bool log_errors) {
 
     // Is voltage difference low enough?
     return check_or_confirm(
-        abs_int32(model->battery_voltage_mV - model->output_voltage_mV) <= PRECHARGE_SUCCESS_MIN_MV,
+        abs_int32(model->battery_voltage_mV - model->output_voltage_mV) <= PRECHARGE_SUCCESS_MAX_MV,
         log_errors,
         ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
         ((uint64_t)model->battery_voltage_mV << 32) | (uint32_t)model->output_voltage_mV
@@ -309,6 +309,7 @@ bool confirm_contactors_staying_closed(bms_model_t *model) {
     }
 
     // TODO - check for voltage diference between battery and output?
+    // also make sure current is actually zero?
 
     return ret;
 }
@@ -503,12 +504,19 @@ void contactor_sm_tick(bms_model_t *model) {
             // Now close precharge contactor (actually just the Bat+ one)
             contactors_set_pos_pre_neg(false, true, true);
 
+            printf("PRECHARGING: %d mV, %d mA\n", 
+                model->battery_voltage_mV - model->output_voltage_mV,
+                model->current_mA
+            );
+
+
             if(model->contactor_req == CONTACTORS_REQUEST_OPEN || model->contactor_req == CONTACTORS_REQUEST_FORCE_OPEN) {
                 // Abort precharge
                 model->contactor_req = CONTACTORS_REQUEST_NULL;
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_OPEN);
             } else if(state_timeout((sm_t*)contactor_sm, 1000) && check_precharge_successful(model, false)) {
                 // Successful precharge
+                printf("Precharge successful after %u ms\n", state_time((sm_t*)contactor_sm));
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_CLOSED);
             } else if(state_timeout((sm_t*)contactor_sm, 10000)) {
                 // Failed to precharge!

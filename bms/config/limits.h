@@ -87,14 +87,12 @@
 #define NUM_MODULE_TEMPS 8
 #define BATTERY_CAPACITY_AH 200
 
-// includes the extra zero every 15 cells
-//#define BALANCE_PRESENCE_MASK { 0xfff0f7f, 0x1fff0fff, 0x1fff0fff, 0xfff0f7f }
-
-// Number of 1s in the above bitmask
-// Number of modules of voltages to read
-//#define NUM_MODULE_VOLTAGES 8
-// How many modules of temps to read
-//#define NUM_MODULE_TEMPS 8
+// for the 108-cell LFP pack:
+// #define CELL_PRESENCE_MASK { 0x87ffbfff, 0xffffefff, 0xf9fffbff, 0x3ffeff }
+// #define NUM_CELLS 108
+// #define NUM_MODULE_VOLTAGES 8
+// #define NUM_MODULE_TEMPS 8
+// #define BATTERY_CAPACITY_AH 163
 
 
 

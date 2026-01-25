@@ -60,6 +60,17 @@ static void model_calculate_cell_current_limits(bms_model_t *model) {
     );
 }
 
+static void model_calculate_voltage_limits(bms_model_t *model) {
+    // Calculate pack voltage limits based on cell voltages
+
+    // TODO - add error compensation based on measured current?
+
+    model->max_voltage_limit_dV = (CELL_VOLTAGE_SOFT_MAX_mV * NUM_CELLS) / 100; // in 0.1V units
+    model->min_voltage_limit_dV = (CELL_VOLTAGE_SOFT_MIN_mV * NUM_CELLS) / 100; // in 0.1V units
+}
+
+
+
 static void model_apply_current_limits(bms_model_t *model) {
     uint16_t charge_limit = CHARGE_MAX_CURRENT_dA;
     uint16_t discharge_limit = DISCHARGE_MAX_CURRENT_dA;
@@ -187,6 +198,7 @@ void model_tick(bms_model_t *model) {
 
     model_calculate_cell_current_limits(model);
     model_calculate_temperature_current_limits(model);
+    model_calculate_voltage_limits(model);
 
     model_apply_current_limits(model);
     model_accumulate_overcurrent(model);

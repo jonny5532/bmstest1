@@ -25,3 +25,8 @@ void state_reset(sm_t* sm) {
 bool state_timeout(sm_t* sm, uint32_t timeout) {
     return (millis64()-sm->last_transition_time) >= (uint64_t)timeout;
 }
+
+uint32_t state_time(sm_t* sm) {
+    return (uint32_t)(millis64() - sm->last_transition_time);
+}
+

@@ -13,3 +13,4 @@ void sm_init(sm_t* sm, const char* name);
 void state_reset(sm_t* sm);
 void state_transition(sm_t* sm, uint16_t new_state);
 bool state_timeout(sm_t* sm, uint32_t timeout);
+uint32_t state_time(sm_t* sm);

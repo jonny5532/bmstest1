@@ -19,7 +19,7 @@ uint16_t voltage_based_soc_estimate(bms_model_t *model) {
 
     //float cell_voltage_mV
 
-    float ocv = (representative_voltage_mV - model->current_mA * internal_resistance) / 1000.0f;
+    float ocv = (representative_voltage_mV + model->current_mA * internal_resistance) / 1000.0f;
     float soc = nmc_ocv_to_soc(ocv);
     return (uint16_t)(soc * 10000.0f); // in 0.01% units
 }

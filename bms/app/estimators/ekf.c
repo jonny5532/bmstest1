@@ -104,6 +104,21 @@ static float nmc_ocv_curve_diff[100] = {
     1.27195335,  1.2590027 ,  1.3141156 ,  1.30435473,  1.35620603
 };
 
+float nmc_ocv_to_soc(float ocv) {
+    // Simple linear search (could be optimized with binary search)
+    if (ocv <= nmc_ocv_curve[0]) return 0.0f;
+    if (ocv >= nmc_ocv_curve[100]) return 1.0f;
+
+    for (int i = 0; i < 100; i++) {
+        if (ocv < nmc_ocv_curve[i + 1]) {
+            float frac = (ocv - nmc_ocv_curve[i]) / (nmc_ocv_curve[i + 1] - nmc_ocv_curve[i]);
+            return (i + frac) / 100.0f;
+        }
+    }
+    return 1.0f; // Should not reach here
+}
+
+
 
 // --- Helper: OCV Curve ---
 // Returns Open Circuit Voltage for a given SOC

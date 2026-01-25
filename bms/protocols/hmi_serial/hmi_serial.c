@@ -287,7 +287,7 @@ static void hmi_handle_read_registers(const uint8_t *rx_buf, size_t len, bms_mod
     uint8_t addr = rx_buf[1];
     if (addr != device_address) return;
 
-    uint8_t tx_buf[256];
+    uint8_t tx_buf[256+8];
     uint16_t tx_idx = 0;
     tx_buf[tx_idx++] = HMI_MSG_READ_REGISTERS_RESPONSE;
     tx_buf[tx_idx++] = device_address;
@@ -298,7 +298,12 @@ static void hmi_handle_read_registers(const uint8_t *rx_buf, size_t len, bms_mod
             // Skip unavailable registers
             continue;
         }
-        tx_idx += hmi_append_register_value(&tx_buf[tx_idx], reg_id, model);
+        uint8_t len = hmi_append_register_value(&tx_buf[tx_idx], reg_id, model);
+        if(tx_idx + len > 256) {
+            // prevent buffer overflow
+            break;
+        }
+        tx_idx += len;
     }
 
     duart_send_packet(&HMI_SERIAL_DUART, tx_buf, tx_idx);

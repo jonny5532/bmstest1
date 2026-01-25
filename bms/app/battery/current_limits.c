@@ -8,6 +8,11 @@ uint16_t calculate_cell_voltage_charge_current_limit(uint32_t cell_voltage_min_m
     uint16_t charge_limit = 0xFFFF;
 
     if(cell_voltage_max_mV > 4000) {
+        int16_t delta_from_max = CELL_VOLTAGE_SOFT_MAX_mV - cell_voltage_max_mV;
+        // TODO: Add a nonlinear curve to reduce charge current as delta falls to zero.
+        
+
+
         // TODO - handle LFP or use EKF SoC?
         // We're onto the steeper part of the curve now, so SoC estimation is more accurate
         float soc = nmc_ocv_to_soc(cell_voltage_max_mV / 1000.0f);
