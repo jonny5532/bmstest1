@@ -1,4 +1,5 @@
 #include "config/allocations.h"
+#include "config/limits.h"
 #include "config/pins.h"
 #include "sys/events/events.h"
 #include "app/model.h"
@@ -64,6 +65,12 @@ static void can2040_cb(struct can2040 *cd, uint32_t notify, struct can2040_msg *
             break;
         case 0x91:
             // process voltage/current/temp
+            printf("Got CAN 091: ");
+            for(int i=0; i<msg->dlc; i++) {
+                printf("%02X ", msg->data[i]);
+            }
+            printf("\n");
+
             break;
         case 0xd1:
             // process inverter SoC
@@ -205,10 +212,28 @@ static int send_110(bms_model_t *model) {
     struct can2040_msg msg;
     msg.id = 0x110;
     msg.dlc = 8;
-    msg.data[0] = (model->max_voltage_limit_dV >> 8) & 0xFF;
-    msg.data[1] = model->max_voltage_limit_dV & 0xFF;
-    msg.data[2] = (model->min_voltage_limit_dV >> 8) & 0xFF;
-    msg.data[3] = model->min_voltage_limit_dV & 0xFF;
+
+    uint16_t cell_voltage_working_max_mV = model->cell_voltage_working_max_mV;
+    if(cell_voltage_working_max_mV == 0) {
+        cell_voltage_working_max_mV = CELL_VOLTAGE_WORKING_MAX_mV;
+    }
+    uint16_t cell_voltage_working_min_mV = model->cell_voltage_working_min_mV;
+    if(cell_voltage_working_min_mV == 0) {
+        cell_voltage_working_min_mV = CELL_VOLTAGE_WORKING_MIN_mV;
+    }
+
+    uint32_t max_voltage_limit_dV = cell_voltage_working_max_mV * NUM_CELLS / 1000; // in 0.1V units
+    uint32_t min_voltage_limit_dV = cell_voltage_working_min_mV * NUM_CELLS / 1000; // in 0.1V units
+    
+    max_voltage_limit_dV += model->pack_voltage_limit_upper_offset_dV;
+    min_voltage_limit_dV += model->pack_voltage_limit_lower_offset_dV;  
+
+    // TODO - nudge voltage limits to account for some cells nearing the top or bottom quicker, and also inverter voltage error?
+
+    msg.data[0] = (max_voltage_limit_dV >> 8) & 0xFF;
+    msg.data[1] = max_voltage_limit_dV & 0xFF;
+    msg.data[2] = (min_voltage_limit_dV >> 8) & 0xFF;
+    msg.data[3] = min_voltage_limit_dV & 0xFF;
     msg.data[4] = (model->discharge_current_limit_dA >> 8) & 0xFF;
     msg.data[5] = model->discharge_current_limit_dA & 0xFF;
     msg.data[6] = (model->charge_current_limit_dA >> 8) & 0xFF;
@@ -230,23 +255,41 @@ static int send_150(bms_model_t *model) {
     struct can2040_msg msg;
     msg.id = 0x150;
     msg.dlc = 8;
+
+    int16_t divisor = model->soc_scaling_max - model->soc_scaling_min;
+    if(divisor == 0) {
+        divisor = 10000; // default to no scaling
+    }
     
-    //const uint16_t soc = 5000; // 50.00%
-    msg.data[0] = (model->soc >> 8) & 0xFF;
-    msg.data[1] = model->soc & 0xFF;
+    int16_t scaled_soc =(int32_t)(model->soc - model->soc_scaling_min) * 10000 / divisor;
+    if(scaled_soc > 10000) scaled_soc = 10000;
+    if(scaled_soc < 0) scaled_soc = 0;
+
+    msg.data[0] = (scaled_soc >> 8) & 0xFF;
+    msg.data[1] = scaled_soc & 0xFF;
     // TODO: workaround for Deye?
     //const uint16_t soh = 10000; // 100.00%
     const uint16_t soh = 9900; // 99.00%
     msg.data[2] = (soh >> 8) & 0xFF;
     msg.data[3] = soh & 0xFF;
 
-    const uint16_t remaining_capacity_Ah = ((uint64_t)model->capacity_mC * model->soc) / ((uint64_t)10000 * 3600 * 1000);
-    msg.data[4] = (remaining_capacity_Ah >> 8) & 0xFF;
-    msg.data[5] = remaining_capacity_Ah & 0xFF;
+    // so if scaling min/max is 50 to 75, we're only using 25% of the working capacity
 
-    const uint16_t full_capacity_Ah = (model->capacity_mC / (3600 * 1000));
-    msg.data[6] = (full_capacity_Ah >> 8) & 0xFF;
-    msg.data[7] = full_capacity_Ah & 0xFF;
+    int32_t scaled_working_capacity_mC = (model->working_capacity_mC * divisor) / 10000;
+    if(scaled_working_capacity_mC <= 0) {
+        scaled_working_capacity_mC = 1; // avoid div by zero
+    }
+
+    const uint16_t remaining_capacity_dAh = ((uint64_t)scaled_working_capacity_mC * scaled_soc) / ((uint64_t)10000 * 3600 * 100);
+    msg.data[4] = (remaining_capacity_dAh >> 8) & 0xFF;
+    msg.data[5] = remaining_capacity_dAh & 0xFF;
+
+    const uint16_t full_capacity_dAh = (scaled_working_capacity_mC / (3600 * 100));
+    msg.data[6] = (full_capacity_dAh >> 8) & 0xFF;
+    msg.data[7] = full_capacity_dAh & 0xFF;
+
+    printf("CAN 150 sent SOC %d RemCap %d FullCap %d\n",
+        scaled_soc, remaining_capacity_dAh, full_capacity_dAh);
 
     return can2040_transmit(&cbus, &msg);
 }
@@ -346,13 +389,13 @@ void inverter_tick(bms_model_t *model) {
         send_110(model);
     }
     if(timestep_every_ms(10000, &timestep_2)) {
-        // send regular messages every 1000ms
+        // send regular messages every 10s
         send_150(model);
         send_1d0(model);
         send_210(model);
     }
     if(timestep_every_ms(60000, &timestep_3)) {
-        // send regular messages every 60000ms
+        // send regular messages every 60s
         send_190(model);
     }
 

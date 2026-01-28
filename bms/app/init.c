@@ -83,7 +83,7 @@ static void init_model() {
         printf("No calibration data in NVM\n");
     }
 
-    model.capacity_mC = BATTERY_CAPACITY_AH * 3600 * 1000; // in mC
+    model.nameplate_capacity_mC = NAMEPLATE_CAPACITY_AH * 3600 * 1000; // in mC
 
     // Pretend balancing is active at startup to avoid trusting
     // cell voltages until we've definitely turned balancing off.

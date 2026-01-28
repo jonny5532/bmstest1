@@ -6,11 +6,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "../model.h"
-#include "../state_machines/contactors.h"
-#include "../monitoring/events.h"
-#include "../hw/actuators/contactors.h"
-#include "../hw/chip/time.h"
+#include "app/model.h"
+#include "app/state_machines/contactors.h"
+#include "sys/events/events.h"
+#include "drivers/contactors/contactors.h"
+#include "sys/time/time.h"
 
 #define CONTACTORS_TEST_WAIT_MS 1000
 
@@ -26,6 +26,10 @@ void contactors_set_pos_pre_neg(bool pos, bool pre, bool neg) {
     check_expected(pos);
     check_expected(pre);
     check_expected(neg);
+}
+
+void contactors_test_pre(bool pre) {
+    check_expected(pre);
 }
 
 // Test helper to tick the SM multiple times if needed and advance time
@@ -64,23 +68,29 @@ static void test_close_request_to_testing_sequence(void **state) {
     model.contactor_sm.state = CONTACTORS_STATE_OPEN;
     model.contactor_req = CONTACTORS_REQUEST_CLOSE;
     
-    // 1. Transition to TESTING_NEG_OPEN
+    // 1. Transition to TESTING_PRE_CLOSED
     expect_value(contactors_set_pos_pre_neg, pos, false);
     expect_value(contactors_set_pos_pre_neg, pre, false);
     expect_value(contactors_set_pos_pre_neg, neg, false);
     tick_sm(&model, 0);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_PRE_CLOSED);
+
+    // 2. TESTING_PRE_CLOSED
+    model.precharge_closed = true;
+    expect_value(contactors_test_pre, pre, true);
+    tick_sm(&model, 1100);
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_NEG_OPEN);
 
-    // 2. TESTING_NEG_OPEN -> TESTING_NEG_CLOSED
-    // Wait for timeout
-    model.neg_contactor_voltage_mV = 5000; // Above threshold (open)
+    // 3. TESTING_NEG_OPEN
+    model.pos_contactor_voltage_mV = 10000; // Above threshold (open)
+    model.neg_contactor_voltage_mV = 10000; // Above threshold (open)
     expect_value(contactors_set_pos_pre_neg, pos, false);
     expect_value(contactors_set_pos_pre_neg, pre, false);
     expect_value(contactors_set_pos_pre_neg, neg, false);
     tick_sm(&model, 1100);
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_NEG_CLOSED);
 
-    // 3. TESTING_NEG_CLOSED -> TESTING_POS_OPEN
+    // 4. TESTING_NEG_CLOSED
     model.neg_contactor_voltage_mV = 100; // Below threshold (closed)
     expect_value(contactors_set_pos_pre_neg, pos, false);
     expect_value(contactors_set_pos_pre_neg, pre, false);
@@ -88,15 +98,16 @@ static void test_close_request_to_testing_sequence(void **state) {
     tick_sm(&model, 1100);
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_POS_OPEN);
 
-    // 4. TESTING_POS_OPEN -> TESTING_POS_CLOSED
-    model.pos_contactor_voltage_mV = 5000; // Above threshold (open)
+    // 5. TESTING_POS_OPEN
+    model.neg_contactor_voltage_mV = 10000; // Above threshold (open)
+    model.pos_contactor_voltage_mV = 10000; // Above threshold (open)
     expect_value(contactors_set_pos_pre_neg, pos, false);
     expect_value(contactors_set_pos_pre_neg, pre, false);
     expect_value(contactors_set_pos_pre_neg, neg, false);
     tick_sm(&model, 1100);
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_POS_CLOSED);
 
-    // 5. TESTING_POS_CLOSED -> PRECHARGING_NEG
+    // 6. TESTING_POS_CLOSED
     model.pos_contactor_voltage_mV = 100; // Below threshold (closed)
     expect_value(contactors_set_pos_pre_neg, pos, true);
     expect_value(contactors_set_pos_pre_neg, pre, true);
@@ -172,7 +183,7 @@ static void test_pos_weld_failure_detection(void **state) {
     tick_sm(&model, 2100);
 
     assert_int_equal(get_event_count(ERR_CONTACTOR_POS_STUCK_CLOSED), 1);
-    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_FAILED);
 }
 
 static void test_open_request_from_closed(void **state) {

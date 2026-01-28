@@ -43,12 +43,18 @@
 
 #elif CHEMISTRY == NMC
     // Hard voltage limits, beyond which the battery will be cut off
-    #define CELL_VOLTAGE_HARD_MIN_mV 2800
+    #define CELL_VOLTAGE_HARD_MIN_mV 2700
     #define CELL_VOLTAGE_HARD_MAX_mV 4250
     // Soft voltage limits, beyond which the battery will only allow a low-current
     // restoration charge/discharge.
-    #define CELL_VOLTAGE_SOFT_MIN_mV 3200
-    #define CELL_VOLTAGE_SOFT_MAX_mV 4100
+    #define CELL_VOLTAGE_SOFT_MIN_mV 3000
+    #define CELL_VOLTAGE_SOFT_MAX_mV 4200
+    // Working voltage range, which defines 0% and 100% SoC. This may be
+    // overridden by user settings.
+    #define CELL_VOLTAGE_WORKING_MIN_mV 3300
+    #define CELL_VOLTAGE_WORKING_MAX_mV 4150
+
+
 
     // Absolute maximum current limits
     #define CHARGE_MAX_CURRENT_dA 500 // 50A
@@ -90,7 +96,7 @@
 #define NUM_CELLS 15
 #define NUM_MODULE_VOLTAGES 1
 #define NUM_MODULE_TEMPS 1
-#define BATTERY_CAPACITY_AH 1
+#define NAMEPLATE_CAPACITY_AH 1
     
 #elif BMS_PROFILE == BMS_BLUETESLA
     // for the 96-cell NMC pack:
@@ -98,7 +104,7 @@
 #define NUM_CELLS 96
 #define NUM_MODULE_VOLTAGES 8
 #define NUM_MODULE_TEMPS 8
-#define BATTERY_CAPACITY_AH 200
+#define NAMEPLATE_CAPACITY_AH 200
 
 #else
     #error "Unsupported BMS_PROFILE"
@@ -109,7 +115,7 @@
 // #define NUM_CELLS 108
 // #define NUM_MODULE_VOLTAGES 8
 // #define NUM_MODULE_TEMPS 8
-// #define BATTERY_CAPACITY_AH 163
+// #define NAMEPLATE_CAPACITY_AH 163
 
 
 
@@ -128,7 +134,7 @@
 // (which should be calibrated away at zero current).
 #define VOLTAGE_MISMATCH_THRESHOLD_mV 5000
 
-#define MINIMUM_BALANCE_VOLTAGE_mV 3500
+#define MINIMUM_BALANCE_VOLTAGE_mV 3840
 
 // Is voltage derating of current limits feasible, given the steepness of the
 // voltage curves at top of charge? Probably not?

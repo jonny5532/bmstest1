@@ -71,6 +71,8 @@ pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/bms/drivers/isospi/isosno
 #pico_generate_pio_header(isosnooper ${CMAKE_CURRENT_LIST_DIR}/isospi_scope.pio)
 #pico_generate_pio_header(isosnooper ${CMAKE_CURRENT_LIST_DIR}/isospi_device.pio)
 
+#add_compile_definitions(BMS_PROFILE=${BMS_PROFILE})
+
 target_compile_options(bms PUBLIC
     -Wall
     -Wextra

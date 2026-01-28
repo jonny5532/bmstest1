@@ -39,26 +39,32 @@ charging and discharging, according to the cell chemistry.
 
 
 
-### Cell voltage
+### Voltage limits
 
-There are two sets of cell voltage limits - hard limits and soft limits.
+There are six separate voltage limits, which are defined in reference to the voltage of an individual cell. These limits operate progressively, and are designed to ensure safety whilst making it usually possible to recover a pack that has gone beyond the normal range.
 
-If the hard limits (the most extreme) are exceeded, a FATAL event is raised and
-the contactors quickly open to prevent overcharge/overdischarge. This state will
-require manual restoration of the battery before the BMS can be successfully
-reset without immediately tripping again.
+#### Working limits
 
-The soft limits allow for a more graceful recovery. In the soft-limit region,
-the battery can still be charged (in the case of the lower limit) or discharged
-(in the case of the upper limit) at a reduced current. If however the overcharge
-or overdischarge continues beyond a certain threshold (measured in amp-hours),
-or the voltage stays in the soft-limit region for more than an hour, a FATAL
-event will be raised and the contactors will open.
+The battery's operating range is defined by the working voltage limits, representing 0% and 100% State of Charge (SoC). 
 
-This ensures that an unattended battery that overcharges or overdischarges will
-be automatically disconnected whilst it is still in the soft-limit region, and
-can then be safely discharged/charged back into normal service after manual
-intervention.
+Since some inverters prevent discharging below a specific threshold (e.g., 10%), the Minimum SoC setting allows you to define a percentage that will coresspond to the lower voltage limit.
+
+#### Soft voltage limits
+
+If a cell's voltage goes outside the soft limits, the BMS immediately issues a WARNING. It will also restrict current to prevent further charging (at the upper limit) or discharging (at the lower limit).
+
+The BMS will disconnect the battery if:
+- A current continues to flow against these restrictions.
+- The state persists for more than one hour.
+
+This gives you a chance to correct the problem - if the battery has disconnected, you can restart the BMS, and will have one hour to charge/discharge the battery back into the normal range.
+
+
+#### Hard voltage limits
+
+If a cell exceeds its hard voltage limits, the BMS will immediately disconnect the battery. These limits are set to prevent permanent damage to the cell chemistry. Recovery would require bypassing or manually energizing the contactors. 
+
+Proceed with caution if you decide to manually recover or recharge the battery.
 
 
 ### Response time

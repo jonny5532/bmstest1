@@ -58,16 +58,11 @@ void confirm_battery_safety(bms_model_t *model) {
             ERR_CELL_VOLTAGE_VERY_HIGH,
             model->cell_voltage_max_mV
         );
-        if(!confirm(
+        confirm(
             model->cell_voltage_min_mV >= CELL_VOLTAGE_SOFT_MIN_mV,
             ERR_CELL_VOLTAGE_LOW,
             model->cell_voltage_min_mV
-        )) {
-            printf("Low cell voltage: %d mV cvm %d\n",
-                model->cell_voltage_min_mV,
-                model->cell_voltage_millis
-            );
-        }
+        );
         confirm(
             model->cell_voltage_min_mV >= CELL_VOLTAGE_HARD_MIN_mV,
             ERR_CELL_VOLTAGE_VERY_LOW,

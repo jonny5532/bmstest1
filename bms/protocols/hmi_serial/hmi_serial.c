@@ -189,7 +189,7 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
             break;
         case HMI_REG_CAPACITY:
             buf[idx++] = HMI_TYPE_UINT32;
-            idx += hmi_buf_append_uint32(&buf[idx], model->capacity_mC);
+            idx += hmi_buf_append_uint32(&buf[idx], model->nameplate_capacity_mC);
             break;
         case HMI_REG_SUPPLY_VOLTAGE_3V3:
             buf[idx++] = HMI_TYPE_UINT16;
@@ -206,6 +206,30 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
         case HMI_REG_SUPPLY_VOLTAGE_CTR:
             buf[idx++] = HMI_TYPE_UINT16;
             idx += hmi_buf_append_uint16(&buf[idx], model->supply_voltage_contactor_mV);
+            break;
+        case HMI_REG_CELL_VOLTAGE_LIMIT_MIN:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->cell_voltage_working_min_mV);
+            break;
+        case HMI_REG_CELL_VOLTAGE_LIMIT_MAX:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->cell_voltage_working_max_mV);
+            break;
+        case HMI_REG_SOC_SCALING_MIN:
+            buf[idx++] = HMI_TYPE_INT16;
+            idx += hmi_buf_append_uint16(&buf[idx], (uint16_t)model->soc_scaling_min);
+            break;
+        case HMI_REG_SOC_SCALING_MAX:
+            buf[idx++] = HMI_TYPE_INT16;
+            idx += hmi_buf_append_uint16(&buf[idx], (uint16_t)model->soc_scaling_max);
+            break;
+        case HMI_REG_VOLTAGE_LIMIT_OFFSET_LOWER:
+            buf[idx++] = HMI_TYPE_INT16;
+            idx += hmi_buf_append_uint16(&buf[idx], (uint16_t)model->pack_voltage_limit_lower_offset_dV);
+            break;
+        case HMI_REG_VOLTAGE_LIMIT_OFFSET_UPPER:
+            buf[idx++] = HMI_TYPE_INT16;
+            idx += hmi_buf_append_uint16(&buf[idx], (uint16_t)model->pack_voltage_limit_upper_offset_dV);
             break;
         default:
             if (reg_id >= HMI_REG_CELL_VOLTAGES_START && reg_id <= HMI_REG_CELL_VOLTAGES_END) {
@@ -334,10 +358,34 @@ static void hmi_handle_write_registers(const uint8_t *rx_buf, size_t len, bms_mo
                     model->system_req = (system_requests_t)rx_buf[rx_idx];
                     break;
             }
+        } else if(type == HMI_TYPE_UINT16) {
+            switch(reg_id) {
+                case HMI_REG_CELL_VOLTAGE_LIMIT_MIN:
+                    model->cell_voltage_working_min_mV = hmi_buf_get_uint16(&rx_buf[rx_idx]);
+                    break;
+                case HMI_REG_CELL_VOLTAGE_LIMIT_MAX:
+                    model->cell_voltage_working_max_mV = hmi_buf_get_uint16(&rx_buf[rx_idx]);
+                    break;
+            }
+        } else if(type == HMI_TYPE_INT16) {
+            switch(reg_id) {
+                case HMI_REG_SOC_SCALING_MIN:
+                    model->soc_scaling_min = (int16_t)hmi_buf_get_uint16(&rx_buf[rx_idx]);
+                    break;
+                case HMI_REG_SOC_SCALING_MAX:
+                    model->soc_scaling_max = (int16_t)hmi_buf_get_uint16(&rx_buf[rx_idx]);
+                    break;
+                case HMI_REG_VOLTAGE_LIMIT_OFFSET_LOWER:
+                    model->pack_voltage_limit_lower_offset_dV = (int16_t)hmi_buf_get_uint16(&rx_buf[rx_idx]);
+                    break;
+                case HMI_REG_VOLTAGE_LIMIT_OFFSET_UPPER:
+                    model->pack_voltage_limit_upper_offset_dV = (int16_t)hmi_buf_get_uint16(&rx_buf[rx_idx]);
+                    break;
+            }
         } else if(type == HMI_TYPE_UINT32) {
             switch(reg_id) {
                 case HMI_REG_CAPACITY:
-                    model->capacity_mC = hmi_buf_get_uint32(&rx_buf[rx_idx]);
+                    model->nameplate_capacity_mC = hmi_buf_get_uint32(&rx_buf[rx_idx]);
                     break;
             }
         }

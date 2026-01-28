@@ -462,7 +462,9 @@ void contactor_sm_tick(bms_model_t *model) {
             }
             break;
         case CONTACTORS_STATE_TESTING_POS_CLOSED:
-            // Both positive and precharge (since this actually leaves the precharge open due to the inverted logic)
+            // Both positive and precharge (since this actually leaves the
+            // precharge open due to the inverted logic - we don't want to close
+            // more than one contactor per state due to current draw)
             contactors_set_pos_pre_neg(true, true, false);
 
             int32_t voltage = abs_int32(model->pos_contactor_voltage_mV);

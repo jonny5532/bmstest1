@@ -43,7 +43,9 @@ typedef struct bms_model {
     uint16_t soc_basic_count;
     uint16_t soc_fancy_count;
 
-    uint32_t capacity_mC; // battery capacity in mC
+
+    uint32_t nameplate_capacity_mC; // nameplate battery capacity in mC
+    uint32_t working_capacity_mC; // nameplate capacity within working voltage range in mC
 
     system_sm_t system_sm;
     system_requests_t system_req;
@@ -78,10 +80,21 @@ typedef struct bms_model {
 
     bool cell_voltage_slow_mode; // only request BMB data infrequently
 
-    // The calculated pack voltage limits
-    uint16_t max_voltage_limit_dV;
-    uint16_t min_voltage_limit_dV;
+    // The calculated pack voltage limits (??)
+    // uint16_t max_voltage_limit_dV;
+    // uint16_t min_voltage_limit_dV;
+    // User-configured working voltage range (zero for defaults)
+    uint16_t cell_voltage_working_max_mV;
+    uint16_t cell_voltage_working_min_mV;
 
+    // Inverter SoC scaling
+    int16_t soc_scaling_min; // in 0.01% units
+    int16_t soc_scaling_max; // in 0.01% units
+
+    // Inverter voltage limit offsets (to account for discrepancies between BMS and inverter readings)
+    // These values will increase the voltage limits sent to the inverter
+    int16_t pack_voltage_limit_upper_offset_dV; // in 0.1V units
+    int16_t pack_voltage_limit_lower_offset_dV; // in 0.1V units
 
     // Current limits (the lower of these limits will be used)
     uint16_t temp_charge_current_limit_dA; // in 0.1A units

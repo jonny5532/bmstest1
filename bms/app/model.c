@@ -65,8 +65,6 @@ static void model_calculate_voltage_limits(bms_model_t *model) {
 
     // TODO - add error compensation based on measured current?
 
-    model->max_voltage_limit_dV = (CELL_VOLTAGE_SOFT_MAX_mV * NUM_CELLS) / 100; // in 0.1V units
-    model->min_voltage_limit_dV = (CELL_VOLTAGE_SOFT_MIN_mV * NUM_CELLS) / 100; // in 0.1V units
 }
 
 

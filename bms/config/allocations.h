@@ -1,3 +1,5 @@
+#include <pico/stdlib.h>
+
 #define INA228_I2C i2c0
 
 #define ADS1115_I2C i2c1

@@ -1,6 +1,7 @@
 #include "ekf.h"
-#include "../../sys/time/time.h"
-#include "../model.h"
+#include "config/limits.h"
+#include "sys/time/time.h"
+#include "app/model.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -118,6 +119,28 @@ float nmc_ocv_to_soc(float ocv) {
     return 1.0f; // Should not reach here
 }
 
+static float prev_min;
+static float prev_max;
+static float prev_soc_min;
+static float prev_soc_mul;
+
+float nmc_ocv_to_soc_scaled(float ocv, float min_voltage, float max_voltage) {
+    if (ocv <= min_voltage) return 0.0f;
+    if (ocv >= max_voltage) return 1.0f;
+
+    if (min_voltage != prev_min || max_voltage != prev_max) {
+        // Cache the scaling factors
+        prev_soc_min = nmc_ocv_to_soc(min_voltage);
+        float soc_max = nmc_ocv_to_soc(max_voltage);
+        prev_soc_mul = 1.0f / (soc_max - prev_soc_min);
+        prev_min = min_voltage;
+        prev_max = max_voltage;
+    }
+
+    float soc = nmc_ocv_to_soc(ocv);
+    return (soc - prev_soc_min) * prev_soc_mul;
+}
+
 
 
 // --- Helper: OCV Curve ---
@@ -135,6 +158,24 @@ static float soc_to_ocv(float soc) {
     float frac = index - (float)idx_lower;
     return nmc_ocv_curve[idx_lower] * (1.0f - frac) + nmc_ocv_curve[idx_upper] * frac;
 }
+
+static float soc_to_ocv_scaled(float soc, float min_voltage, float max_voltage) {
+    if (soc < 0.0f) soc = 0.0f;
+    if (soc > 1.0f) soc = 1.0f;
+
+    if(min_voltage != prev_min || max_voltage != prev_max) {
+        // Cache the scaling factors
+        prev_soc_min = nmc_ocv_to_soc(min_voltage);
+        float soc_max = nmc_ocv_to_soc(max_voltage);
+        prev_soc_mul = 1.0f / (soc_max - prev_soc_min);
+        prev_min = min_voltage;
+        prev_max = max_voltage;
+    }
+
+    float soc_unscaled = soc / prev_soc_mul + prev_soc_min;
+    return soc_to_ocv(soc_unscaled);
+}
+
 
 // --- Helper: OCV Derivative ---
 // Returns d(OCV)/d(SOC)
@@ -240,7 +281,7 @@ void ekf_step(EKF *ekf, float charge_Ah, float current_amps, float voltage_measu
 
     // Calculate dynamic SOC: 1 - (Ah_used / Capacity)
     float soc_est = 1.0f - (ah_used / cap);
-    
+
     // Predict Voltage
     float ocv = soc_to_ocv(soc_est);
     float v_pred = ocv - v_c1 + (current_amps * ekf->R0);
@@ -356,7 +397,7 @@ uint32_t ekf_tick(int32_t charge_mC, int32_t current_mA, int32_t voltage_mV) {
             initial_soc += (voltage_volts - soc_to_ocv(initial_soc)); // Simple convergence
         }
 
-        float initial_capacity_ah = model.capacity_mC / 3600000; // in Ah
+        float initial_capacity_ah = model.nameplate_capacity_mC / 3600000; // in Ah
         ekf_init(&ekf_instance, initial_soc, initial_capacity_ah);
 
         initialized = true;
@@ -373,6 +414,35 @@ uint32_t ekf_tick(int32_t charge_mC, int32_t current_mA, int32_t voltage_mV) {
     ekf_step(&ekf_instance, charge_Ah, current_amps, voltage_volts);
 
     float soc = ekf_get_soc(&ekf_instance);
+
+    uint16_t cell_voltage_working_min_mV = model.cell_voltage_working_min_mV;
+    if(cell_voltage_working_min_mV == 0) {
+        cell_voltage_working_min_mV = CELL_VOLTAGE_WORKING_MIN_mV;
+    }
+    uint16_t cell_voltage_working_max_mV = model.cell_voltage_working_max_mV;
+    if(cell_voltage_working_max_mV == 0) {
+        cell_voltage_working_max_mV = CELL_VOLTAGE_WORKING_MAX_mV;
+    }
+
+    // Scale soc according to voltage limits
+    if(cell_voltage_working_min_mV != prev_min || cell_voltage_working_max_mV != prev_max) {
+        // Cache the scaling factors
+        prev_soc_min = nmc_ocv_to_soc(cell_voltage_working_min_mV/1000.0f);
+        float soc_max = nmc_ocv_to_soc(cell_voltage_working_max_mV/1000.0f);
+        prev_soc_mul = 1.0f / (soc_max - prev_soc_min);
+        prev_min = cell_voltage_working_min_mV;
+        prev_max = cell_voltage_working_max_mV;
+
+        printf("EKF OCV Scaling Updated: Min V=%d mV (SOC=%f), Max V=%d mV (SOC=%f), Mul=%f\n",
+               cell_voltage_working_min_mV, prev_soc_min,
+               cell_voltage_working_max_mV, soc_max,
+               prev_soc_mul);
+
+        // TODO - put this somewhere else
+        model.working_capacity_mC = (soc_max - prev_soc_min) * model.nameplate_capacity_mC;
+    }
+    soc = (soc / prev_soc_mul) + prev_soc_min;
+
     if (soc < 0.0f) soc = 0.0f;
     if (soc > 1.0f) soc = 1.0f;
 
