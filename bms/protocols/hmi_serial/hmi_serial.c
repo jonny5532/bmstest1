@@ -104,6 +104,8 @@ static bool hmi_register_is_available(uint16_t reg_id, bms_model_t *model) {
             return model->high_voltages.pos_contactor_millis > 0;
         case HMI_REG_NEG_CONTACTOR_VOLTAGE:
             return model->high_voltages.neg_contactor_millis > 0;
+        case HMI_REG_LINK_VOLTAGE:
+            return model->high_voltages.link_millis > 0;
         case HMI_REG_TEMPERATURE_MIN:
         case HMI_REG_TEMPERATURE_MAX:
             return model->temperature_millis > 0;
@@ -173,6 +175,10 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
         case HMI_REG_NEG_CONTACTOR_VOLTAGE:
             buf[idx++] = HMI_TYPE_INT32;
             idx += hmi_buf_append_uint32(&buf[idx], (uint32_t)(model->high_voltages.neg_contactor * 1000));
+            break;
+        case HMI_REG_LINK_VOLTAGE:
+            buf[idx++] = HMI_TYPE_INT32;
+            idx += hmi_buf_append_uint32(&buf[idx], (uint32_t)(model->high_voltages.link * 1000));
             break;
         case HMI_REG_TEMPERATURE_MIN:
             buf[idx++] = HMI_TYPE_FLOAT;

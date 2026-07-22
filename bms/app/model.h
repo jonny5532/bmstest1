@@ -69,6 +69,12 @@ typedef struct {
     uint16_t minimum_balancing_voltage_mV; // Minimum cell voltage to allow balancing
     uint16_t balancing_start_voltage_mV;   // Start balancing when highest cell reaches this voltage
 
+    // Rev1 board calibration (appended at the end to preserve the NVM layout;
+    // these default to zero on older saves and rev0 boards)
+    float pos_contactor_offset_mV; // offset for the direct pos contactor channel
+    float link_voltage_mul;
+    float fuse_drop_mul;
+
 } bms_model_persistent_slow_t;
 
 static const uint32_t BMS_MODEL_PERSISTENT_SLOW_VERSION = 2;
@@ -97,6 +103,16 @@ typedef struct high_voltages {
     float neg_contactor;
     float neg_contactor_deviation;
     millis_t neg_contactor_millis;
+
+    // Rev1 boards only (second ADS1115): these stay zero/stale on rev0
+    // Link rail voltage (Link+ to Link-)
+    float link;
+    float link_deviation;
+    millis_t link_millis;
+    // Voltage drop across the F4 fuse / drive-unit jumper (OutPos - LinkPos)
+    float fuse_drop;
+    float fuse_drop_deviation;
+    millis_t fuse_drop_millis;
 } high_voltages_t;
 
 typedef struct inverter_outputs {

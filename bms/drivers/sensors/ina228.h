@@ -32,6 +32,7 @@
 typedef struct {
     i2c_inst_t *i2c;
     uint8_t addr;
+    bool present;
     float current_lsb;
     float shunt_resistor_ohms;
 

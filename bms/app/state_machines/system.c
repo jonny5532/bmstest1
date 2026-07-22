@@ -27,6 +27,12 @@ bool successfully_initialized(const bms_model_t *model) {
         return false;
     }
 
+#if BMS_BOARD == BMS_BOARD_REV1
+    if(!millis_recent_enough(model->high_voltages.link_millis, CONTACTOR_VOLTAGE_STALE_THRESHOLD_MS)) {
+        return false;
+    }
+#endif
+
     if(!millis_recent_enough(model->current_millis, CURRENT_STALE_THRESHOLD_MS)) {
         return false;
     }

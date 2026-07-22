@@ -83,6 +83,17 @@ void battery_model_tick(battery_model_t *bat, bms_model_t *model, float current_
     model->high_voltages.battery = (float)model->cell_voltage_min_mV * NUM_CELLS * 0.001f;
     model->high_voltages.battery_millis = stored_millis;
 
+#if BMS_BOARD == BMS_BOARD_REV1
+    // Rev1 boards sense the link rail directly; model it as connected to the
+    // battery (both link contactors closed, no drop across them)
+    model->high_voltages.link = model->high_voltages.battery;
+    model->high_voltages.link_millis = stored_millis;
+    model->high_voltages.pos_contactor = 0.0f;
+    model->high_voltages.pos_contactor_millis = stored_millis;
+    model->high_voltages.fuse_drop = 0.0f;
+    model->high_voltages.fuse_drop_millis = stored_millis;
+#endif
+
     model->module_temperatures_millis = stored_millis;
 
     // printf("Battery: SoC %.2f, Cell Voltage %.2f V, Current %.2f A\n",

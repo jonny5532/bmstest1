@@ -77,6 +77,17 @@ bool check_precharge_successful(const bms_model_t *model, bool log_errors) {
         return false;
     }
 
+#if BMS_BOARD == BMS_BOARD_REV1
+    if(!check_or_confirm(
+        millis_recent_enough(model->high_voltages.link_millis, CONTACTOR_VOLTAGE_STALE_THRESHOLD_MS),
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
+        0x5000000000000000
+    )) {
+        return false;
+    }
+#endif
+
     if(!check_or_confirm(
         fabsf(model->high_voltages.neg_contactor) <= (CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV * 0.001f),
         log_errors,
@@ -95,6 +106,20 @@ bool check_precharge_successful(const bms_model_t *model, bool log_errors) {
     )) {
         return false;
     }
+
+#if BMS_BOARD == BMS_BOARD_REV1
+    // Is the voltage across the PTC + FC negative contactor path (link vs
+    // output) low enough? This is a direct measurement, so can be tighter than
+    // the battery-vs-output check below.
+    if(!check_or_confirm(
+        fabsf(model->high_voltages.link - model->high_voltages.output) <= (PRECHARGE_SUCCESS_LINK_MAX_MV * 0.001f),
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
+        ((uint64_t)(model->high_voltages.link * 1000) << 32) | (uint32_t)(model->high_voltages.output * 1000)
+    )) {
+        return false;
+    }
+#endif
 
     // Is voltage difference low enough?
     return check_or_confirm(
@@ -262,6 +287,24 @@ bool confirm_contactors_staying_closed(const bms_model_t *model) {
         ) && ret;
     }
 
+#if BMS_BOARD == BMS_BOARD_REV1
+    // With direct link sensing, the link rail should track the battery voltage
+    // while both link contactors are closed. A large mismatch means one of
+    // them has dropped out.
+    if(confirm(
+        millis_recent_enough(model->high_voltages.link_millis, CONTACTOR_VOLTAGE_STALE_THRESHOLD_MS)
+        && millis_recent_enough(model->high_voltages.battery_millis, BATTERY_VOLTAGE_STALE_THRESHOLD_MS),
+        ERR_LINK_VOLTAGE_MISMATCH,
+        0x3000000000000000
+    )) {
+        ret = confirm(
+            fabsf(model->high_voltages.battery - model->high_voltages.link) <= (CONTACTORS_LINK_MISMATCH_THRESHOLD_MV * 0.001f),
+            ERR_LINK_VOLTAGE_MISMATCH,
+            ((uint64_t)(model->high_voltages.battery * 1000) << 32) | (uint32_t)(model->high_voltages.link * 1000)
+        ) && ret;
+    }
+#endif
+
     // TODO - check for voltage diference between battery and output?
     // or check for voltage across precharge?
 
@@ -339,6 +382,22 @@ void contactor_sm_tick(bms_model_t *model) {
                 // Enable current flow after a short delay
                 contactor_sm->enable_current = true;
             }
+
+#if BMS_BOARD == BMS_BOARD_REV1
+            // Diagnostic only: with contactors closed and current flowing, a
+            // sustained voltage drop across the F4 fuse/jumper suggests it has
+            // blown or the drive-unit connection is open.
+            if(state_timeout((sm_t*)contactor_sm, 2000)
+                && millis_recent_enough(model->high_voltages.fuse_drop_millis, CONTACTOR_VOLTAGE_STALE_THRESHOLD_MS)
+                && millis_recent_enough(model->current_millis, CURRENT_STALE_THRESHOLD_MS)
+                && abs_int32(model->current_mA) > CONTACTORS_INSTANT_OPEN_MA) {
+                confirm(
+                    fabsf(model->high_voltages.fuse_drop) <= (FUSE_DROP_WARNING_THRESHOLD_MV * 0.001f),
+                    ERR_FUSE_VOLTAGE_DROP_HIGH,
+                    (int32_t)(model->high_voltages.fuse_drop * 1000)
+                );
+            }
+#endif
 
             if(try_to_open) {
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_AWAITING_OPEN);

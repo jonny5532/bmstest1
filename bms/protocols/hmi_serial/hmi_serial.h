@@ -89,6 +89,8 @@
 #define HMI_REG_HARD_CHARGE_CURRENT_LIMIT_DA            54 // uint16 (0.1A)
 #define HMI_REG_HARD_DISCHARGE_CURRENT_LIMIT_DA         55 // uint16 (0.1A)
 
+#define HMI_REG_LINK_VOLTAGE           56 // int32 (mV), rev1 boards only
+
 
 #define HMI_REG_CELL_VOLTAGES_START 0x100
 #define HMI_REG_CELL_VOLTAGES_END   0x1FF

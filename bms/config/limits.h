@@ -50,6 +50,32 @@
 #endif
 
 
+// PCB revision selection (orthogonal to the pack profile above)
+
+#define BMS_BOARD_REV0 1
+#define BMS_BOARD_REV1 2
+
+#ifndef BMS_BOARD
+#define BMS_BOARD BMS_BOARD_REV0
+#endif
+
+#if BMS_BOARD == BMS_BOARD_REV1
+// Rev1 adds a second ADS1115 (0x49) sensing the Link and Drive Unit rails
+#define HAS_ADS1115_SECONDARY 1
+// Rev1's default contactor arrangement precharges via the FC negative contactor
+#ifndef PRECHARGE_ON_NEGATIVE
+#define PRECHARGE_ON_NEGATIVE 1
+#endif
+// Rev1 uses 501:1 dividers (12M/24k): 501 * 1.024/32768 V per count
+#define ADS1115_DEFAULT_MUL 0.015656f
+#elif BMS_BOARD == BMS_BOARD_REV0
+// Rev0 divider ratio is ~416:1
+#define ADS1115_DEFAULT_MUL 0.013f
+#else
+    #error "Unsupported BMS_BOARD"
+#endif
+
+
 // TODO - derate voltage limits based on temperature
 
 #if CHEMISTRY == LFP
@@ -276,9 +302,22 @@
 #define CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV 2000
 // Min voltage across a contactor to consider it open
 #define CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV 3000 // was 5000
+#if BMS_BOARD == BMS_BOARD_REV1
+// Rev1 measures directly across the pos (Link Positive) contactor, so the
+// tight generic thresholds apply
+#define CONTACTORS_POS_CLOSED_VOLTAGE_THRESHOLD_MV 2000
+#define CONTACTORS_POS_OPEN_VOLTAGE_THRESHOLD_MV 3000
+// Max discrepancy between battery and link voltage while closed (measured by
+// two different ADCs which may be independently [un]calibrated)
+#define CONTACTORS_LINK_MISMATCH_THRESHOLD_MV 16000
+// Max sustained drop across the F4 fuse/jumper (while current is flowing)
+// before warning that it may have blown
+#define FUSE_DROP_WARNING_THRESHOLD_MV 10000
+#else
 // Pos contactor has wider tolerances due to the way it is measured
 #define CONTACTORS_POS_CLOSED_VOLTAGE_THRESHOLD_MV 5000
 #define CONTACTORS_POS_OPEN_VOLTAGE_THRESHOLD_MV 10000
+#endif
 
 
 // Precharge thresholds
@@ -296,6 +335,11 @@
 #define PRECHARGE_SUCCESS_MAX_MA 225
 // Maximum voltage difference to consider precharge successful (allowing for uncalibrated contactors)
 #define PRECHARGE_SUCCESS_MAX_MV 16000
+#if BMS_BOARD == BMS_BOARD_REV1
+// Rev1 also senses the link rail directly, so the voltage across the PTC + FC
+// negative contactor path (link vs output) can be held to a tighter limit
+#define PRECHARGE_SUCCESS_LINK_MAX_MV 8000
+#endif
 
 
 // Contactor opening thresholds
