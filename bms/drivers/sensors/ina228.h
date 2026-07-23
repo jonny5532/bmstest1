@@ -29,6 +29,19 @@
 
 #define INA228_I2C_TIMEOUT_US     10000
 
+// External shunt NTC divider (Shunt_5V -> 10k pullup -> NTC -> GND_Shunt),
+// sensed via the INA228 VBUS pin. The supply is an unregulated isolated DC-DC,
+// so absolute accuracy is limited; the computed resistance is exposed over the
+// HMI to allow later calibration of these constants.
+#define INA228_NTC_PULLUP_OHMS   10000.0f
+#define INA228_NTC_R25_OHMS      10000.0f
+#define INA228_NTC_BETA          3950.0f
+#define INA228_NTC_SUPPLY_V      5.55f
+
+// How many accepted current samples (~531ms each) between temperature
+// measurements. Each trigger alternates between the die temp and the NTC.
+#define INA228_TEMP_MEASURE_INTERVAL_SAMPLES 100
+
 typedef struct {
     i2c_inst_t *i2c;
     uint8_t addr;

@@ -22,6 +22,8 @@
 #define INA228_CONFIG_ADCRANGE     (1 << 4)  // 0 = ±163.84 mV, 1 = ±40.96 mV
 
 // ADC_CONFIG register bits
+#define INA228_ADC_MODE_TRIG_BUS   0x1
+#define INA228_ADC_MODE_TRIG_TEMP  0x4
 #define INA228_ADC_MODE_CONT_SHUNT  0xa
 #define INA228_ADC_MODE_CONT_ALL   0xf
 
@@ -50,6 +52,33 @@
 #define INA228_AVG_256    5
 #define INA228_AVG_512    6
 #define INA228_AVG_1024   7
+
+// Normal operation: continuous shunt conversions, 2074us x 256 avg ~= 531ms/sample
+#define INA228_ADC_CONFIG_CONTINUOUS ((INA228_ADC_MODE_CONT_SHUNT << 12) | \
+                                      INA228_ADC_VBUSCT(INA228_CT_2074US) | \
+                                      INA228_ADC_VSHCT(INA228_CT_2074US) | \
+                                      INA228_ADC_VTCT(INA228_CT_2074US) | \
+                                      INA228_ADC_AVG(INA228_AVG_256))
+
+// Triggered single-shot temperature/bus conversions: 2074us x 64 avg ~= 133ms.
+// Both channels are inherently quiet, so 64x averaging is already essentially
+// noise-free while keeping the pause in current sampling short.
+#define INA228_ADC_CONFIG_TRIG_TEMP ((INA228_ADC_MODE_TRIG_TEMP << 12) | \
+                                     INA228_ADC_VBUSCT(INA228_CT_2074US) | \
+                                     INA228_ADC_VSHCT(INA228_CT_2074US) | \
+                                     INA228_ADC_VTCT(INA228_CT_2074US) | \
+                                     INA228_ADC_AVG(INA228_AVG_64))
+
+#define INA228_ADC_CONFIG_TRIG_BUS  ((INA228_ADC_MODE_TRIG_BUS << 12) | \
+                                     INA228_ADC_VBUSCT(INA228_CT_2074US) | \
+                                     INA228_ADC_VSHCT(INA228_CT_2074US) | \
+                                     INA228_ADC_VTCT(INA228_CT_2074US) | \
+                                     INA228_ADC_AVG(INA228_AVG_64))
+
+// A triggered conversion takes 2074us x 64 = 132.7ms; wait at least this long
+// after writing the trigger config before reading the result register (we
+// don't rely on the CNVRF flag, which can be stale from continuous mode).
+#define INA228_TEMP_CONVERSION_WAIT_US 140000
 
 // Global variables for storing current measurements
 // static int32_t ina228_current_raw = 0;
@@ -201,14 +230,8 @@ void ina228_configure(ina228_t *dev) {
         return;
     }
     
-    // Configure ADC: continuous mode, all measurements
-    // Use 540µs conversion time for balance between speed and noise
-    // Use 4x averaging for good noise rejection
-    uint16_t adc_config = (INA228_ADC_MODE_CONT_SHUNT << 12) |
-                          INA228_ADC_VBUSCT(INA228_CT_2074US) |
-                          INA228_ADC_VSHCT(INA228_CT_2074US) |
-                          INA228_ADC_VTCT(INA228_CT_2074US) |
-                          INA228_ADC_AVG(INA228_AVG_256);
+    // Configure ADC: continuous shunt conversions with long averaging
+    uint16_t adc_config = INA228_ADC_CONFIG_CONTINUOUS;
     
     if (!ina228_write_reg16(dev, INA228_REG_ADC_CONFIG, adc_config)) {
         error_printf("INA228: Failed to write ADC_CONFIG\n");
@@ -247,6 +270,28 @@ static uint8_t async_read_buf[5];
 static volatile int32_t latest_async_current_raw = 0;
 static volatile bool async_new_reading_available = false;
 
+// Temperature measurement state machine. Every
+// INA228_TEMP_MEASURE_INTERVAL_SAMPLES accepted current samples, the main tick
+// requests a triggered single-shot conversion (alternating between the die
+// temperature and the NTC via VBUS). All I2C transactions are started from the
+// 160ms timer callback, so they never race with each other.
+typedef enum {
+    MEAS_STATE_CURRENT = 0,       // Continuous shunt mode, polling current
+    MEAS_STATE_TRIGGER_PENDING,   // Need to write the triggered ADC config
+    MEAS_STATE_CONVERTING,        // Triggered conversion in progress
+    MEAS_STATE_RESTORE_PENDING,   // Result read; restore continuous config
+} meas_state_t;
+
+static volatile meas_state_t meas_state = MEAS_STATE_CURRENT;
+static bool meas_is_ntc = false;               // Which channel the current trigger targets
+static volatile bool temp_result_is_ntc = false; // Which channel the pending result is from
+static volatile uint32_t trigger_written_us = 0;
+static uint32_t temp_interval_counter = 0;
+
+static uint8_t temp_read_buf[3];
+static volatile int32_t latest_temp_raw = 0;
+static volatile bool temp_reading_available = false;
+
 static void on_read_complete(i2c_inst_t *i2c, bool success, void *user_data) {
     (void)i2c;
     (void)user_data;
@@ -269,15 +314,91 @@ static void on_read_complete(i2c_inst_t *i2c, bool success, void *user_data) {
     }
 }
 
+static void on_config_write_complete(i2c_inst_t *i2c, bool success, void *user_data) {
+    (void)i2c;
+    (void)user_data;
+
+    if (!success) {
+        return; // Stay in the current state; the timer will retry
+    }
+
+    if (meas_state == MEAS_STATE_TRIGGER_PENDING) {
+        trigger_written_us = time_us_32();
+        meas_state = MEAS_STATE_CONVERTING;
+    } else if (meas_state == MEAS_STATE_RESTORE_PENDING) {
+        meas_state = MEAS_STATE_CURRENT;
+    }
+}
+
+static void on_temp_read_complete(i2c_inst_t *i2c, bool success, void *user_data) {
+    (void)i2c;
+    (void)user_data;
+
+    if (!success) {
+        return; // Stay in MEAS_STATE_CONVERTING; the timer will retry
+    }
+
+    if (meas_is_ntc) {
+        // VBUS is a 20-bit value in the upper bits of 3 bytes
+        int32_t raw = ((int32_t)temp_read_buf[0] << 12) |
+                      ((int32_t)temp_read_buf[1] << 4) |
+                      ((int32_t)temp_read_buf[2] >> 4);
+        if (raw & 0x80000) {
+            raw |= 0xFFF00000;
+        }
+        latest_temp_raw = raw;
+    } else {
+        // DIETEMP is a signed 16-bit value
+        latest_temp_raw = (int16_t)(((uint16_t)temp_read_buf[0] << 8) | temp_read_buf[1]);
+    }
+    temp_result_is_ntc = meas_is_ntc;
+    temp_reading_available = true;
+    meas_state = MEAS_STATE_RESTORE_PENDING;
+}
+
+static bool start_async_config_write(ina228_t *dev, uint16_t value) {
+    static uint8_t cfg_buf[2];
+    cfg_buf[0] = (value >> 8) & 0xFF;
+    cfg_buf[1] = value & 0xFF;
+    return i2c_async_write_reg(dev->i2c, dev->addr, INA228_REG_ADC_CONFIG,
+                               cfg_buf, 2, on_config_write_complete, dev);
+}
+
 static bool timer_callback(struct repeating_timer *t) {
     ina228_t *dev = (ina228_t *)t->user_data;
     
     // Only start if not already busy
-    if (!i2c_async_is_busy(dev->i2c)) {
-        i2c_async_read_regs_dual(dev->i2c, dev->addr, 
-                                 INA228_REG_DIAG_ALRT, 2, 
-                                 INA228_REG_CURRENT, 3, 
-                                 async_read_buf, on_read_complete, dev);
+    if (i2c_async_is_busy(dev->i2c)) {
+        return true;
+    }
+
+    switch (meas_state) {
+        case MEAS_STATE_CURRENT:
+            i2c_async_read_regs_dual(dev->i2c, dev->addr, 
+                                     INA228_REG_DIAG_ALRT, 2, 
+                                     INA228_REG_CURRENT, 3, 
+                                     async_read_buf, on_read_complete, dev);
+            break;
+        case MEAS_STATE_TRIGGER_PENDING:
+            start_async_config_write(dev, meas_is_ntc ?
+                INA228_ADC_CONFIG_TRIG_BUS : INA228_ADC_CONFIG_TRIG_TEMP);
+            break;
+        case MEAS_STATE_CONVERTING:
+            // The triggered conversion completes after a fixed time; read the
+            // result once it has definitely finished.
+            if ((time_us_32() - trigger_written_us) >= INA228_TEMP_CONVERSION_WAIT_US) {
+                if (meas_is_ntc) {
+                    i2c_async_read_reg(dev->i2c, dev->addr, INA228_REG_VBUS,
+                                       temp_read_buf, 3, on_temp_read_complete, dev);
+                } else {
+                    i2c_async_read_reg(dev->i2c, dev->addr, INA228_REG_DIETEMP,
+                                       temp_read_buf, 2, on_temp_read_complete, dev);
+                }
+            }
+            break;
+        case MEAS_STATE_RESTORE_PENDING:
+            start_async_config_write(dev, INA228_ADC_CONFIG_CONTINUOUS);
+            break;
     }
     
     return true;
@@ -289,7 +410,57 @@ static void ina228_start_async_timer(ina228_t *dev) {
     add_repeating_timer_us(-160000, timer_callback, dev, &timer);
 }
 
+// Convert and store a completed temperature measurement into the model
+static void store_temp_result(bool is_ntc, int32_t raw) {
+    if (is_ntc) {
+        // NTC divider voltage via the VBUS input (195.3125 uV/LSB)
+        float v = (float)raw * 195.3125e-6f;
+        // Clamp to avoid division by zero / log of a non-positive number
+        // (e.g. with the NTC disconnected the node floats up to the supply)
+        float v_max = INA228_NTC_SUPPLY_V - 0.001f;
+        if (v < 0.001f) v = 0.001f;
+        if (v > v_max) v = v_max;
+
+        float r_ntc = INA228_NTC_PULLUP_OHMS * v / (INA228_NTC_SUPPLY_V - v);
+        // Beta equation: 1/T = 1/T25 + ln(R/R25)/B
+        float temp_c = 1.0f / (1.0f / 298.15f
+                               + logf(r_ntc / INA228_NTC_R25_OHMS) / INA228_NTC_BETA)
+                       - 273.15f;
+
+        model.shunt_ntc_resistance_ohms = r_ntc;
+        model.shunt_ntc_temperature = temp_c;
+        model.shunt_ntc_millis = millis();
+    } else {
+        // DIETEMP: 7.8125 m degrees C per LSB
+        model.shunt_die_temperature = (float)raw * 0.0078125f;
+        model.shunt_die_temperature_millis = millis();
+    }
+}
+
+// Only interrupt current sampling for a temperature measurement when the
+// contactor state machine is settled, so precharge/weld-test/calibration logic
+// (which relies on fresh current readings) never sees the sampling pause.
+static bool contactors_settled(void) {
+    switch (model.contactor_sm.state) {
+        case CONTACTORS_STATE_OPEN:
+        case CONTACTORS_STATE_CLOSED:
+        case CONTACTORS_STATE_PRECHARGE_FAILED:
+        case CONTACTORS_STATE_TESTING_FAILED:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool ina228_read_current_async(ina228_t *dev) {
+    // Consume any completed temperature measurement
+    if (temp_reading_available) {
+        bool is_ntc = temp_result_is_ntc;
+        int32_t temp_raw = latest_temp_raw;
+        temp_reading_available = false;
+        store_temp_result(is_ntc, temp_raw);
+    }
+
     if (!async_new_reading_available) {
         return false;
     }
@@ -311,12 +482,35 @@ bool ina228_read_current_async(ina228_t *dev) {
         20.0f   // fast threshold
     );
     
-    // Update charge
-    model.charge_raw += (int64_t)current_corrected;
+    // Update charge. Normally each accepted sample represents one ~531ms
+    // conversion period, but a temperature measurement pauses current
+    // conversions for roughly one extra period, so scale this sample's charge
+    // contribution by the number of elapsed periods to keep coulomb counting
+    // honest through the gap.
+    uint32_t now_us = time_us_32();
+    int32_t periods = 1;
+    if (last_sample_us != 0) {
+        uint32_t elapsed_us = now_us - last_sample_us;
+        periods = (int32_t)((elapsed_us + 265472) / 530944); // round to nearest
+        if (periods < 1) periods = 1;
+        if (periods > 3) periods = 3;
+    }
+    last_sample_us = now_us;
+    model.charge_raw += (int64_t)current_corrected * periods;
     model.charge_millis = model.current_millis;
 
     dev->null_accumulator += current_raw;
     dev->null_counter++;
+
+    // Periodically measure the die temperature / shunt NTC, interleaved
+    temp_interval_counter++;
+    if (temp_interval_counter >= INA228_TEMP_MEASURE_INTERVAL_SAMPLES
+            && meas_state == MEAS_STATE_CURRENT
+            && contactors_settled()) {
+        temp_interval_counter = 0;
+        meas_is_ntc = !meas_is_ntc;
+        meas_state = MEAS_STATE_TRIGGER_PENDING;
+    }
 
     return true;
 }

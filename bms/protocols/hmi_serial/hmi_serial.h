@@ -106,6 +106,10 @@
 
 #define HMI_REG_LINK_VOLTAGE           56 // int32 (mV), rev1 boards only
 
+#define HMI_REG_SHUNT_DIE_TEMP         57 // float (C), INA228 internal temperature
+#define HMI_REG_SHUNT_NTC_TEMP         58 // float (C), external shunt NTC temperature
+#define HMI_REG_SHUNT_NTC_RESISTANCE   59 // float (ohms), for NTC calibration
+
 #define HMI_REG_PROTOCOL_VERSION       71 // uint16, HMI_PROTOCOL_VERSION; absent before READ_ARRAY
 
 // The OCV learner (bms/app/estimators/ocv_learn.h), when the profile has OCV_LEARN

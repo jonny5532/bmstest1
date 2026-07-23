@@ -280,13 +280,29 @@ void bms_tick() {
         print_bms_events();
         inverter_debug_print();
         
-        debug_printf("Temp: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
+        debug_printf("MCU: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
             get_temperature_c_times10(),
             model.supply_voltages.voltage_3V3_mV,
             model.supply_voltages.voltage_5V_mV,
             model.supply_voltages.voltage_12V_mV,
             model.supply_voltages.voltage_contactor_mV
         );
+
+        {
+            millis_t now = millis();
+            debug_printf("ModTemps:");
+            for(int i=0; i<NUM_MODULE_TEMPS; i++) {
+                debug_printf(" [%d]=%.1fC", i, model.module_temperatures[i]);
+            }
+            debug_printf(" (age %lums) | ShuntDie: %.1fC (age %lums) | ShuntNTC: %.1fC / %.0f ohm (age %lums)\n",
+                model.module_temperatures_millis ? (now - model.module_temperatures_millis) : 0,
+                model.shunt_die_temperature,
+                model.shunt_die_temperature_millis ? (now - model.shunt_die_temperature_millis) : 0,
+                model.shunt_ntc_temperature,
+                model.shunt_ntc_resistance_ohms,
+                model.shunt_ntc_millis ? (now - model.shunt_ntc_millis) : 0
+            );
+        }
 
         debug_printf("Batt: %6.3fV (%3.3f) | Out: %6.3fV (%3.3f) | NegCtr: %6.3fV (%3.3f) | PosCtr: %6.3fV (%3.3f)\n",
             model.high_voltages.battery,

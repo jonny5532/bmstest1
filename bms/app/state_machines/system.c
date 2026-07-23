@@ -33,7 +33,7 @@ bool successfully_initialized(const bms_model_t *model) {
     }
 #endif
 
-    if(!millis_recent_enough(model->current_millis, CURRENT_STALE_THRESHOLD_MS)) {
+    if(!millis_recent_enough(model->current_millis, CURRENT_STALE_FAULT_THRESHOLD_MS)) {
         return false;
     }
 

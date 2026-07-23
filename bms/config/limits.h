@@ -105,6 +105,13 @@
 // must wait this long to ensure it isn't using pre-precharge readings.
 #define CURRENT_STALE_THRESHOLD_MS 800
 
+// Current sampling is briefly paused (~1.2s worst case between samples) every
+// ~53s while the INA228 takes a shunt temperature measurement, so fault/
+// readiness checks must tolerate a longer gap. The contactor logic keeps the
+// tight threshold above; it never sees the pause because temperature
+// measurements are deferred unless the contactors are settled.
+#define CURRENT_STALE_FAULT_THRESHOLD_MS 1500
+
 #define TEMPERATURE_STALE_THRESHOLD_MS(model) (  \
     (model)->cell_voltage_slow_mode ?              \
         CELL_TEMPERATURE_STALE_THRESHOLD_SLOW_MS  \

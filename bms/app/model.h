@@ -167,6 +167,14 @@ typedef struct bms_model {
     float temperature_max;
     millis_t temperature_millis;
 
+    // Shunt temperature measurements (via the INA228: internal die temp, and
+    // the external shunt NTC sensed through the VBUS pin)
+    float shunt_die_temperature; // degrees C
+    millis_t shunt_die_temperature_millis;
+    float shunt_ntc_temperature; // degrees C
+    float shunt_ntc_resistance_ohms;
+    millis_t shunt_ntc_millis;
+
     high_voltages_t high_voltages;
     // float battery_voltage;
     // millis_t battery_voltage_millis;
