@@ -42,6 +42,11 @@
 // measurements. Each trigger alternates between the die temp and the NTC.
 #define INA228_TEMP_MEASURE_INTERVAL_SAMPLES 100
 
+// Conversion from shunt input offset voltage (uV) to raw current counts.
+// One raw count is 0.25mA, which across the 1mOhm shunt is 0.25uV, so
+// counts = uV / 0.25. Adjust if a different shunt resistance is used.
+#define INA228_VOS_UV_TO_COUNTS 4.0f
+
 typedef struct {
     i2c_inst_t *i2c;
     uint8_t addr;

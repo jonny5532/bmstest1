@@ -437,6 +437,58 @@ static void store_temp_result(bool is_ntc, int32_t raw) {
     }
 }
 
+// Apparent input offset voltage vs die temperature, fitted to measured
+// zero-current data (band centers of a logged temperature sweep, calibrated
+// zero at 33.7C, temperature axis shifted -1C from the logging MCU sensor to
+// reference the INA228 die temp). The observed drift (~-3uV/C at the hot end,
+// ~-24mA at 48C through the 1mOhm shunt) is ~400x larger than the INA228
+// datasheet die-offset curve (Figure 6-4), so the die offset itself cannot be
+// the dominant mechanism (likely thermal EMFs at the shunt sense junctions),
+// but it tracks die temperature repeatably so we correct against it. The curve
+// is anchored to ~0 at the 32.7C (die) calibration point so existing stored
+// zero-current offsets remain valid.
+typedef struct {
+    float temp_c;
+    float vos_uv;
+} vos_point_t;
+
+static const vos_point_t vos_table[] = {
+    {  19.0f,   0.5f },
+    {  29.0f,   0.5f },
+    {  32.7f,   0.0f },
+    {  34.0f,  -1.5f },
+    {  39.0f,  -5.5f },
+    {  44.0f, -14.5f },
+    {  47.0f, -24.0f },
+    // Extrapolated beyond the measured 19-48C range at ~-3uV/C (unverified)
+    {  60.0f, -63.0f },
+};
+#define VOS_TABLE_LEN (sizeof(vos_table) / sizeof(vos_table[0]))
+
+// Returns the expected input offset voltage at the given die temperature,
+// expressed in raw current counts (0.25mA each), using linear interpolation
+// clamped at the table ends.
+static float ina228_vos_counts(float die_temp_c) {
+    float vos_uv;
+    if (die_temp_c <= vos_table[0].temp_c) {
+        vos_uv = vos_table[0].vos_uv;
+    } else if (die_temp_c >= vos_table[VOS_TABLE_LEN - 1].temp_c) {
+        vos_uv = vos_table[VOS_TABLE_LEN - 1].vos_uv;
+    } else {
+        vos_uv = vos_table[0].vos_uv;
+        for (size_t i = 1; i < VOS_TABLE_LEN; i++) {
+            if (die_temp_c <= vos_table[i].temp_c) {
+                float frac = (die_temp_c - vos_table[i - 1].temp_c)
+                             / (vos_table[i].temp_c - vos_table[i - 1].temp_c);
+                vos_uv = vos_table[i - 1].vos_uv
+                         + frac * (vos_table[i].vos_uv - vos_table[i - 1].vos_uv);
+                break;
+            }
+        }
+    }
+    return vos_uv * INA228_VOS_UV_TO_COUNTS;
+}
+
 // Only interrupt current sampling for a temperature measurement when the
 // contactor state machine is settled, so precharge/weld-test/calibration logic
 // (which relies on fresh current readings) never sees the sampling pause.
@@ -468,7 +520,24 @@ bool ina228_read_current_async(ina228_t *dev) {
     int32_t current_raw = latest_async_current_raw;
     async_new_reading_available = false;
 
-    int32_t current_corrected = current_raw - model.current_offset;
+    // Correct for the temperature-dependent apparent input offset voltage.
+    // Until the first die temperature reading arrives, assume 25C (where the
+    // fitted curve is near zero). The fractional part of the correction is
+    // carried between samples (error diffusion) so the applied correction
+    // averages to the exact value, which is what matters for charge
+    // integration. Applied to the raw value before the null-calibration
+    // accumulator, so the stored zero-current offset stays
+    // temperature-independent.
+    static float vos_residual = 0.0f;
+    float die_temp_c = (model.shunt_die_temperature_millis > 0)
+                       ? model.shunt_die_temperature : 25.0f;
+    float vos_total = ina228_vos_counts(die_temp_c) + vos_residual;
+    int32_t vos_whole = (int32_t)lroundf(vos_total);
+    vos_residual = vos_total - (float)vos_whole;
+
+    int32_t raw_compensated = current_raw - vos_whole;
+
+    int32_t current_corrected = raw_compensated - model.current_offset;
     model.current_mA = div_round_closest(current_corrected, 4);
     model.current_millis = millis();
 
@@ -499,7 +568,7 @@ bool ina228_read_current_async(ina228_t *dev) {
     model.charge_raw += (int64_t)current_corrected * periods;
     model.charge_millis = model.current_millis;
 
-    dev->null_accumulator += current_raw;
+    dev->null_accumulator += raw_compensated;
     dev->null_counter++;
 
     // Periodically measure the die temperature / shunt NTC, interleaved
