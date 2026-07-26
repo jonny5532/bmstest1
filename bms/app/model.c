@@ -289,6 +289,9 @@ static void model_calculate_inverter_voltage_limits(const bms_model_t *model, in
     // Guard against a single wildly-deviating cell (e.g. a failed/disconnected
     // tap reported as ~0V) pushing the per-cell deviation term far enough to
     // invert the limits relative to each other.
+    if(max_voltage_limit_dV < 0) {
+        max_voltage_limit_dV = 0;
+    }
     if(min_voltage_limit_dV > max_voltage_limit_dV) {
         min_voltage_limit_dV = max_voltage_limit_dV;
     }

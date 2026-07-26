@@ -227,7 +227,7 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
                 calc_crc
             );
             isosnoop_print_buffer();
-            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | (module_crc << 16) | calc_crc);
+            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | ((uint32_t)module_crc << 16) | calc_crc);
             crc_ok = false;
             continue;
         }
@@ -353,7 +353,7 @@ bool bmb3y_read_more_temps_blocking(bms_model_t *model) {
                 module, module_crc, calc_crc, calc_crc ^ 0x425b, calc_crc ^ 0xc6ed);
             crc_ok = false;
             if(millis64() > 2000) {
-                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
+                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | ((uint32_t)module_crc << 16) | calc_crc);
             }
             continue;
         }
@@ -409,7 +409,7 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
                 module, module_crc, calc_crc, calc_crc ^ 0x425b, calc_crc ^ 0xc6ed);
             crc_ok = false;
             if(millis64() > 2000) {
-                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
+                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | ((uint32_t)module_crc << 16) | calc_crc);
             }
             continue;
         }
