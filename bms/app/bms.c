@@ -52,31 +52,52 @@ void read_inputs(bms_model_t *model) {
     // For differential readings, full scale should be 436V
     // const int32_t full_scale_mv = 436000;
 
-    float battery_voltage_mul = fabs(model->battery_voltage_mul) > 0.001f ? model->battery_voltage_mul : 0.013f;
+    float battery_voltage_mul = fabs(model->battery_voltage_mul) > 0.001f ? model->battery_voltage_mul : ADS1115_DEFAULT_MUL;
     model->high_voltages.battery_millis = ads1115_get_sample_millis(0);
     model->high_voltages.battery = ads1115_float_sample(0, battery_voltage_mul);
     model->high_voltages.battery_deviation = ads1115_float_deviation(0, battery_voltage_mul);
 
-    float output_voltage_mul = fabs(model->output_voltage_mul) > 0.001f ? model->output_voltage_mul : 0.013f;
+    float output_voltage_mul = fabs(model->output_voltage_mul) > 0.001f ? model->output_voltage_mul : ADS1115_DEFAULT_MUL;
     model->high_voltages.output_millis = ads1115_get_sample_millis(1);
     model->high_voltages.output = ads1115_float_sample(1, output_voltage_mul);
     model->high_voltages.output_deviation = ads1115_float_deviation(1, output_voltage_mul);
 
-    float neg_contactor_mul = fabs(model->neg_contactor_mul) > 0.001f ? model->neg_contactor_mul : 0.013f;
+    float neg_contactor_mul = fabs(model->neg_contactor_mul) > 0.001f ? model->neg_contactor_mul : ADS1115_DEFAULT_MUL;
     model->high_voltages.neg_contactor_millis = ads1115_get_sample_millis(2);
     model->high_voltages.neg_contactor = ads1115_float_sample(2, neg_contactor_mul) + (0.001f * model->neg_contactor_offset_mV);
     model->high_voltages.neg_contactor_deviation = ads1115_float_deviation(2, neg_contactor_mul);
 
+    float pos_contactor_mul = fabs(model->pos_contactor_mul) > 0.001f ? model->pos_contactor_mul : ADS1115_DEFAULT_MUL;
+
+#if BMS_BOARD == BMS_BOARD_REV1
+    // Rev1 measures directly across the pos (Link Positive) contactor via
+    // ADC B channel 6 (BatPos - LinkPos)
+    model->high_voltages.pos_contactor_millis = ads1115_get_sample_millis(6);
+    model->high_voltages.pos_contactor = ads1115_float_sample(6, pos_contactor_mul) + (0.001f * model->pos_contactor_offset_mV);
+    model->high_voltages.pos_contactor_deviation = ads1115_float_deviation(6, pos_contactor_mul);
+
+    // Link rail voltage (channel 7 measures LinkNeg - LinkPos, so negate)
+    float link_voltage_mul = fabs(model->link_voltage_mul) > 0.001f ? model->link_voltage_mul : ADS1115_DEFAULT_MUL;
+    model->high_voltages.link_millis = ads1115_get_sample_millis(7);
+    model->high_voltages.link = -ads1115_float_sample(7, link_voltage_mul);
+    model->high_voltages.link_deviation = ads1115_float_deviation(7, link_voltage_mul);
+
+    // Drop across the F4 fuse / drive-unit jumper (channel 8, OutPos - LinkPos)
+    float fuse_drop_mul = fabs(model->fuse_drop_mul) > 0.001f ? model->fuse_drop_mul : ADS1115_DEFAULT_MUL;
+    model->high_voltages.fuse_drop_millis = ads1115_get_sample_millis(8);
+    model->high_voltages.fuse_drop = ads1115_float_sample(8, fuse_drop_mul);
+    model->high_voltages.fuse_drop_deviation = ads1115_float_deviation(8, fuse_drop_mul);
+#else
     // Positive contactor voltage has to be derived from the difference between (battery+
     // to output-) and (output+ to output-), since we can't sample relative to battery+.
 
-    float pos_contactor_mul = fabs(model->pos_contactor_mul) > 0.001f ? model->pos_contactor_mul : 0.013f;
     millis_t raw_bat_pos_to_out_neg_millis = ads1115_get_sample_millis(3);
     float raw_bat_plus_to_out_neg = ads1115_float_sample(3, pos_contactor_mul);
     
     model->high_voltages.pos_contactor_millis = raw_bat_pos_to_out_neg_millis < model->high_voltages.output_millis ? raw_bat_pos_to_out_neg_millis : model->high_voltages.output_millis;
     model->high_voltages.pos_contactor = raw_bat_plus_to_out_neg - model->high_voltages.output;
     model->high_voltages.pos_contactor_deviation = ads1115_float_deviation(3, pos_contactor_mul) + model->high_voltages.output_deviation;
+#endif
     
     // INA228 current and charge readings
     
@@ -250,13 +271,29 @@ void bms_tick() {
         //isosnoop_print_buffer();
         print_bms_events();
         
-        debug_printf("Temp: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
+        debug_printf("MCU: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
             get_temperature_c_times10(),
             model.supply_voltages.voltage_3V3_mV,
             model.supply_voltages.voltage_5V_mV,
             model.supply_voltages.voltage_12V_mV,
             model.supply_voltages.voltage_contactor_mV
         );
+
+        {
+            millis_t now = millis();
+            debug_printf("ModTemps:");
+            for(int i=0; i<NUM_MODULE_TEMPS; i++) {
+                debug_printf(" [%d]=%.1fC", i, model.module_temperatures[i]);
+            }
+            debug_printf(" (age %lums) | ShuntDie: %.1fC (age %lums) | ShuntNTC: %.1fC / %.0f ohm (age %lums)\n",
+                model.module_temperatures_millis ? (now - model.module_temperatures_millis) : 0,
+                model.shunt_die_temperature,
+                model.shunt_die_temperature_millis ? (now - model.shunt_die_temperature_millis) : 0,
+                model.shunt_ntc_temperature,
+                model.shunt_ntc_resistance_ohms,
+                model.shunt_ntc_millis ? (now - model.shunt_ntc_millis) : 0
+            );
+        }
 
         debug_printf("Batt: %6.3fV (%3.3f) | Out: %6.3fV (%3.3f) | NegCtr: %6.3fV (%3.3f) | PosCtr: %6.3fV (%3.3f)\n",
             model.high_voltages.battery,
@@ -268,6 +305,14 @@ void bms_tick() {
             model.high_voltages.pos_contactor,
             model.high_voltages.pos_contactor_deviation
         );
+#if BMS_BOARD == BMS_BOARD_REV1
+        debug_printf("Link: %6.3fV (%3.3f) | Fuse: %6.3fV (%3.3f)\n",
+            model.high_voltages.link,
+            model.high_voltages.link_deviation,
+            model.high_voltages.fuse_drop,
+            model.high_voltages.fuse_drop_deviation
+        );
+#endif
         int64_t charge_mC = raw_charge_to_mC(model.charge_raw);
         debug_printf("Current: %6ld mA | Charge: %lld mC | SoC: %2.2f %% | SoC(VB): %2.2f %% | SoC(BC): %2.2f %% | SoC(FC): %2.2f %%\n",
             model.current_mA,

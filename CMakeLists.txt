@@ -83,6 +83,10 @@ if(BMS_PROFILE)
     add_compile_definitions(BMS_PROFILE=${BMS_PROFILE})
 endif()
 
+if(BMS_BOARD)
+    add_compile_definitions(BMS_BOARD=${BMS_BOARD})
+endif()
+
 target_compile_options(bms PUBLIC
     -Wall
     -Wextra
