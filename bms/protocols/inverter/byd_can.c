@@ -17,10 +17,11 @@ static const int FW_MINOR_VERSION = 0x29;
 
 static const uint32_t INVERTER_TIMEOUT_MS = 300000; // 5 minutes
   
-static bool inverter_present = false;
-static bool inverter_initialized = false;
+// Written from the CAN RX callback (ISR context) and read from the main loop
+static volatile bool inverter_present = false;
+static volatile bool inverter_initialized = false;
 static int inverter_init_state = 0;
-static uint32_t last_received_millis = 0;
+static volatile uint32_t last_received_millis = 0;
 // offsets to avoid sending all messages on the same timestep
 static uint32_t timestep_1 = 0;
 static uint32_t timestep_2 = 1;

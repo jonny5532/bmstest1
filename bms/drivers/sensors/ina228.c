@@ -210,15 +210,15 @@ void ina228_configure(ina228_t *dev) {
     // For max_current_a = 100A, we want good resolution
     // Current_LSB = 100 / 524288 = 0.000190735 A/LSB
     
-    // Calculate current_lsb (in A/LSB) to use full 20-bit range efficiently
-    dev->current_lsb = 100.0f / 524288.0f;  // For 100A max current
+    // We use a fixed calibration from the board profile rather than deriving
+    // it from max_current_a/shunt_resistor_ohms passed to ina228_init - those
+    // parameters do NOT affect the calibration. The datasheet derivation, for
+    // reference: Current_LSB = max_current / 2^19, then
+    // SHUNT_CAL = 13107.2e6 * Current_LSB * R_shunt (x4 with ADCRANGE=1).
+    // INA228_SHUNT_CAL is chosen so the CURRENT register reads in 0.25mA units
+    // (332 would read mA; x4 for adcrange, /4 for 0.25mA units cancel out).
     dev->current_lsb = 0.001f;
-    
-    // SHUNT_CAL = 13107.2 × 10^6 × Current_LSB × R_shunt
-    float shunt_cal_float = 13107.2e6f * dev->current_lsb * dev->shunt_resistor_ohms;
-    uint16_t shunt_cal = (uint16_t)shunt_cal_float;
-    // 332 to read mA, *4 due to adcrange, /4 because we want in 0.25mA units instead
-    shunt_cal = INA228_SHUNT_CAL*4/4;
+    uint16_t shunt_cal = INA228_SHUNT_CAL;
     
     debug_printf("INA228: Current LSB = %.6f A/LSB\n", dev->current_lsb);
     debug_printf("INA228: SHUNT_CAL = %u (0x%04X)\n", shunt_cal, shunt_cal);
@@ -561,7 +561,13 @@ bool ina228_read_current_async(ina228_t *dev) {
         uint32_t elapsed_us = now_us - last_sample_us;
         periods = (int32_t)((elapsed_us + 265472) / 530944); // round to nearest
         if (periods < 1) periods = 1;
-        if (periods > 3) periods = 3;
+        if (periods > 3) {
+            // A gap this long (I2C stall, flash write, ...) exceeds what the
+            // clamp can compensate for - the charge integral silently loses
+            // the excess, so at least make it visible.
+            info_printf("INA228: charge integration gap of %ld periods clamped to 3\n", periods);
+            periods = 3;
+        }
     }
     last_sample_us = now_us;
     model.charge_raw += (int64_t)current_corrected * periods;

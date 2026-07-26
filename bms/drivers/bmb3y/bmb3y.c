@@ -131,7 +131,11 @@ void bmb3y_send_balancing_blocking(bms_model_t *model) {
                 int module = 7 - (balance_index >> 4);
                 int module_cell_index = balance_index & 0x0F;
 
-                tx_buf[2 + 2 + module * 6 + (module_cell_index / 8)] |= (1 << (module_cell_index & 0x07));
+                // A presence mask bit beyond the 8x15 channel slots would make
+                // module negative and write before tx_buf - refuse it.
+                if(module >= 0 && module < 8) {
+                    tx_buf[2 + 2 + module * 6 + (module_cell_index / 8)] |= (1 << (module_cell_index & 0x07));
+                }
             }
             logical_index++;
         }

@@ -236,6 +236,8 @@ void balancing_sm_tick(bms_model_t *model) {
             if(state_timeout((sm_t*)balancing_sm, model->auto_balancing_period_ms) && good_conditions_for_balancing(model)) {
                 // Start balancing
                 if(start_balancing(model)) {
+                    // Start the pause cadence fresh each session
+                    balancing_sm->pause_counter = 0;
                     state_transition((sm_t*)balancing_sm, BALANCING_STATE_ACTIVE);
                 }
             }
