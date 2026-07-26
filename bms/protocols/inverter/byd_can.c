@@ -29,7 +29,7 @@ static uint32_t timestep_3 = 2;
 
 static const struct can2040_msg byd_250 = {
     .id = 0x250,
-    .dlc = 4,
+    .dlc = 8,
     .data = {
         FW_MAJOR_VERSION, FW_MINOR_VERSION, 0x00, 0x66,
         (uint8_t)((battery_capacity_Wh / 100) >> 8),

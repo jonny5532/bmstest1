@@ -115,7 +115,7 @@ bool check_precharge_successful(const bms_model_t *model, bool log_errors) {
         fabsf(model->high_voltages.link - model->high_voltages.output) <= (PRECHARGE_SUCCESS_LINK_MAX_MV * 0.001f),
         log_errors,
         ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
-        ((uint64_t)(model->high_voltages.link * 1000) << 32) | (uint32_t)(model->high_voltages.output * 1000)
+        ((uint64_t)(uint32_t)(int32_t)(model->high_voltages.link * 1000) << 32) | (uint32_t)(int32_t)(model->high_voltages.output * 1000)
     )) {
         return false;
     }
@@ -126,7 +126,7 @@ bool check_precharge_successful(const bms_model_t *model, bool log_errors) {
         fabsf(model->high_voltages.battery - model->high_voltages.output) <= (PRECHARGE_SUCCESS_MAX_MV * 0.001f),
         log_errors,
         ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
-        ((uint64_t)(model->high_voltages.battery * 1000) << 32) | (uint32_t)(model->high_voltages.output * 1000)
+        ((uint64_t)(uint32_t)(int32_t)(model->high_voltages.battery * 1000) << 32) | (uint32_t)(int32_t)(model->high_voltages.output * 1000)
     );
 }
 

@@ -16,7 +16,7 @@ static void model_process_temperatures(bms_model_t *model) {
     model->temperature_min = model->module_temperatures[0];
     model->temperature_max = model->module_temperatures[0];
     for(int i=1; i<NUM_MODULE_TEMPS; i++) {
-        int16_t temp = model->module_temperatures[i];
+        float temp = model->module_temperatures[i];
         if(temp < model->temperature_min) {
             model->temperature_min = temp;
         }
@@ -32,10 +32,10 @@ static void model_process_cell_voltages(bms_model_t *model) {
         // No valid data yet
         return;
     }
-    model->cell_voltage_min_mV = model->cell_voltages_mV[0];
-    model->cell_voltage_max_mV = model->cell_voltages_mV[0];
-    model->cell_voltage_total_mV = model->cell_voltages_mV[0];
-    for(int i=1; i<NUM_CELLS; i++) {
+    model->cell_voltage_min_mV = INT16_MAX;
+    model->cell_voltage_max_mV = INT16_MIN;
+    model->cell_voltage_total_mV = 0;
+    for(int i=0; i<NUM_CELLS; i++) {
         int32_t voltage = model->cell_voltages_mV[i];
 
         // TODO - decide on how to handle missing cells
@@ -315,10 +315,10 @@ static void model_calculate_inverter_soc_and_capacity(const bms_model_t *model, 
     if(scaled_soc > 10000) scaled_soc = 10000;
     if(scaled_soc < 0) scaled_soc = 0;
 
-    if(model->discharge_current_limit_dA == 0) {
+    if(model->discharge_current_limit_dA == 0 && model->charge_current_limit_dA > 0) {
         // Force to 0% to stop discharge
         scaled_soc = 0;
-    } else if(model->charge_current_limit_dA == 0) {
+    } else if(model->charge_current_limit_dA == 0 && model->discharge_current_limit_dA > 0) {
         // Force to 100% to stop charge
         scaled_soc = 10000;
     }

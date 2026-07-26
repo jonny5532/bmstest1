@@ -124,7 +124,7 @@ void confirm_battery_safety(const bms_model_t *model) {
         confirm(
             voltage_diff > -(VOLTAGE_MISMATCH_THRESHOLD_mV * 0.001f) && voltage_diff < (VOLTAGE_MISMATCH_THRESHOLD_mV * 0.001f),
             ERR_VOLTAGE_MISMATCH,
-            ((uint64_t)model->cell_voltage_total_mV << 32) | (uint32_t)(expected_total * 1000)
+            ((uint64_t)(uint32_t)model->cell_voltage_total_mV << 32) | (uint32_t)(expected_total * 1000)
         );
     }
 
