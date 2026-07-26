@@ -64,10 +64,6 @@ static void __not_in_flash_func(i2c_irq_handler_internal)(i2c_inst_t *i2c) {
     i2c_hw_t *hw = i2c_get_hw(i2c);
     uint32_t stat = hw->intr_stat;
 
-    for(int i=0;i<59100;i++) {
-        asm volatile("nop");
-    }
-
     // Check for errors
     if (stat & I2C_IC_INTR_STAT_R_TX_ABRT_BITS) {
         hw->clr_tx_abrt;

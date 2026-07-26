@@ -90,7 +90,7 @@ void store_module_temperature(uint8_t module_index, int16_t raw_temp_dC) {
 
         if(delta >= MODULE_TEMPERATURE_GLITCH_THRESHOLD_dC) {
             uint64_t event_data = ((uint64_t)module_index << 32) |
-                                  ((uint16_t)previous_raw_temp << 16) |
+                                  ((uint32_t)(uint16_t)previous_raw_temp << 16) |
                                   (uint16_t)raw_temp_dC;
             count_bms_event(ERR_MODULE_TEMPERATURE_GLITCH, event_data);
         }
@@ -258,9 +258,9 @@ static void model_calculate_inverter_voltage_limits(const bms_model_t *model, in
     uint16_t cell_voltage_working_max_mV = get_cell_voltage_working_max_mV(model);
     uint16_t cell_voltage_working_min_mV = get_cell_voltage_working_min_mV(model);
 
-    uint32_t max_voltage_limit_dV = (cell_voltage_working_max_mV * NUM_CELLS) / 100; // in 0.1V units
-    uint32_t min_voltage_limit_dV = (cell_voltage_working_min_mV * NUM_CELLS) / 100; // in 0.1V units
-    
+    int32_t max_voltage_limit_dV = (cell_voltage_working_max_mV * NUM_CELLS) / 100; // in 0.1V units
+    int32_t min_voltage_limit_dV = (cell_voltage_working_min_mV * NUM_CELLS) / 100; // in 0.1V units
+
     int32_t mean_cell_voltage_mV = model->cell_voltage_total_mV / NUM_CELLS;
 
     // How far is the highest cell above the mean?
@@ -284,7 +284,17 @@ static void model_calculate_inverter_voltage_limits(const bms_model_t *model, in
     // Apply user-configured offsets to account for errors in the inverter
     // voltage reading.
     max_voltage_limit_dV += model->pack_voltage_limit_upper_offset_dV;
-    min_voltage_limit_dV += model->pack_voltage_limit_lower_offset_dV;  
+    min_voltage_limit_dV += model->pack_voltage_limit_lower_offset_dV;
+
+    // Guard against a single wildly-deviating cell (e.g. a failed/disconnected
+    // tap reported as ~0V) pushing the per-cell deviation term far enough to
+    // invert the limits relative to each other.
+    if(min_voltage_limit_dV > max_voltage_limit_dV) {
+        min_voltage_limit_dV = max_voltage_limit_dV;
+    }
+    if(min_voltage_limit_dV < 0) {
+        min_voltage_limit_dV = 0;
+    }
 
     out->max_voltage_limit_dV = max_voltage_limit_dV;
     out->min_voltage_limit_dV = min_voltage_limit_dV;
