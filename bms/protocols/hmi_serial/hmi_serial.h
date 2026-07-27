@@ -89,6 +89,12 @@
 #define HMI_REG_HARD_CHARGE_CURRENT_LIMIT_DA            54 // uint16 (0.1A)
 #define HMI_REG_HARD_DISCHARGE_CURRENT_LIMIT_DA         55 // uint16 (0.1A)
 
+#define HMI_REG_LINK_VOLTAGE           56 // int32 (mV), rev1 boards only
+
+#define HMI_REG_SHUNT_DIE_TEMP         57 // float (C), INA228 internal temperature
+#define HMI_REG_SHUNT_NTC_TEMP         58 // float (C), external shunt NTC temperature
+#define HMI_REG_SHUNT_NTC_RESISTANCE   59 // float (ohms), for NTC calibration
+
 
 #define HMI_REG_CELL_VOLTAGES_START 0x100
 #define HMI_REG_CELL_VOLTAGES_END   0x1FF

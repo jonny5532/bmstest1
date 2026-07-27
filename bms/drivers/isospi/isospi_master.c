@@ -69,7 +69,7 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
 
         if(i < skip) {
             // skip receiving this byte
-            rx_buf[i] = 0;
+            if(rx_buf) rx_buf[i] = 0;
             continue;
         }
 

@@ -104,6 +104,13 @@ static bool hmi_register_is_available(uint16_t reg_id, bms_model_t *model) {
             return model->high_voltages.pos_contactor_millis > 0;
         case HMI_REG_NEG_CONTACTOR_VOLTAGE:
             return model->high_voltages.neg_contactor_millis > 0;
+        case HMI_REG_LINK_VOLTAGE:
+            return model->high_voltages.link_millis > 0;
+        case HMI_REG_SHUNT_DIE_TEMP:
+            return model->shunt_die_temperature_millis > 0;
+        case HMI_REG_SHUNT_NTC_TEMP:
+        case HMI_REG_SHUNT_NTC_RESISTANCE:
+            return model->shunt_ntc_millis > 0;
         case HMI_REG_TEMPERATURE_MIN:
         case HMI_REG_TEMPERATURE_MAX:
             return model->temperature_millis > 0;
@@ -173,6 +180,22 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
         case HMI_REG_NEG_CONTACTOR_VOLTAGE:
             buf[idx++] = HMI_TYPE_INT32;
             idx += hmi_buf_append_uint32(&buf[idx], (uint32_t)(model->high_voltages.neg_contactor * 1000));
+            break;
+        case HMI_REG_LINK_VOLTAGE:
+            buf[idx++] = HMI_TYPE_INT32;
+            idx += hmi_buf_append_uint32(&buf[idx], (uint32_t)(model->high_voltages.link * 1000));
+            break;
+        case HMI_REG_SHUNT_DIE_TEMP:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->shunt_die_temperature);
+            break;
+        case HMI_REG_SHUNT_NTC_TEMP:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->shunt_ntc_temperature);
+            break;
+        case HMI_REG_SHUNT_NTC_RESISTANCE:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->shunt_ntc_resistance_ohms);
             break;
         case HMI_REG_TEMPERATURE_MIN:
             buf[idx++] = HMI_TYPE_FLOAT;

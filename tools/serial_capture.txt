@@ -1,0 +1,232 @@
+0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3832 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57451mV | Temps: 23.8C - 23.8C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, DADS A (0x48): present
+ADS B (0x49): present
+ADS ch0: raw   3429.9 (age 60 ms)
+ADS ch1: raw     -4.2 (age 39 ms)
+ADS ch2: raw   -533.0 (age 20 ms)
+ADS ch3: raw   3055.2 (age 20 ms)
+ADS ch4: raw  13936.5 (age 81 ms)
+ADS ch5: raw  13019.5 (age 81 ms)
+ADS ch6: raw   2805.0 (age 60 ms)
+ADS ch7: raw      7.4 (age 39 ms)
+ADS ch8: raw      2.0 (age 20 ms)
+ADS ch9: raw  13159.9 (age 20 ms)
+INA228 (0x40): present
+INA228 current: 0 mA (age 528 ms)
+ata 0x0000000000000000
+Temp: 313 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.307V (0.066) | Out: -0.075V (0.059) | NegCtr: -8.651V (0.077) | PosCtr: 49.461V (0.129)
+Link: -0.123V (0.053) | Fuse:  0.031V (0.000)
+Current:      1 mA | Charge: -1 mC | SoC: 70.28 % | SoC(VB): 60.45 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.004925 mA (0.271547)
+CV: 179.5/457.0 A | W: 30.0 A | T: 47.6/57.6 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3832 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57451mV | Temps: 23.8C - 23.8C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.308V (0.066) | Out: -0.074V (0.060) | NegCtr: -8.653V (0.073) | PosCtr: 49.454V (0.122)
+Link: -0.123V (0.048) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -1 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.009876 mA (0.319907)
+CV: 179.5/457.0 A | W: 30.0 A | T: 47.6/57.6 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57452mV | Temps: 23.8C - 23.8C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.309V (0.067) | Out: -0.073V (0.057) | NegCtr: -8.654V (0.069) | PosCtr: 49.451V (0.127)
+Link: -0.122V (0.048) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -2 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.019679 mA (0.413271)
+CV: 179.5/457.0 A | W: 30.0 A | T: 47.6/57.6 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3829 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57453mV | Temps: 23.9C - 23.9C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 57.310V (0.063) | Out: -0.072V (0.060) | NegCtr: -8.655V (0.065) | PosCtr: 49.448V (0.139)
+Link: -0.121V (0.052) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -2 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.019482 mA (0.338479)
+CV: 179.5/457.0 A | W: 30.0 A | T: 47.7/57.7 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3829 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57453mV | Temps: 23.9C - 23.9C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.311V (0.065) | Out: -0.071V (0.064) | NegCtr: -8.656V (0.066) | PosCtr: 49.444V (0.147)
+Link: -0.121V (0.058) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -3 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.034117 mA (0.511052)
+CV: 179.5/457.0 A | W: 30.0 A | T: 47.8/57.8 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+11029ms [system] state 1->3
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57452mV | Temps: 23.9C - 23.9C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.312V (0.064) | Out: -0.071V (0.061) | NegCtr: -8.657V (0.071) | PosCtr: 49.442V (0.134)
+Link: -0.120V (0.060) | Fuse:  0.031V (0.001)
+Current:      0 mA | Charge: -3 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.038751 mA (0.504776)
+CV: 179.5/457.0 A | W: 30.0 A | T: 47.8/57.8 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57452mV | Temps: 23.9C - 23.9C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.313V (0.062) | Out: -0.070V (0.063) | NegCtr: -8.658V (0.074) | PosCtr: 49.440V (0.138)
+Link: -0.120V (0.055) | Fuse:  0.031V (0.002)
+Current:      0 mA | Charge: -4 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.048098 mA (0.536757)
+CV: 179.5/457.0 A | W: 30.0 A | T: 47.8/57.8 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57452mV | Temps: 24.0C - 24.0C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13450 mV
+Batt: 57.314V (0.059) | Out: -0.069V (0.058) | NegCtr: -8.659V (0.070) | PosCtr: 49.438V (0.137)
+Link: -0.119V (0.052) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -5 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.057593 mA (0.615158)
+CV: 179.5/457.0 A | W: 30.0 A | T: 47.9/57.9 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3832 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57451mV | Temps: 24.0C - 24.0C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.315V (0.061) | Out: -0.068V (0.054) | NegCtr: -8.660V (0.072) | PosCtr: 49.436V (0.120)
+Link: -0.119V (0.046) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -5 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.066659 mA (0.615877)
+CV: 179.5/457.0 A | W: 30.0 A | T: 48.0/58.0 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3832 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57451mV | Temps: 24.0C - 24.0C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 315 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.316V (0.058) | Out: -0.068V (0.053) | NegCtr: -8.660V (0.064) | PosCtr: 49.435V (0.136)
+Link: -0.118V (0.046) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -6 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.070994 mA (0.598227)
+CV: 179.5/457.0 A | W: 30.0 A | T: 48.0/58.0 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57452mV | Temps: 24.0C - 24.0C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.317V (0.056) | Out: -0.067V (0.053) | NegCtr: -8.661V (0.063) | PosCtr: 49.434V (0.126)
+Link: -0.117V (0.048) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -6 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.080261 mA (0.660611)
+CV: 179.5/457.0 A | W: 30.0 A | T: 48.0/58.0 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57452mV | Temps: 24.0C - 24.0C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 314 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.318V (0.058) | Out: -0.066V (0.060) | NegCtr: -8.662V (0.066) | PosCtr: 49.431V (0.140)
+Link: -0.117V (0.056) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -7 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.084013 mA (0.572165)
+CV: 179.5/457.0 A | W: 30.0 A | T: 48.0/58.0 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3829 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57453mV | Temps: 24.1C - 24.1C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 315 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.319V (0.059) | Out: -0.065V (0.060) | NegCtr: -8.663V (0.071) | PosCtr: 49.431V (0.128)
+Link: -0.116V (0.051) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -7 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.083175 mA (0.479374)
+CV: 179.5/457.0 A | W: 30.0 A | T: 48.1/58.1 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+Received command: 'ads'
+Executing command: 'ads'
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3832 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57451mV | Temps: 24.1C - 24.1C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 315 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.320V (0.059) | Out: -0.064V (0.056) | NegCtr: -8.664V (0.068) | PosCtr: 49.429V (0.130)
+Link: -0.116V (0.051) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -7 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.086934 mA (0.455415)
+CV: 179.5/457.0 A | W: 30.0 A | T: 48.1/58.1 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+Max timings (us): 1631 8975 2811 3280 1665 3311 1606 3388 7117 
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 mV | [c 14]: 3832 mV | 
+Total: 57452mV | Temps: 24.1C - 24.1C | Delta: 27 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 315 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 57.321V (0.055) | Out: -0.064V (0.058) | NegCtr: -8.665V (0.066) | PosCtr: 49.428V (0.129)
+Link: -0.115V (0.049) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -7 mC | SoC: 70.28 % | SoC(VB): 60.44 % | SoC(BC): 59.51 % | SoC(FC): 12.34 %
+Current filtered: -0.086067 mA (0.385360)
+CV: 179.5/457.0 A | W: 30.0 A | T: 48.1/58.1 A | Inv. min: 49.7 V | Inv. max: 60.6 V
+
+midpoint is 13478.0 | Vpos: -1.071 V | Vneg: 1.186 V | Riso: -4.75 Mohm
+[2J[H[c  0]: 3814 mV | [c  1]: 3841 mV | [c  2]: 3839 mV | [c  3]: 3820 mV | [c  4]: 3820 mV | 
+[c  5]: 3836 mV | [c  6]: 3832 mV | [c  7]: 3828 mV | [c  8]: 3833 mV | [c  9]: 3837 mV | 
+[c 10]: 3834 mV | [c 11]: 3821 mV | [c 12]: 3833 mV | [c 13]: 3832 
