@@ -19,6 +19,9 @@
 #include "protocols/hmi_serial/hmi_serial.h"
 #include "protocols/internal_serial/internal_serial.h"
 #include "protocols/inverter/inverter.h"
+#if CAN_MASTER
+#include "protocols/inverter/can_master.h"
+#endif
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
 #include "sys/time/time.h"
@@ -214,7 +217,13 @@ void bms_tick() {
     // Phase 5: Comms
 
     nvm_tick(&model);
+#if CAN_MASTER
+    // Talk to the slave batteries, then present the whole fleet to the inverter
+    can_master_tick(&model);
+    inverter_tick(&model.fleet_outputs);
+#else
     inverter_tick(&model.inverter_outputs);
+#endif
     internal_serial_tick();
     hmi_serial_tick(&model);
 
@@ -290,6 +299,9 @@ void bms_tick() {
             model.inverter_outputs.min_voltage_limit_dV / 10.0f,
             model.inverter_outputs.max_voltage_limit_dV / 10.0f
         );
+#if CAN_MASTER
+        can_master_print_status();
+#endif
 
         /*
         char ascii[127-33+1];

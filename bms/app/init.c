@@ -11,6 +11,9 @@
 #include "../drivers/contactors/contactors.h"
 #include "../protocols/hmi_serial/hmi_serial.h"
 #include "../protocols/inverter/inverter.h"
+#if CAN_MASTER
+#include "../protocols/inverter/can_master.h"
+#endif
 #include "../drivers/isospi/isosnoop.h"
 #include "../drivers/isospi/isospi_master.h"
 #include "state_machines/contactors.h"
@@ -89,6 +92,9 @@ static void init_comms() {
     init_hmi_serial();
 
     init_inverter();
+#if CAN_MASTER
+    init_can_master();
+#endif
 }
 
 static void init_model() {

@@ -127,6 +127,30 @@ It is usual to top-balance a pack, evening the cell voltages when the pack is fu
 
 
 
+## Inverter integration
+
+The BMS talks CAN to the outside world via one of two protocol
+implementations, selected at build time with `-DINVERTER_PROTOCOL=<name>`:
+
+- `byd_can` (default) emulates a BYD Battery-Box directly to an inverter.
+- `custom_can` is a multi-battery protocol spoken on the inter-BMS port
+  (CAN2, GPIO 4/5) to an upstream controller: batteries auto-announce on a
+  fixed discovery ID, the controller assigns addresses, and the battery
+  streams its complete internal state (limits, measurements, cell voltages,
+  balancing, events, ...) while accepting RUN/STOP requests. See
+  [docs/custom_can_protocol.md](docs/custom_can_protocol.md) for the
+  specification and controller implementation guide, and
+  [tools/custom_can/](tools/custom_can/) for a Python reference controller,
+  battery simulator and demo (`python -m tools.custom_can demo`).
+
+Several batteries on a parallel HV bus can be run by one CellKeeper in
+**master mode** (`-DCAN_MASTER=ON` together with `byd_can`): it controls its
+own battery and the `custom_can` slaves over CAN2, and presents the aggregate
+(summed current limits and capacity, tightest voltage limits, weighted SoC)
+to the inverter on CAN1. Enabling CAN2 in either role compiles out the
+`isosnoop` ISOSPI debugging aid, which shares its PIO block.
+
+
 ## Internal architecture
 
 The BMS has a conventional single-threaded loop architecture, with a 50Hz loop

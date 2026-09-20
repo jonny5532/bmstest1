@@ -3,6 +3,9 @@
 #include "app/model.h"
 #include "app/state_machines/system.h"
 #include "drivers/sensors/internal_adc.h"
+#if CAN_MASTER
+#include "protocols/inverter/can_master.h"
+#endif
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
 
@@ -116,6 +119,10 @@ static void cli_handle_command(const char *cmd) {
             internal_adc_read_12v_mv(), now - internal_adc_read_12v_millis());
         printf("ADC: Ctr: %5ld mV (age %lu ms)\n",
             internal_adc_read_contactor_mv(), now - internal_adc_read_contactor_millis());
+#if CAN_MASTER
+    } else if(strcmp(cmd, "fleet") == 0) {
+        can_master_print_status();
+#endif
     } else if(strcmp(cmd, "print_working_charge_settings") == 0) {
         debug_printf("working_charge_internal_resistance_uR = %f\n", working_charge_internal_resistance_uR);
         debug_printf("working_charge_ceiling_dA = %f\n", working_charge_ceiling_dA);

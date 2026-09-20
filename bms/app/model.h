@@ -127,6 +127,14 @@ typedef struct inverter_outputs {
     int16_t full_capacity_dAh;
 } inverter_outputs_t;
 
+// Master mode: summary of the slave batteries on the fleet CAN bus
+typedef struct fleet_summary {
+    uint8_t slaves_known;        // slaves seen (announced) and still remembered
+    uint8_t slaves_online;       // reporting STATUS within the liveness timeout
+    uint8_t slaves_contributing; // online, current enabled, no critical/fatal events
+    uint8_t worst_slave_level;   // highest event level of any online slave
+} fleet_summary_t;
+
 
 
 // This entire structure will be zero-initialized at startup
@@ -268,6 +276,11 @@ typedef struct bms_model {
     //int32_t current_offset;
 
     inverter_outputs_t inverter_outputs;
+
+    // Master mode: what the inverter is told, aggregated over this battery
+    // and the slave batteries (see protocols/inverter/can_master.c)
+    inverter_outputs_t fleet_outputs;
+    fleet_summary_t fleet;
 
     bool balancing_active; // whether balancing was requested during the past BMB cycle (and so whether any read voltages are unstable)
 

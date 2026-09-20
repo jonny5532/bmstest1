@@ -83,6 +83,42 @@ target_include_directories(test_soc PRIVATE
 
 add_test(NAME test_soc COMMAND ${MEMORY_CHECK} test_soc)
 
+add_executable(test_custom_can
+    test_custom_can.c
+    ../bms/app/model.c
+    ../bms/app/battery/current_limits.c
+    ../bms/protocols/inverter/can.c
+    ../bms/protocols/inverter/custom_can.c
+    ../bms/sys/events/events.c
+)
+target_link_libraries(test_custom_can PRIVATE cmocka m)
+target_include_directories(test_custom_can PRIVATE 
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+    ../vendor/can2040/src
+)
+
+add_test(NAME test_custom_can COMMAND ${MEMORY_CHECK} test_custom_can)
+
+add_executable(test_can_master
+    test_can_master.c
+    ../bms/app/model.c
+    ../bms/app/battery/current_limits.c
+    ../bms/protocols/inverter/can.c
+    ../bms/protocols/inverter/can_master.c
+    ../bms/sys/events/events.c
+)
+target_link_libraries(test_can_master PRIVATE cmocka m)
+target_include_directories(test_can_master PRIVATE 
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+    ../vendor/can2040/src
+)
+
+add_test(NAME test_can_master COMMAND ${MEMORY_CHECK} test_can_master)
+
 add_executable(test_events 
     test_events.c 
     ../bms/sys/events/events.c

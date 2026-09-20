@@ -6,6 +6,7 @@
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
 #include "drivers/isospi/isospi_master.h"
+#include "drivers/isospi/isosnoop.h"
 
 #include "pico/stdlib.h"
 

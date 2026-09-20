@@ -1,4 +1,18 @@
 #include "isosnoop.h"
+
+#if BMS_INTERCAN
+
+// PIO2 is used by the inter-BMS CAN bus in this build; the ISOSPI snooper
+// (a debugging aid that dumps captured ISOSPI bits on CRC failures) is
+// unavailable.
+void isosnoop_setup(unsigned int rx_pin_base, unsigned int sampling_pin, unsigned int rx_and_pin, unsigned int timer_disable_pin) {
+    (void)rx_pin_base; (void)sampling_pin; (void)rx_and_pin; (void)timer_disable_pin;
+}
+void isosnoop_print_buffer() {}
+void isosnoop_flush() {}
+
+#else
+
 #include "isosnoop.pio.h"
 
 #include "config/allocations.h"
@@ -166,3 +180,5 @@ void isosnoop_print_buffer() {
 void isosnoop_flush() {
     last_write_addr = dma_chan->write_addr;
 }
+
+#endif // BMS_INTERCAN
