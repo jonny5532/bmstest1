@@ -52,6 +52,10 @@ void tick_sm(bms_model_t *model, uint32_t ms) {
     model->high_voltages.output_millis = stored_millis;
     model->high_voltages.pos_contactor_millis = stored_millis;
     model->high_voltages.neg_contactor_millis = stored_millis;
+#if BMS_BOARD == BMS_BOARD_REV1
+    model->high_voltages.link_millis = stored_millis;
+    model->high_voltages.fuse_drop_millis = stored_millis;
+#endif
     model->current_millis = stored_millis;
 
     contactor_sm_tick(model);
@@ -104,7 +108,12 @@ static void test_close_request_to_testing_sequence(void **state) {
     // 4. TESTING_NEG_CLOSED
     model.high_voltages.neg_contactor = 0.1f; // Below threshold (closed)
     expect_value(contactors_set_pos_pre_neg, pos, false);
+#ifdef PRECHARGE_ON_NEGATIVE
+    // pre is logically true here (leaves the bypass contactor open)
+    expect_value(contactors_set_pos_pre_neg, pre, true);
+#else
     expect_value(contactors_set_pos_pre_neg, pre, false);
+#endif
     expect_value(contactors_set_pos_pre_neg, neg, true);
     tick_sm(&model, 1100);
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_POS_OPEN);
@@ -121,7 +130,12 @@ static void test_close_request_to_testing_sequence(void **state) {
     // 6. TESTING_POS_CLOSED
     model.high_voltages.pos_contactor = 0.5f; // Below threshold (closed)
     expect_value(contactors_set_pos_pre_neg, pos, true);
+#ifdef PRECHARGE_ON_NEGATIVE
+    expect_value(contactors_set_pos_pre_neg, pre, false);
+#else
+    // pre is logically true here (leaves the bypass contactor open)
     expect_value(contactors_set_pos_pre_neg, pre, true);
+#endif
     expect_value(contactors_set_pos_pre_neg, neg, false);
     tick_sm(&model, 1100);
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_PRECHARGING_INIT);
@@ -142,14 +156,24 @@ static void test_precharge_success(void **state) {
     model.high_voltages.output_millis = stored_millis;
     model.high_voltages.neg_contactor = 0.1f; // < threshold
     model.high_voltages.neg_contactor_millis = stored_millis;
+#if BMS_BOARD == BMS_BOARD_REV1
+    model.high_voltages.link = 399.5f; // link-output diff within limit
+    model.high_voltages.link_millis = stored_millis;
+#endif
     model.current_mA = 300.0f; // < PRECHARGE_SUCCESS_MAX_MA
     model.current_filtered_mA = 300.0f;
     model.contactor_sm.pre_close_current_mA = 300.0f;
     model.current_millis = stored_millis;
 
+#ifdef PRECHARGE_ON_NEGATIVE
+    expect_value(contactors_set_pos_pre_neg, pos, true);
+    expect_value(contactors_set_pos_pre_neg, pre, true);
+    expect_value(contactors_set_pos_pre_neg, neg, false);
+#else
     expect_value(contactors_set_pos_pre_neg, pos, false);
     expect_value(contactors_set_pos_pre_neg, pre, true);
     expect_value(contactors_set_pos_pre_neg, neg, true);
+#endif
     
     tick_sm(&model, 1100);
 
@@ -170,17 +194,65 @@ static void test_precharge_failure_timeout(void **state) {
     model.high_voltages.output_millis = stored_millis;
     model.high_voltages.neg_contactor = 0.0f;
     model.high_voltages.neg_contactor_millis = stored_millis;
+#if BMS_BOARD == BMS_BOARD_REV1
+    model.high_voltages.link = 400.0f; // link is live, output never rises
+    model.high_voltages.link_millis = stored_millis;
+#endif
     model.current_millis = stored_millis;
 
+#ifdef PRECHARGE_ON_NEGATIVE
+    expect_value(contactors_set_pos_pre_neg, pos, true);
+    expect_value(contactors_set_pos_pre_neg, pre, true);
+    expect_value(contactors_set_pos_pre_neg, neg, false);
+#else
     expect_value(contactors_set_pos_pre_neg, pos, false);
     expect_value(contactors_set_pos_pre_neg, pre, true);
     expect_value(contactors_set_pos_pre_neg, neg, true);
+#endif
     
     tick_sm(&model, 15000);
 
     assert_int_equal(get_event_count(ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH), 1);
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_PRECHARGE_FAILED);
 }
+
+#if BMS_BOARD == BMS_BOARD_REV1
+static void test_precharge_failure_link_voltage(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+
+    model.contactor_sm.state = CONTACTORS_STATE_PRECHARGING;
+    model.contactor_sm.last_transition_time = stored_millis64;
+
+    // Battery vs output looks acceptable, but the directly-sensed link rail
+    // shows a large drop across the PTC + FC negative contactor path
+    model.high_voltages.battery = 400.0f;
+    model.high_voltages.battery_millis = stored_millis;
+    model.high_voltages.output = 390.0f; // 10V diff, within PRECHARGE_SUCCESS_MAX_MV
+    model.high_voltages.output_millis = stored_millis;
+    model.high_voltages.neg_contactor = 0.1f;
+    model.high_voltages.neg_contactor_millis = stored_millis;
+    model.high_voltages.link = 410.0f; // 20V from output, above PRECHARGE_SUCCESS_LINK_MAX_MV
+    model.high_voltages.link_millis = stored_millis;
+    model.current_mA = 300.0f;
+    model.current_filtered_mA = 300.0f;
+    model.contactor_sm.pre_close_current_mA = 300.0f;
+    model.current_millis = stored_millis;
+
+    expect_value(contactors_set_pos_pre_neg, pos, true);
+    expect_value(contactors_set_pos_pre_neg, pre, true);
+    expect_value(contactors_set_pos_pre_neg, neg, false);
+
+    // Event counts accumulate across tests, so compare against the count
+    // before the failing tick
+    int16_t count_before = get_event_count(ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH);
+
+    tick_sm(&model, 15000);
+
+    assert_int_equal(get_event_count(ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH), count_before + 1);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_PRECHARGE_FAILED);
+}
+#endif
 
 static void test_pos_weld_failure_detection(void **state) {
     (void) state;
@@ -382,6 +454,9 @@ int main(void) {
         cmocka_unit_test(test_close_request_to_testing_sequence),
         cmocka_unit_test(test_precharge_success),
         cmocka_unit_test(test_precharge_failure_timeout),
+#if BMS_BOARD == BMS_BOARD_REV1
+        cmocka_unit_test(test_precharge_failure_link_voltage),
+#endif
         cmocka_unit_test(test_pos_weld_failure_detection),
         cmocka_unit_test(test_open_request_from_closed),
         cmocka_unit_test(test_delayed_open_request_from_closed),

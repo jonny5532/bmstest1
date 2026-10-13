@@ -10,3 +10,6 @@ void init_inverter();
 // handshakes and then send regular messages. Consider staggering messages to
 // avoid exceeding the CAN transmit buffer size.
 void inverter_tick(inverter_outputs_t *outputs);
+// Print a one-line status summary (presence, handshake state, link health) to
+// the log. Intended for the periodic debug dump.
+void inverter_debug_print(void);

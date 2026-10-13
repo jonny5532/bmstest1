@@ -50,6 +50,8 @@
 // 16-47 via the GPIOBASE register)
 
 /* ADS1115 inputs:
+
+ADC A (0x48, all board revs):
 AIN0 = bat pos
 AIN1 = bat neg
 AIN2 = FC pos
@@ -58,5 +60,13 @@ AIN3 = FC neg
 bat voltage: AIN0 - AIN1
 fc voltage: AIN2 - AIN3
 
+ADC B (0x49, rev1 boards only):
+AIN0 = link neg
+AIN1 = out pos (drive unit positive, before the F4 fuse/jumper)
+AIN2 = bat pos
+AIN3 = link pos
 
+pos contactor (K6 Link Positive): AIN2 - AIN3
+link voltage (negated): AIN0 - AIN3
+fuse/jumper drop: AIN1 - AIN3
 */

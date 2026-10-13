@@ -35,6 +35,23 @@ target_include_directories(test_contactors PRIVATE
 
 add_test(NAME test_contactors COMMAND ${MEMORY_CHECK} test_contactors)
 
+# Rev1 board variant (dual ADS1115, precharge on negative FC contactor)
+add_executable(test_contactors_rev1
+    test_contactors.c 
+    ../bms/sys/events/events.c
+    ../bms/app/state_machines/contactors.c 
+    ../bms/app/state_machines/base.c
+)
+target_compile_definitions(test_contactors_rev1 PRIVATE BMS_BOARD=2)
+target_link_libraries(test_contactors_rev1 PRIVATE cmocka)
+target_include_directories(test_contactors_rev1 PRIVATE 
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_contactors_rev1 COMMAND ${MEMORY_CHECK} test_contactors_rev1)
+
 add_executable(test_low_voltage
     test_low_voltage.c
     physical_model.c

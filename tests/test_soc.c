@@ -28,17 +28,33 @@ millis64_t stored_millis64 = 0;
 uint32_t stored_timestep = 0;
 
 struct can2040_msg last_150;
+// Record of every transmitted CAN id, in order
+#define TX_LOG_SIZE 64
+uint32_t tx_log[TX_LOG_SIZE];
+int tx_log_count = 0;
+int can2040_stop_count = 0;
+
+static void tx_log_reset(void) {
+    tx_log_count = 0;
+}
+
 int can2040_transmit(struct can2040 *cd, const struct can2040_msg *msg) {
     (void)cd;
     if(msg->id == 0x150) {
         last_150 = *msg;
     }
+    if(tx_log_count < TX_LOG_SIZE) {
+        tx_log[tx_log_count] = msg->id;
+    }
+    tx_log_count++;
 
-    // check_expected(msg->id);
-    // for (int i = 0; i < msg->dlc; i++) {
-    //     check_expected(msg->data[i]);
-    // }
     return 0;
+}
+
+void can2040_stop(struct can2040 *cd) { (void)cd; can2040_stop_count++; }
+void can2040_get_statistics(struct can2040 *cd, struct can2040_stats *stats) {
+    (void)cd;
+    memset(stats, 0, sizeof(*stats));
 }
 
 // Current callback function
@@ -158,8 +174,9 @@ static void test_inverter_soc_scaling(void **state) {
 
     init_inverter();
 
-    struct can2040_msg msg;
+    struct can2040_msg msg = {0};
     msg.id = 0x151;
+    msg.dlc = 8;
     can2040_cb(0, CAN2040_NOTIFY_RX, &msg);
 
     // Set up model so model_tick computes inverter_soc from soc_scaling
@@ -222,6 +239,123 @@ static void test_inverter_soc_scaling(void **state) {
     assert_int_equal(sent_soc, 10000);
 }
 
+// Advance one main-loop tick (20 ms) and run the inverter
+static void inverter_step(bool ack) {
+    stored_millis += 20;
+    stored_millis64 += 20;
+    stored_timestep += 1;
+    inverter_tick(&model.inverter_outputs);
+    if (ack) {
+        struct can2040_msg ack_msg = {0};
+        can2040_cb(0, CAN2040_NOTIFY_TX, &ack_msg);
+    }
+}
+
+static void inverter_rx(uint32_t id, uint8_t byte0) {
+    struct can2040_msg msg = {0};
+    msg.id = id;
+    msg.dlc = 8;
+    msg.data[0] = byte0;
+    can2040_cb(0, CAN2040_NOTIFY_RX, &msg);
+}
+
+static const uint32_t IDENT_SEQUENCE[] = {0x250, 0x290, 0x2D0, 0x3D0, 0x3D0, 0x3D0, 0x3D0};
+
+static void test_inverter_restart_reidentifies(void **state) {
+    (void) state;
+
+    memset(&model, 0, sizeof(bms_model_t));
+    stored_millis = 100000;
+    stored_millis64 = 100000;
+    stored_timestep = 5000;
+
+    model.system_sm.state = SYSTEM_STATE_OPERATING;
+    model.contactor_sm.enable_current = true;
+    model.soc = 5000;
+    model.soc_scaling_min = 0;
+    model.soc_scaling_max = 10000;
+    model.soc_millis = stored_millis;
+    model.high_voltages.battery_millis = stored_millis;
+    model.cell_voltage_millis = stored_millis;
+    model.cell_voltages_millis = stored_millis;
+    model.temperature_millis = stored_millis;
+    model.module_temperatures_millis = stored_millis;
+    model.current_millis = stored_millis;
+    model.temperature_min = 25.0f;
+    model.temperature_max = 25.0f;
+    for (int i = 0; i < NUM_CELLS; i++) {
+        model.cell_voltages_mV[i] = 3700;
+    }
+    model.high_voltages.battery = 3700.0f * NUM_CELLS * 0.001f;
+    model_tick(&model);
+
+    init_inverter();
+
+    // The inverter driver keeps static state across tests; clear any pending
+    // transmit left over from a previous test by acknowledging it.
+    {
+        struct can2040_msg ack_msg = {0};
+        can2040_cb(0, CAN2040_NOTIFY_TX, &ack_msg);
+    }
+    can2040_stop_count = 0;
+
+    // Inverter is up and asks us to identify; we should reply and then run
+    inverter_rx(0x151, 0x01);
+    tx_log_reset();
+    for (int i = 0; i < 10; i++) inverter_step(true);
+    assert_true(tx_log_count >= 7);
+    for (int i = 0; i < 7; i++) {
+        assert_int_equal(tx_log[i], IDENT_SEQUENCE[i]);
+    }
+
+    // Steady state: regular frames flowing, all acknowledged
+    tx_log_reset();
+    for (int i = 0; i < 50; i++) inverter_step(true);
+    assert_true(tx_log_count > 0);
+    assert_int_equal(can2040_stop_count, 0);
+
+    // Inverter goes down: nothing acknowledges our frames any more. Within a
+    // few seconds we must notice, reset the CAN stack and go quiet.
+    for (int i = 0; i < 150; i++) inverter_step(false); // 3 s
+    assert_int_equal(can2040_stop_count, 1);
+
+    tx_log_reset();
+    for (int i = 0; i < 100; i++) inverter_step(false); // 2 s of silence
+    assert_int_equal(tx_log_count, 0);
+
+    // Inverter comes back and speaks. The very next frames out of us must be
+    // the identification sequence, in order, before any regular frame.
+    inverter_rx(0x151, 0x01);
+    tx_log_reset();
+    inverter_step(true);
+    assert_int_equal(tx_log_count, 7);
+    for (int i = 0; i < 7; i++) {
+        assert_int_equal(tx_log[i], IDENT_SEQUENCE[i]);
+    }
+
+    // ...and then regular frames resume
+    tx_log_reset();
+    for (int i = 0; i < 10; i++) inverter_step(true);
+    assert_true(tx_log_count > 0);
+    assert_int_equal(tx_log[0], 0x110);
+
+    // RX silence path: frames are acknowledged (someone is on the bus) but the
+    // inverter says nothing for longer than the RX timeout.
+    for (int i = 0; i < 520; i++) inverter_step(true); // 10.4 s
+    assert_int_equal(can2040_stop_count, 2);
+    tx_log_reset();
+    for (int i = 0; i < 50; i++) inverter_step(true);
+    assert_int_equal(tx_log_count, 0);
+
+    // A regular inverter frame (not a reinit request) also triggers
+    // identification after a loss, same as a BMS cold start.
+    inverter_rx(0x91, 0x00);
+    tx_log_reset();
+    inverter_step(true);
+    assert_int_equal(tx_log_count, 7);
+    assert_int_equal(tx_log[0], 0x250);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_ekf_soc_scaling_midrange),
@@ -229,6 +363,7 @@ int main(void) {
         cmocka_unit_test(test_ekf_init_full_charge),
         cmocka_unit_test(test_ekf_init_uninitialized_falls_back_to_voltage),
         cmocka_unit_test(test_inverter_soc_scaling),
+        cmocka_unit_test(test_inverter_restart_reidentifies),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

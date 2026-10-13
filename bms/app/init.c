@@ -20,7 +20,6 @@
 #include <math.h>
 
 ina228_t ina228_dev = {0};
-ads1115_t ads1115_dev = {0};
 
 static struct repeating_timer logging_timer;
 
@@ -71,6 +70,11 @@ static void init_hw() {
     if(!ads1115_init(&ads1115_dev, 0x48)) {
         error_printf("ADS1115 init failed!\n");
     }
+#ifdef HAS_ADS1115_SECONDARY
+    if(!ads1115_init(&ads1115_dev_b, 0x49)) {
+        error_printf("ADS1115 (secondary, 0x49) init failed!\n");
+    }
+#endif
 
     isospi_master_setup(
         PIN_ISOSPI_TX_EN,

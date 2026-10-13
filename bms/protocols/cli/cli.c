@@ -3,6 +3,8 @@
 #include "app/model.h"
 #include "app/state_machines/system.h"
 #include "drivers/sensors/internal_adc.h"
+#include "drivers/sensors/ads1115.h"
+#include "drivers/sensors/ina228.h"
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
 
@@ -116,6 +118,24 @@ static void cli_handle_command(const char *cmd) {
             internal_adc_read_12v_mv(), now - internal_adc_read_12v_millis());
         printf("ADC: Ctr: %5ld mV (age %lu ms)\n",
             internal_adc_read_contactor_mv(), now - internal_adc_read_contactor_millis());
+    } else if(strcmp(cmd, "ads") == 0) {
+        millis_t now = millis();
+        printf("ADS A (0x48): %s\n", ads1115_dev.present ? "present" : "NOT DETECTED");
+#ifdef HAS_ADS1115_SECONDARY
+        printf("ADS B (0x49): %s\n", ads1115_dev_b.present ? "present" : "NOT DETECTED");
+#endif
+        for(int ch = 0; ch < ADS1115_CHANNEL_COUNT; ch++) {
+            printf("ADS ch%d: raw %8.1f (age %lu ms)\n",
+                ch, (double)filtered_samples[ch], now - ads1115_get_sample_millis(ch));
+        }
+        extern ina228_t ina228_dev;
+        printf("INA228 (0x40): %s\n", ina228_dev.present ? "present" : "NOT DETECTED");
+        if(model.current_millis > 0) {
+            printf("INA228 current: %ld mA (age %lu ms)\n",
+                model.current_mA, now - model.current_millis);
+        } else {
+            printf("INA228 current: no reading yet\n");
+        }
     } else if(strcmp(cmd, "print_working_charge_settings") == 0) {
         debug_printf("working_charge_internal_resistance_uR = %f\n", working_charge_internal_resistance_uR);
         debug_printf("working_charge_ceiling_dA = %f\n", working_charge_ceiling_dA);
