@@ -131,7 +131,11 @@ void bmb3y_send_balancing_blocking(bms_model_t *model) {
                 int module = 7 - (balance_index >> 4);
                 int module_cell_index = balance_index & 0x0F;
 
-                tx_buf[2 + 2 + module * 6 + (module_cell_index / 8)] |= (1 << (module_cell_index & 0x07));
+                // A presence mask bit beyond the 8x15 channel slots would make
+                // module negative and write before tx_buf - refuse it.
+                if(module >= 0 && module < 8) {
+                    tx_buf[2 + 2 + module * 6 + (module_cell_index / 8)] |= (1 << (module_cell_index & 0x07));
+                }
             }
             logical_index++;
         }
@@ -188,7 +192,9 @@ static const uint16_t SHORT_READ_COMMANDS[] = {
 bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
     uint8_t rx_buf[72];
     uint32_t cmd = READ_COMMANDS[bank_index];
+#ifdef BMS_ISOSNOOP
     isosnoop_flush();
+#endif
     if (!bmb3y_long_command_get_data_blocking(cmd, rx_buf, 72)) {
         error_printf("BMB3Y read failed for cmd 0x%02lX\n", cmd);
         count_bms_event(ERR_BMB_READ_ERROR, 0x0100000000000000 | bank_index);
@@ -226,8 +232,10 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
                 rx_buf[module * 9 + 8],
                 calc_crc
             );
+#ifdef BMS_ISOSNOOP
             isosnoop_print_buffer();
-            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | (module_crc << 16) | calc_crc);
+#endif
+            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | ((uint32_t)module_crc << 16) | calc_crc);
             crc_ok = false;
             continue;
         }
@@ -353,7 +361,7 @@ bool bmb3y_read_more_temps_blocking(bms_model_t *model) {
                 module, module_crc, calc_crc, calc_crc ^ 0x425b, calc_crc ^ 0xc6ed);
             crc_ok = false;
             if(millis64() > 2000) {
-                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
+                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | ((uint32_t)module_crc << 16) | calc_crc);
             }
             continue;
         }
@@ -409,7 +417,7 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
                 module, module_crc, calc_crc, calc_crc ^ 0x425b, calc_crc ^ 0xc6ed);
             crc_ok = false;
             if(millis64() > 2000) {
-                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
+                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | ((uint32_t)module_crc << 16) | calc_crc);
             }
             continue;
         }

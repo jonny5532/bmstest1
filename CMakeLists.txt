@@ -27,6 +27,8 @@ include_directories(bms vendor/can2040/src)
 
 add_executable(bms
     bms/app/bms.c
+    bms/app/isolation.c
+    bms/app/board_id.c
     bms/app/hardware_checks.c
     bms/app/init.c
     bms/app/model.c
@@ -81,6 +83,38 @@ pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/bms/drivers/isospi/isosno
 
 if(BMS_PROFILE)
     add_compile_definitions(BMS_PROFILE=${BMS_PROFILE})
+endif()
+
+if(BMS_BOARD)
+    add_compile_definitions(BMS_BOARD=${BMS_BOARD})
+endif()
+
+# Boards modified with an external D+ pull-up powered from the host's VBUS (so a
+# switched-off host is never back-powered through D+). The chip's own pull-up,
+# powered by the BMS, must then stay off. Leave OFF on unmodified boards, or the
+# host never sees the device.
+option(BMS_USB_EXTERNAL_PULLUP "Board has a VBUS-powered external USB D+ pull-up" OFF)
+if(BMS_USB_EXTERNAL_PULLUP)
+    add_compile_definitions(BMS_USB_EXTERNAL_PULLUP=1)
+endif()
+
+# Boards with USB VBUS wired to GPIO3 (J12 pin 2) through a 3.3k/5.1k divider.
+# The chip's D+ pull-up is then only switched on while the host supplies VBUS,
+# so a switched-off host is never back-powered through D+. Leave OFF on boards
+# without the divider, or USB never connects.
+option(BMS_USB_VBUS_SENSE "Board has USB VBUS sensed on GPIO3" OFF)
+if(BMS_USB_VBUS_SENSE)
+    if(BMS_USB_EXTERNAL_PULLUP)
+        message(FATAL_ERROR "BMS_USB_VBUS_SENSE and BMS_USB_EXTERNAL_PULLUP are alternatives")
+    endif()
+    add_compile_definitions(BMS_USB_VBUS_SENSE=1)
+endif()
+
+# Passive isoSPI listener that dumps the raw bus symbols when a BMB CRC fails.
+# Bench debugging only: it uses all of one PIO, a DMA channel and GPIO30.
+option(BMS_ISOSNOOP "Enable the isoSPI snooper debug dump" OFF)
+if(BMS_ISOSNOOP)
+    add_compile_definitions(BMS_ISOSNOOP=1)
 endif()
 
 target_compile_options(bms PUBLIC

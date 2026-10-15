@@ -1,0 +1,299 @@
+d isoSPI nibble 0x0 on byte 35 bit 7
+Invalid isoSPI nibble 0x0 on byte 36 bit 0
+Invalid isoSPI nibble 0x0 on byte 36 bit 1
+Invalid isoSPI nibble 0x0 on byte 36 bit 2
+Invalid isoSPI nibble 0x0 on byte 36 bit 3
+Invalid isoSPI nibble 0x0 on byte 36 bit 4
+Invalid isoSPI nibble 0x0 on byte 36 bit 5
+Invalid isoSPI nibble 0x0 on byte 36 bit 6
+Invalid isoSPI nibble 0x0 on byte 36 bit 7
+Invalid isoSPI nibble 0x0 on byte 37 bit 0
+Invalid isoSPI nibble 0xADC: now=36148 ms | Temp: 322 dC
+ADC: 3V3: 3282 mV (age 142 ms)
+ADC: 5V:  5217 mV (age 142 ms)
+ADC: 12V: 13275 mV (age 142 ms)
+ADC: Ctr: 13375 mV (age 142 ms)
+0 on byte 37 bit 1
+Invalid isoSPI nibble 0x0 on byte 37 bit 2
+Invalid isoSPI nibble 0x0 on byte 37 bit 3
+Invalid isoSPI nibble 0x0 on byte 37 bit 4
+Invalid isoSPI nibble 0x0 on byte 37 bit 5
+Invalid isoSPI nibble 0x0 on byte 37 bit 6
+Invalid isoSPI nibble 0x0 on byte 37 bit 7
+Invalid isoSPI nibble 0x0 on byte 38 bit 0
+Invalid isoSPI nibble 0x0 on byte 38 bit 1
+Invalid isoSPI nibble 0x0 on byte 38 bit 2
+Invalid isoSPI nibble 0x0 on byte 38 bit 3
+Invalid isoSPI nibble 0x0 on byte 38 bit 4
+Invalid isoSPI nibble 0x0 on byte 38 bit 5
+Invalid isoSPI nibble 0x0 on byte 38 bit 6
+Invalid isoSPI nibble 0x0 on byte 38 bit 7
+Invalid isoSPI nibble 0x0 on byte 39 bit 0
+Invalid isoSPI nibble 0x0 on byte 39 bit 1
+Invalid isoSPI nibble 0x0 on byte 39 bit 2
+Invalid isoSPI nib
+Invalid isoSPI nibble 0x0 on byte 20 bit 1
+Invalid isoSPI nibblte 48 bit 3
+Invalid isoSPI nibble 0x0 on byte 48 bit 4
+Invalid i bit 3
+Invalid isoSPI nibble 0x0 on byte 28 bit 4
+Invalid isoSPIte 35 bit 4
+Invalid isoSPI nibble 0x0 on byte 35 bit 5
+Invalid i
+Invalid isoSPI nibble 0x0 on byte 27 bit 3
+Invalid isoSPI nibbl3 bit 6
+Invalid isoSPI nibble 0x0 on byte 33 bit 7
+Invalid isoSP bit 3
+Invalid isoSPI nibble 0x0 on byte 28 bit 4
+Invalid isoSPIte 64 bit 3
+Invalid isoSPI nibble 0x0 on byte 64 bit 4
+Invalid i
+Invalid isoSPI nibble 0x0 on byte 26 bit 3
+Invalid isoSPI nibblInvalid isoSPI nibble 0x0 on bytit 1
+Invalid isoSPI nibble 0x0 obyte 18 bit 3
+Invalid isoSPI nibble 0x0 on byte 18 bit 4
+InvalidisoSPI nibble 0x0 on byte 54 bit 2
+Invalid isoSPI nibble 0x0 on yte 18 bit 3
+Invalid isoSPI nibble 0x0 on byte 18 bit 4
+Invalid isoSPI nibble 0x0 on byte 18 bit 5
+Invalid isoSPI nibble 0x0 on byte 18 bit 6
+Invalid isoSPI nibble 0x0 on byte 18 bit 7
+Invalid isoSPI nibble 0x0 on byte 19 bit 0
+Invalid isoSPI nibble 0x0 on byte 19 bit 1
+Invalid isoSPI nibble 0x0 on byte 19 bit 2
+Invalid isoSPI nibble 0x0 on byte 19 bit 3
+Invalid isoSPI nibble 0x0 on byte 19 bit 4
+Invalid isoSPI nibble 0x0 on byte 19 bit 5
+Invalid isoSPI nibble 0x0 on byte 19 bit 6
+Invalid isoSPI nibble 0x0 on byte 19 bit 7
+Invalid isoSPI nibble 0x0 on byte 20 bit 0
+Invalid isoSPI nibble 0x0 on byte 20 bit 1
+Invalid isoSPI nibble 0x0 on byte 20 bit 2
+Invalid isoSPI nibble 0x0 on byte 20 bit 3
+Invalid isoSPI nibble 0x0 on byte 20 bit 4
+Invalid isoSPI nibble 0x0 on byte 20 bit 5
+Invalid isoSPI nibble 0x0 on byte 20 bit 6
+Invalid isoSPI nibble 0x0 on byte 20 bit 7
+Invalid isoSPI nibble 0x0 on byte 21 bit 0
+Invalid isoSPI nibble 0x0 on byte 21 bit 1
+Invalid isoSPI nibble 0x0 on byte 21 bit 2
+Invalid isoSPI nibble 0x0 on byte 21 bit 3
+Invalid isoSPI nibble 0x0 on byte 21 bit 4
+Invalid isoSPI nibble 0x0 on byte 21 bit 5
+Invalid isoSPI nibble 0x0 on byte 21 bit 6
+Invalid isoSPI nibble 0x0 on byte 21 bit 7
+Invalid isoSPI nibble 0x0 on byte 22 bit 0
+Invalid isoSPI nibble 0x0 on byte 22 bit 1
+Invalid isoSPI nibble 0x0 on byte 22 bit 2
+Invalid isoSPI nibble 0x0 on byte 22 bit 3
+Invalid isoSPI nibble 0x0 on byte 22 bit 4
+Invalid isoSPI nibble 0x0 on byte 22 bit 5
+Invalid isoSPI nibble 0x0 on byte 22 bit 6
+Invalid isoSPI nibble 0x0 on byte 22 bit 7
+Invalid isoSPI nibble 0x0 on byte 23 bit 0
+Invalid isoSPI nibble 0x0 on byte 23 bit 1
+Invalid isoSPI nibble 0x0 on byte 23 bit 2
+Invalid isoSPI nibble 0x0 on byte 23 bit 3
+Invalid isoSPI nibble 0x0 on byte 23 bit 4
+Invalid isoSPI nibble 0x0 on byte 23 bit 5
+Invalid isoSPI nibble 0x0 on byte 23 bit 6
+Invalid isoSPI nibble 0x0 on byte 23 bit 7
+Invalid isoSPI nibble 0x0 on byte 24 bit 0
+Invalid isoSPI nibble 0x0 on byte 24 bit 1
+Invalid isoSPI nibble 0x0 on byte 24 bit 2
+Invalid isoSPIte 26 bit 4
+Invalid isoSPI nibble 0x0 on byte 26 bit 5
+Invalid isoSPI nibble 0x0 on byte 26 bit 6
+Invalid isoSPI nibble 0x0 on byte 26 bit 7
+Invalid isoSPI nibble 0x0 on byte 27 bit 0
+Invalid isoSPI nibble 0x0 on byte 27 bit 1
+Invalid isoSPI nibble 0x0 on byte 27 bit 2
+Invalid isoSPI nibble 0x0 on byte 27 bit 3
+Invalid isoSPI nibble 0x0 on byte 27 bit 4
+Invalid isoSPI nibble 0x0 on byte 27 bit 5
+Invalid isoSPI nibble 0x0 on byte 27 bit 6
+Invalid isoSPI nibble 0x0 on byte 27 bit 7
+Invalid isoSPI nibble 0x0 on byte 28 bit 0
+Invalid isoSPI nibble 0x0 on byte 28 bit 1
+Invalid isoSPI nibble 0x0 on byte 28 bit 2
+Invalid isoSPI nibble 0x0 on byte 28 bit 3
+Invalid isoSPI nibble 0x0 on byte 28 bit 4
+Invalid isoSPI nibble 0x0 on byte 28 bit 5
+Invalid isoSPI nibble 0x0 on byte 28 bit 6
+Invalid isoSPI nibble 0x0 on byte 28 bit 7
+Invalid isoSPI nibble 0x0 on byte 29 bit 0
+Invalid isoSPI nibble 0x0 on byte 29 bit 1
+Invalid isoSPI nibble 0x0 on byte 29 bit 2
+Invalid isoSPI nibble 0x0 on byte 29 bit 3
+Invalid isoSPI nibble 0x0 on byte 29 bit 4
+Invalid isoSPI nibble 0x0 on byte 29 bit 5
+Invalid isoSPI nibble 0x0 on byte 29 bit 6
+Invalid isoSPI nibble 0x0 on byte 29 bit 7
+Invalid isoSPI nibble 0x0 on byte 30 bit 0
+Invalid isoSPI nibble 0x0 on byte 30 bit 1
+Invalid isoSPI nibble 0x0 on byte 30 bit 2
+Invalid isoSPI nibble 0x0 on byte 30 bit 3
+Invalid isoSPI nibble 0x0 on byte 30 bit 4
+Invalid isoSPI nibble 0x0 on byte 30 bit 5
+Invalid isoSPI nibble 0x0 on byte 30 bit 6
+Invalid isoSPI nibble 0x0 on byte 30 bit 7
+Invalid isoSPI nibble 0x0 on byte 31 bit 0
+Invalid isoSPI nibble 0x0 on byte 31 bit 1
+Invalid isoSPI nibble 0x0 on byte 31 bit 2
+Invalid isoSPI nibble 0x0 on byte 31 bit 3
+Invalid isoSPI nibble 0x0 on byte 31 bit 4
+Invalid isoSPI nibble 0x0 on byte 31 bit 5
+Invalid isoSPI nibble 0x0 on byte 31 bit 6
+Invalid isoSPI nibble 0x0 on byte 31 bit 7
+Invalid isoSPI nibble 0x0 on byte 32 bit 0
+Invalid isoSPI nibble 0x0 on byte 32 bit 1
+Invalid isoSPI nibble 0x0 on byte 32 bit 2
+Invalid isoSPI nibble 0x0 on byte 32 bit 3
+Invalid isoSPI nibble 0x0 on byte 32 bit 4
+Invalid isoSPI nibble 0x0 on byte 32 bit 5
+Invalid isoSPI nibble 0x0 on byte 32 bit 6
+Invalid isoSPI nibble 0x0 on byte 32 bit 7
+Invalid isoSPI nibble 0x0 on byte 33 bit 0
+Invalid isoSPI nibble 0x0 on byte 33 bit 1
+Invalid isoSPI nibble 0x0 on byte 33 bit 2
+Invalid isoSPI nibble 0x0 on byte 33 bit 3
+Invalid isoSPI nibble 0x0 on byte 33 bit 4
+Invalid isoSPI nibble 0x0 on byte 33 bit 5
+Invalid isoSPI nibble 0x0 on byte 33 bit 6
+Invalid isoSPI nibble 0x0 on byte 33 bit 7
+Invalid isoSPI nibble 0x0 on byte 34 bit 0
+Invalid isoSPI nibble 0x0 on byte 34 bit 1
+Invalid isoSPI nibble 0x0 on byte 34 bit 2
+Invalid isoSPI nibble 0x0 on byte 34 bit 3
+Invalid isoSPI nibble 0x0 on byte 34 bit 4
+Invalid isoSPI nibble 0x0 on byte 34 bit 5
+Invalid isoSPI nibble 0x0 on byte 34 bit 6
+Invalid isoSPI nibble 0x0 on byte 34 bit 7
+Invalid isoSPI nibble 0x0 on byte 35 bit 0
+Invalid isoSPI nibble 0x0 on byte 35 bit 1
+Invalid isoSPI nibble 0x0 on byte 35 bit 2
+Invalid isoSPI nibble 0x0 on byte 35 bit 3
+Invalid isoSPI nibble 0x0 on byte 35 bit 4
+Invalid isoSPI nibble 0x0 on byte 35 bit 5
+Invalid isoSPI nibble 0x0 on byte 35 bit 6
+Invalid isoSPI nibble 0x0 on byte 35 bit 7
+Invalid isoSPI nibble 0x0 on byte 36 bit 0
+Invalid isoSPI nibble 0x0 on byte 36 bit 1
+Invalid isoSPI nibble 0x0 on byte 36 bit 2
+Invalid isoSPI nibble 0x0 on byte 36 bit 3
+Invalid isoSPI nibble 0x0 on byte 36 bit 4
+Invalid isoSPI nibble 0x0 on byte 36 bit 5
+Invalid isoSPI nibble 0x0 on byte 36 bit 6
+Invalid isoSPI nibble 0x0 on byte 36 bit 7
+Invalid isoSPI nibble 0x0 on byte 37 bit 0
+Invalid isoSPI nibble 0x0 on byte 37 bit 1
+Invalid isoSPI nibble 0x0 on byte 37 bit 2
+Invalid isoSPI nibble 0x0 on byte 37 bit 3
+Invalid isoSPI nibble 0x0 on byte 37 bit 4
+Invalid isoSPI nibble 0x0 on byte 37 bit 5
+Invalid isoSPI nibble 0x0 on byte 37 bit 6
+Invalid isoSPI nibble 0x0 on byte 37 bit 7
+Invalid isoSPI nibble 0x0 on byte 38 bit 0
+Invalid isoSPI nibble 0x0 on byte 38 bit 1
+Invalid isoSPI nibble 0x0 on byte 38 bit 2
+Invalid isoSPI nibble 0x0 on byte 38 bit 3
+Invalid isoSPI nibble 0x0 on byte 38 bit 4
+Invalid isoSPI nibble 0x0 on byte 38 bit 5
+Invalid isoSPI nibble 0x0 on byte 38 bit 6
+Invalid isoSPI nibble 0x0 on byte 38 bit 7
+Invalid isoSPI nibble 0x0 on byte 39 bit 0
+Invalid isoSPI nibble 0x0 on byte 39 bit 1
+Invalid isoSPI nibble 0x0 on byte 39 bit 2
+Invalid isoSPI nibble 0x0 on byte 39 bit 3
+Invalid isoSPI nibble 0x0 on byte 39 bit 4
+Invalid isoSPI nibble 0x0 on byte 39 bit 5
+Invalid isoSPI nibble 0x0 on byte 39 bit 6
+Invalid isoSPI nibble 0x0 on byte 39 bit 7
+Invalid isoSPI nibble 0x0 on byte 40 bit 0
+Invalid isoSPI nibble 0x0 on byte 40 bit 1
+Invalid isoSPI nibble 0x0 on byte 40 bit 2
+Invalid isoSPI nibble 0x0 on byte 40 bit 3
+Invalid isoSPI nibble 0x0 on byte 40 bit 4
+Invalid isoSPI nibble 0x0 on byte 40 bit 5
+Invalid isoSPI nibble 0x0 on byte 40 bit 6
+Invalid isoSPI nibble 0x0 on byte 40 bit 7
+Invalid isoSPI nibble 0x0 on byte 41 bit 0
+Invalid isoSPI nibble 0x0 on byte 41 bit 1
+Invalid isoSPI nibble 0x0 on byte 41 bit 2
+Invalid isoSPI nibble 0x0 on byte on byte 65 bit 6
+Invalid isoSPI nibble 0x0 on byte 65 bit 7
+BMB3 bit 3
+Invalid isoSPI nibble 0x0 on byte 28 bit 4
+Invalid isoSPIte 44 bit 5
+Invalid isoSPI nibble 0x0 on byte 44 bit 6
+Invalid i bit 3
+Invalid isoSPI nibble 0x0 on byte 28 bit 4
+Invalid isoSPIte 49 bit 6
+Invalid isoSPI nibble 0x0 on byte 49 bit 7
+Invalid i bit 3
+Invalid isoSPI nibble 0x0 on byte 28 bit 4
+Invalid isoSPIte 55 bit 6
+Invalid isoSPI nibble 0x0 on byte 55 bit 7
+Invalid i bit 3
+Invalid isoSPI nibble 0x0 on byte 28 bit 4
+Invalid isoSPIe 28 bit 7
+Invalid isoSPI nibble 0x0 on byte 29 bit 0
+Invalid is
+Invalid isoSPI nibble 0x0 on byte 25 bit 4
+Invalid isoSPI nibbl6
+Invalid isoSPI nibble 0x0 on byte 9 bit 7
+Invalid isoSPI nibblbyte 18 bit 3
+Invalid isoSPI nibble 0x0 on byte 18 bit 4
+InvalidisoSPI nibble 0x0 on byte 54 bit 1
+Invalid isoSPI nibble 0x0 on yte 18 bit 3
+Invalid isoSPI nibble 0x0 on byte 18 bit 4
+Invalid isoSPI nibble 0x0 on byte 18 bit 5
+Invalid isoSPI nibble 0x0 on byte 18 bit 6
+Invalid isoSPI nibble 0x0 on byte 18 bit 7
+Invalid isoSPI nibble 0x0 on byte 19 bit 0
+Invalid isoSPI nibble 0x0 on byte 19 bit 1
+Invalid isoSPI nibble 0x0 on byte 19 bit 2
+Invalid isoSPI nibble 0x0 on byte 19 bit 3
+Invalid isoSPI nibble 0x0 on byte 19 bit 4
+Invalid isoSPI nibble 0x0 on byte 19 bit 5
+Invalid isoSPI nibble 0x0 on byte 19 bit 6
+Invalid isoSPI nibble 0x0 on byte 19 bit 7
+Invalid isoSPI nibble 0x0 on byte 20 bit 0
+Invalid isoSPI nibble 0x0 on byte 20 bit 1
+Invalid isoSPI nibble 0x0 on byte 20 bit 2
+Invalid isoSPI nibble 0x0 on byte 20 bit 3
+Invalid isoSPI nibble 0x0 on byte 20 bit 4
+Invalid isoSPI nibble 0x0 on byte 20 bit 5
+Invalid isoSPI nibble 0x0 on byte 20 bit 6
+Invalid isoSPI nibble 0x0 on byte 20 bit 7
+Invalid isoSPI nibble 0x0 on byte 21 bit 0
+Invalid isoSPI nibble 0x0 on byte 21 bit 1
+Invalid isoSPI nibble 0x0 on byte 21 bit 2
+Invalid isoSPI nibble 0x0 on byte 21 bit 3
+Invalid isoSPI nibble 0x0 on byte 21 bit 4
+Invalid isoSPI nibble 0x0 on byte 21 bit 5
+Invalid isoSPI nibble 0x0 on byte 21 bit 6
+Invalid isoSPI nibble 0x0 on byte 21 bit 7
+Invalid isoSPI nibble 0x0 on byte 22 bit 0
+Invalid isoSPI nibble 0x0 on byte 22 bit 1
+Invalid isoSPI nibble 0x0 on byte 22 bit 2
+Invalid isoSPI nibble 0x0 on byte 22 bit 3
+Invalid isoSPI nibble 0x0 on byte 22 bit 4
+Invalid isoSPI nibble 0x0 on byte 22 bit 5
+Invalid isoSPI nibble 0x0 on byte 22 bit 6
+Invalid isoSPI nibble 0x0 on byte 22 bit 7
+Invalid isoSPI nibble 0x0 on byte 23 bit 0
+Invalid isoSPI nibble 0x0 on byte 23 bit 1
+Invalid isoSPI nibble 0x0 on byte 23 bit 2
+Invalid isoSPI nibble 0x0 on byte 23 bit 3
+Invalid isoSPI nibble 0x0 on byte 23 bit 4
+Invalid isoSPI nibble 0x0 on byte 23 bit 5
+Invalid isoSPI nibble 0x0 on byte 23 bit 6
+Invalid isoSPI nibble 0x0 on byte 23 bit 7
+Invalid isoSPI nibble 0x0 on byte 24 bit 0
+Invalid isoSPI nibble 0x0 on byte 24 bit 1
+Invalid isoSPI nibble 0x0 on byte 24 bit 2
+Invalid isoSPI nibble 0x0 on byte 25 bit 2
+Invalid isoSPI nibble 0x0 on byte 2te 26 bit 4
+Invalid isoSPI nibble 0x0 on byte 26 bit 5
+Invalid i

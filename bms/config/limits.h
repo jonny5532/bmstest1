@@ -50,6 +50,53 @@
 #endif
 
 
+// PCB revision selection (orthogonal to the pack profile above)
+
+#define BMS_BOARD_REV0 1
+#define BMS_BOARD_REV1 2
+
+#ifndef BMS_BOARD
+#define BMS_BOARD BMS_BOARD_REV0
+#endif
+
+#if BMS_BOARD == BMS_BOARD_REV1
+// Rev1 adds a second ADS1115 (0x49) sensing the Link and Drive Unit rails
+#define HAS_ADS1115_SECONDARY 1
+// Rev1's default contactor arrangement precharges via the FC negative contactor
+#ifndef PRECHARGE_ON_NEGATIVE
+#define PRECHARGE_ON_NEGATIVE 1
+#endif
+// Rev1 uses 501:1 dividers (12M/24k): 501 * 1.024/32768 V per count
+#define ADS1115_DEFAULT_MUL 0.015656f
+// Isolation monitor zero (ADC counts with the pack floating), measured on ck0
+// with the contactors open; no temperature drift measured yet
+#define ISOLATION_ZERO_DEFAULT_COUNTS 13317.0f
+#define ISOLATION_ZERO_TEMPCO_COUNTS_PER_DC 0.0f
+#elif BMS_BOARD == BMS_BOARD_REV0
+// Rev0 divider ratio is ~416:1
+#define ADS1115_DEFAULT_MUL 0.013f
+// Isolation monitor zero from the original Rev0 calibration, with its drift
+#define ISOLATION_ZERO_DEFAULT_COUNTS 22496.4f
+#define ISOLATION_ZERO_TEMPCO_COUNTS_PER_DC 0.28f
+#else
+    #error "Unsupported BMS_BOARD"
+#endif
+
+// Isolation monitor, all boards. The divider ratio is derived at run time from
+// the battery voltage and the channel span, so only the zero needs calibrating.
+#define ISOLATION_ZERO_CAL_TEMP_DC 285.0f       // temperature the zero is referred to
+#define ISOLATION_DIVIDER_BOTTOM_OHMS 24000.0f  // bottom resistor of each HV divider
+#define ISOLATION_RESISTANCE_CAP_OHMS 100e6f    // report at most 100 Mohm
+#define ISOLATION_MIN_SPAN_COUNTS 100.0f        // below this the channels are unusable
+#define ISOLATION_MIN_BATTERY_V 20.0f
+// Automatic zero check at boot (see isolation_autozero_step)
+#define ISOLATION_AUTOZERO_SETTLE_MS 3000        // contactors open this long before averaging
+#define ISOLATION_AUTOZERO_WINDOW_MS 3000        // averaging period
+#define ISOLATION_AUTOZERO_MAX_NOISE_COUNTS 40.0f // midpoint must stay within this band
+#define ISOLATION_AUTOZERO_MAX_STEP_COUNTS 150.0f // larger offsets are treated as a leak
+#define ISOLATION_AUTOZERO_BLEND 0.5f            // fraction of the offset taken per boot
+
+
 // TODO - derate voltage limits based on temperature
 
 #if CHEMISTRY == LFP
@@ -230,6 +277,13 @@
 // must wait this long to ensure it isn't using pre-precharge readings.
 #define CURRENT_STALE_THRESHOLD_MS 800
 
+// Current sampling is briefly paused (~1.2s worst case between samples) every
+// ~53s while the INA228 takes a shunt temperature measurement, so fault/
+// readiness checks must tolerate a longer gap. The contactor logic keeps the
+// tight threshold above; it never sees the pause because temperature
+// measurements are deferred unless the contactors are settled.
+#define CURRENT_STALE_FAULT_THRESHOLD_MS 1500
+
 #define TEMPERATURE_STALE_THRESHOLD_MS(model) (  \
     (model)->cell_voltage_slow_mode ?              \
         CELL_TEMPERATURE_STALE_THRESHOLD_SLOW_MS  \
@@ -276,9 +330,28 @@
 #define CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV 2000
 // Min voltage across a contactor to consider it open
 #define CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV 3000 // was 5000
+// An inverter can keep its battery port energized while the contactors are open
+// (Deye HV). Output at or above this fraction of the battery voltage with both
+// contactors commanded open means "energized from outside", not welded: the
+// weld test is skipped for that start and the BMS precharges onto the port.
+// See docs/contactor-test-energized-port.md.
+#define CONTACTORS_PORT_ENERGIZED_FRACTION 0.8f
+#if BMS_BOARD == BMS_BOARD_REV1
+// Rev1 measures directly across the pos (Link Positive) contactor, so the
+// tight generic thresholds apply
+#define CONTACTORS_POS_CLOSED_VOLTAGE_THRESHOLD_MV 2000
+#define CONTACTORS_POS_OPEN_VOLTAGE_THRESHOLD_MV 3000
+// Max discrepancy between battery and link voltage while closed (measured by
+// two different ADCs which may be independently [un]calibrated)
+#define CONTACTORS_LINK_MISMATCH_THRESHOLD_MV 16000
+// Max sustained drop across the F4 fuse/jumper (while current is flowing)
+// before warning that it may have blown
+#define FUSE_DROP_WARNING_THRESHOLD_MV 10000
+#else
 // Pos contactor has wider tolerances due to the way it is measured
 #define CONTACTORS_POS_CLOSED_VOLTAGE_THRESHOLD_MV 5000
 #define CONTACTORS_POS_OPEN_VOLTAGE_THRESHOLD_MV 10000
+#endif
 
 
 // Precharge thresholds
@@ -296,6 +369,11 @@
 #define PRECHARGE_SUCCESS_MAX_MA 225
 // Maximum voltage difference to consider precharge successful (allowing for uncalibrated contactors)
 #define PRECHARGE_SUCCESS_MAX_MV 16000
+#if BMS_BOARD == BMS_BOARD_REV1
+// Rev1 also senses the link rail directly, so the voltage across the PTC + FC
+// negative contactor path (link vs output) can be held to a tighter limit
+#define PRECHARGE_SUCCESS_LINK_MAX_MV 8000
+#endif
 
 
 // Contactor opening thresholds

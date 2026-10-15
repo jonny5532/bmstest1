@@ -77,6 +77,17 @@ bool check_precharge_successful(const bms_model_t *model, bool log_errors) {
         return false;
     }
 
+#if BMS_BOARD == BMS_BOARD_REV1
+    if(!check_or_confirm(
+        millis_recent_enough(model->high_voltages.link_millis, CONTACTOR_VOLTAGE_STALE_THRESHOLD_MS),
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
+        0x5000000000000000
+    )) {
+        return false;
+    }
+#endif
+
     if(!check_or_confirm(
         fabsf(model->high_voltages.neg_contactor) <= (CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV * 0.001f),
         log_errors,
@@ -96,12 +107,26 @@ bool check_precharge_successful(const bms_model_t *model, bool log_errors) {
         return false;
     }
 
+#if BMS_BOARD == BMS_BOARD_REV1
+    // Is the voltage across the PTC + FC negative contactor path (link vs
+    // output) low enough? This is a direct measurement, so can be tighter than
+    // the battery-vs-output check below.
+    if(!check_or_confirm(
+        fabsf(model->high_voltages.link - model->high_voltages.output) <= (PRECHARGE_SUCCESS_LINK_MAX_MV * 0.001f),
+        log_errors,
+        ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
+        ((uint64_t)(uint32_t)(int32_t)(model->high_voltages.link * 1000) << 32) | (uint32_t)(int32_t)(model->high_voltages.output * 1000)
+    )) {
+        return false;
+    }
+#endif
+
     // Is voltage difference low enough?
     return check_or_confirm(
         fabsf(model->high_voltages.battery - model->high_voltages.output) <= (PRECHARGE_SUCCESS_MAX_MV * 0.001f),
         log_errors,
         ERR_CONTACTOR_PRECHARGE_VOLTAGE_TOO_HIGH,
-        ((uint64_t)(model->high_voltages.battery * 1000) << 32) | (uint32_t)(model->high_voltages.output * 1000)
+        ((uint64_t)(uint32_t)(int32_t)(model->high_voltages.battery * 1000) << 32) | (uint32_t)(int32_t)(model->high_voltages.output * 1000)
     );
 }
 
@@ -262,10 +287,65 @@ bool confirm_contactors_staying_closed(const bms_model_t *model) {
         ) && ret;
     }
 
+#if BMS_BOARD == BMS_BOARD_REV1
+    // With direct link sensing, the link rail should track the battery voltage
+    // while both link contactors are closed. A large mismatch means one of
+    // them has dropped out.
+    if(confirm(
+        millis_recent_enough(model->high_voltages.link_millis, CONTACTOR_VOLTAGE_STALE_THRESHOLD_MS)
+        && millis_recent_enough(model->high_voltages.battery_millis, BATTERY_VOLTAGE_STALE_THRESHOLD_MS),
+        ERR_LINK_VOLTAGE_MISMATCH,
+        0x3000000000000000
+    )) {
+        ret = confirm(
+            fabsf(model->high_voltages.battery - model->high_voltages.link) <= (CONTACTORS_LINK_MISMATCH_THRESHOLD_MV * 0.001f),
+            ERR_LINK_VOLTAGE_MISMATCH,
+            ((uint64_t)(model->high_voltages.battery * 1000) << 32) | (uint32_t)(model->high_voltages.link * 1000)
+        ) && ret;
+    }
+#endif
+
     // TODO - check for voltage diference between battery and output?
     // or check for voltage across precharge?
 
     return ret;
+}
+
+// An inverter can hold its battery port at about pack voltage while our
+// contactors are open (a Deye HV keeps an enabled battery port energized). A
+// single welded contactor can't put that voltage across the output with the
+// other one open, so this means "energized from outside", not "welded".
+static bool output_energized_externally(const bms_model_t *model) {
+    if(!millis_recent_enough(model->high_voltages.output_millis, OUTPUT_VOLTAGE_STALE_THRESHOLD_MS) ||
+       !millis_recent_enough(model->high_voltages.battery_millis, BATTERY_VOLTAGE_STALE_THRESHOLD_MS)) {
+        return false;
+    }
+    return model->high_voltages.battery > 0.0f &&
+           fabsf(model->high_voltages.output) >= model->high_voltages.battery * CONTACTORS_PORT_ENERGIZED_FRACTION;
+}
+
+// Called where the self-test checks that both contactors are open. If the port
+// is energized from outside, the "open" checks can't be trusted, and the port
+// won't go dead while the inverter holds it (a Deye keeps it at about pack
+// voltage - 3 V for as long as the BMS is on CAN). Skip the weld test for this
+// start and precharge onto the port: precharge still has to succeed (small
+// voltage difference, little current) before the main contactors close.
+static bool hot_join_energized_port(bms_model_t *model) {
+    contactors_sm_t *contactor_sm = &(model->contactor_sm);
+    if(!output_energized_externally(model)) {
+        return false;
+    }
+    count_bms_event(ERR_CONTACTOR_PORT_ENERGIZED, (uint64_t)(int64_t)(model->high_voltages.output * 1000));
+    debug_printf("Output %1.1f V with contactors open: port energized externally, skipping weld test\n",
+                 model->high_voltages.output);
+    // The "still closed" check accepts a pos contactor reading below half of
+    // this. On a dead port the test stores about the pack voltage here; the
+    // energized-port reading is only a few volts (and can carry the channel's
+    // offset), which would make a closed contactor look open, so use the
+    // battery voltage the normal path would have seen.
+    contactor_sm->pre_close_pos_contactor_voltage = model->high_voltages.battery;
+    state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_PRECHARGING_INIT);
+    return true;
 }
 
 void contactor_sm_tick(bms_model_t *model) {
@@ -340,6 +420,22 @@ void contactor_sm_tick(bms_model_t *model) {
                 contactor_sm->enable_current = true;
             }
 
+#if BMS_BOARD == BMS_BOARD_REV1
+            // Diagnostic only: with contactors closed and current flowing, a
+            // sustained voltage drop across the F4 fuse/jumper suggests it has
+            // blown or the drive-unit connection is open.
+            if(state_timeout((sm_t*)contactor_sm, 2000)
+                && millis_recent_enough(model->high_voltages.fuse_drop_millis, CONTACTOR_VOLTAGE_STALE_THRESHOLD_MS)
+                && millis_recent_enough(model->current_millis, CURRENT_STALE_THRESHOLD_MS)
+                && abs_int32(model->current_mA) > CONTACTORS_INSTANT_OPEN_MA) {
+                confirm(
+                    fabsf(model->high_voltages.fuse_drop) <= (FUSE_DROP_WARNING_THRESHOLD_MV * 0.001f),
+                    ERR_FUSE_VOLTAGE_DROP_HIGH,
+                    (int32_t)(model->high_voltages.fuse_drop * 1000)
+                );
+            }
+#endif
+
             if(try_to_open) {
                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_AWAITING_OPEN);
             } else if(model->contactor_req == CONTACTORS_REQUEST_CLOSE) {
@@ -381,7 +477,9 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(false, false, false);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(confirm_contactor_pos_and_neg_seems_open(model)) {
+                if(hot_join_energized_port(model)) {
+                    // port energized from outside: weld test skipped, precharging
+                } else if(confirm_contactor_pos_and_neg_seems_open(model)) {
                     // passed
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_NEG_CLOSED);
                 } else {
@@ -422,7 +520,9 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_set_pos_pre_neg(false, false, false);
 
             if(state_timeout((sm_t*)contactor_sm, CONTACTORS_TEST_WAIT_MS)) {
-                if(confirm_contactor_pos_and_neg_seems_open(model)) {
+                if(hot_join_energized_port(model)) {
+                    // port energized from outside: weld test skipped, precharging
+                } else if(confirm_contactor_pos_and_neg_seems_open(model)) {
                     // all tests passed
                     // store pre-close voltage reading for later comparison
                     contactor_sm->pre_close_pos_contactor_voltage = model->high_voltages.pos_contactor;
