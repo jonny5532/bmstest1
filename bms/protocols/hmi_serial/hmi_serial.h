@@ -89,6 +89,21 @@
 #define HMI_REG_HARD_CHARGE_CURRENT_LIMIT_DA            54 // uint16 (0.1A)
 #define HMI_REG_HARD_DISCHARGE_CURRENT_LIMIT_DA         55 // uint16 (0.1A)
 
+#define HMI_REG_LINK_VOLTAGE           56 // int32 (mV), rev1 boards only
+
+#define HMI_REG_SHUNT_DIE_TEMP         57 // float (C), INA228 internal temperature
+#define HMI_REG_SHUNT_NTC_TEMP         58 // float (C), external shunt NTC temperature
+#define HMI_REG_SHUNT_NTC_RESISTANCE   59 // float (ohms), for NTC calibration
+
+#define HMI_REG_ISOLATION_POS_RAW      60 // float (ADC counts), battery+ isolation channel
+#define HMI_REG_ISOLATION_NEG_RAW      61 // float (ADC counts), battery- isolation channel
+#define HMI_REG_ISOLATION_RESISTANCE   62 // float (ohms), leakage estimate; live with contactors open, else the last open reading
+#define HMI_REG_PACK_POS_TO_CHASSIS    63 // float (V), battery+ relative to chassis
+#define HMI_REG_PACK_NEG_TO_CHASSIS    64 // float (V), battery- relative to chassis
+#define HMI_REG_ISOLATION_CHECK_AGE    65 // float (s) since the resistance was measured; 0 = live, NAN = not yet this boot
+#define HMI_REG_BOARD_REVISION         66 // uint16, PCB revision from the strap: major*10+minor (Rev1.3 = 13), 0 = Rev0, 0xFFFF = unknown
+#define HMI_REG_BOARD_STRAP_COUNTS     67 // float (12-bit ADC counts), revision strap reading with no pulls
+
 
 #define HMI_REG_CELL_VOLTAGES_START 0x100
 #define HMI_REG_CELL_VOLTAGES_END   0x1FF
