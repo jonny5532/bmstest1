@@ -83,7 +83,7 @@ static void update_balance_requests(balancing_sm_t *balancing_sm, int16_t decrem
 
                 if (balancing_sm->balance_time_remaining[logical_index] > 0 && !is_physically_adjacent) {
                     balancing_sm->balance_time_remaining[logical_index] -= decrement;
-                    balancing_sm->balance_request_mask[logical_index / 32] |= (1 << (logical_index % 32));
+                    balancing_sm->balance_request_mask[logical_index / 32] |= (1u << (logical_index % 32));
                     any_balancing = true;
                     last_balancing_physical_index = physical_index;
                 }
@@ -153,7 +153,7 @@ static bool start_balancing(bms_model_t *model) {
 
     // Temporary higher-res storage
     uint32_t balance_time_remaining[120];
-    int32_t max_balance_time = 0;
+    uint32_t max_balance_time = 0;
 
     // Set balance times based on how far above minimum voltage each cell is
 
@@ -179,6 +179,7 @@ static bool start_balancing(bms_model_t *model) {
         }
     }
 
+    balancing_sm->pause_counter = 0;
     update_balance_requests(balancing_sm, 0, false);
 
     return true;
@@ -236,6 +237,8 @@ void balancing_sm_tick(bms_model_t *model) {
             if(state_timeout((sm_t*)balancing_sm, model->auto_balancing_period_ms) && good_conditions_for_balancing(model)) {
                 // Start balancing
                 if(start_balancing(model)) {
+                    // Start the pause cadence fresh each session
+                    balancing_sm->pause_counter = 0;
                     state_transition((sm_t*)balancing_sm, BALANCING_STATE_ACTIVE);
                 }
             }

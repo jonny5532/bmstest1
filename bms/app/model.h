@@ -8,6 +8,7 @@
 #include "app/estimators/ekf.h"
 #include "config/limits.h"
 #include "lib/math.h"
+#include "shared/supervisor_protocol.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -69,6 +70,16 @@ typedef struct {
     uint16_t minimum_balancing_voltage_mV; // Minimum cell voltage to allow balancing
     uint16_t balancing_start_voltage_mV;   // Start balancing when highest cell reaches this voltage
 
+    // Rev1 board calibration (appended at the end to preserve the NVM layout;
+    // these default to zero on older saves and rev0 boards)
+    float pos_contactor_offset_mV; // offset for the direct pos contactor channel
+    float link_voltage_mul;
+    float fuse_drop_mul;
+
+    // Isolation monitor zero in ADC counts, referred to ISOLATION_ZERO_CAL_TEMP_DC
+    // (appended; zero on older saves means "use the board default")
+    float isolation_zero_ref_counts;
+
 } bms_model_persistent_slow_t;
 
 static const uint32_t BMS_MODEL_PERSISTENT_SLOW_VERSION = 2;
@@ -97,6 +108,27 @@ typedef struct high_voltages {
     float neg_contactor;
     float neg_contactor_deviation;
     millis_t neg_contactor_millis;
+
+    // Rev1 boards only (second ADS1115): these stay zero/stale on rev0
+    // Link rail voltage (Link+ to Link-)
+    float link;
+    float link_deviation;
+    millis_t link_millis;
+    // Voltage drop across the F4 fuse / drive-unit jumper (OutPos - LinkPos)
+    float fuse_drop;
+    float fuse_drop_deviation;
+    millis_t fuse_drop_millis;
+    // Isolation monitor (see app/isolation.h): raw ADC counts of the battery+
+    // and battery- channels, the pack terminals relative to chassis, and the
+    // leakage estimate (ohms, capped at 100 Mohm; NAN unless contactors are open).
+    float isolation_pos_raw;
+    float isolation_neg_raw;
+    float pack_pos_to_chassis;
+    float pack_neg_to_chassis;
+    float isolation_resistance_ohms;   // live with contactors open, else the last open reading
+    millis_t isolation_millis;
+    float isolation_open_resistance_ohms; // last reading with the contactors open (NAN = none yet)
+    millis_t isolation_open_millis;       // when it was taken (0 = never)
 } high_voltages_t;
 
 typedef struct inverter_outputs {
@@ -143,6 +175,14 @@ typedef struct bms_model {
     float temperature_min;
     float temperature_max;
     millis_t temperature_millis;
+
+    // Shunt temperature measurements (via the INA228: internal die temp, and
+    // the external shunt NTC sensed through the VBUS pin)
+    float shunt_die_temperature; // degrees C
+    millis_t shunt_die_temperature_millis;
+    float shunt_ntc_temperature; // degrees C
+    float shunt_ntc_resistance_ohms;
+    millis_t shunt_ntc_millis;
 
     high_voltages_t high_voltages;
     // float battery_voltage;
@@ -277,11 +317,27 @@ typedef struct bms_model {
     // Whether we should ignore a potential loop overrun at the end of this tick
     // (eg, due to a slow flash write). This is reset each tick.
     bool ignore_missed_deadline;
-    
-  
+    bool isolation_zero_cal_pending; // set by the system SM, done in read_inputs()
+
+    // PCB revision detected from the strap at boot (app/board_id.h)
+    uint16_t board_id;
+    float board_id_counts;
+
+    // Last reply from the supervisor (protocols/internal_serial)
+    sup_reply_t supervisor;
+    millis_t supervisor_millis; // when it arrived (0 = never)
+
 } bms_model_t;
 
 extern bms_model_t model;
+
+// Whether the supervisor is currently enabling the contactor drivers (CTR_EN).
+// Without that the contactors can't close, whatever the BMS drives.
+static inline bool supervisor_contactors_enabled(const bms_model_t *model) {
+    return millis_recent_enough(model->supervisor_millis, SUPERVISOR_REPLY_STALE_MS)
+        && model->supervisor.version == SUP_PROTOCOL_VERSION
+        && model->supervisor.state == SUP_STATE_ON;
+}
 
 void model_tick(bms_model_t *model);
 void store_cell_voltage(uint8_t logical_index, int16_t voltage_mV);

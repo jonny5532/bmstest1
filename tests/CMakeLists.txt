@@ -35,6 +35,23 @@ target_include_directories(test_contactors PRIVATE
 
 add_test(NAME test_contactors COMMAND ${MEMORY_CHECK} test_contactors)
 
+# Rev1 board variant (dual ADS1115, precharge on negative FC contactor)
+add_executable(test_contactors_rev1
+    test_contactors.c 
+    ../bms/sys/events/events.c
+    ../bms/app/state_machines/contactors.c 
+    ../bms/app/state_machines/base.c
+)
+target_compile_definitions(test_contactors_rev1 PRIVATE BMS_BOARD=2)
+target_link_libraries(test_contactors_rev1 PRIVATE cmocka)
+target_include_directories(test_contactors_rev1 PRIVATE 
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_contactors_rev1 COMMAND ${MEMORY_CHECK} test_contactors_rev1)
+
 add_executable(test_low_voltage
     test_low_voltage.c
     physical_model.c
@@ -206,8 +223,74 @@ target_include_directories(test_events_detailed PRIVATE
 
 add_test(NAME test_events_detailed COMMAND ${MEMORY_CHECK} test_events_detailed)
 
+add_executable(test_logging
+    test_logging.c
+    ../bms/sys/logging/logging.c
+)
+target_link_libraries(test_logging PRIVATE cmocka)
+target_include_directories(test_logging PRIVATE 
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_logging COMMAND ${MEMORY_CHECK} test_logging)
+
 add_custom_target(coverage
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/coverage_report.sh ${CMAKE_CURRENT_BINARY_DIR}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Run built tests and generate gcov coverage summary"
 )
+
+# Supervisor link, cell map and enable logic, for each pack profile
+foreach(profile IN ITEMS 1 2 3)
+    add_executable(test_supervisor_${profile}
+        test_supervisor.c
+        ../bms/shared/cell_map.c
+        ../bms/shared/supervisor_protocol.c
+        ../bms/drivers/bmb3y/crc.c
+        ../supervisor/cell_snoop.c
+        ../supervisor/supervisor_logic.c
+    )
+    target_compile_definitions(test_supervisor_${profile} PRIVATE BMS_PROFILE=${profile})
+    target_link_libraries(test_supervisor_${profile} PRIVATE cmocka)
+    target_include_directories(test_supervisor_${profile} PRIVATE
+        ${cmocka_SOURCE_DIR}/include
+        include
+        ../bms
+        ../supervisor
+    )
+    add_test(NAME test_supervisor_${profile} COMMAND ${MEMORY_CHECK} test_supervisor_${profile})
+endforeach()
+
+foreach(board_suffix IN ITEMS "" "_rev1")
+    add_executable(test_isolation${board_suffix}
+        test_isolation.c
+        ../bms/app/isolation.c
+    )
+    if(board_suffix STREQUAL "_rev1")
+        target_compile_definitions(test_isolation${board_suffix} PRIVATE BMS_BOARD=2)
+    endif()
+    target_link_libraries(test_isolation${board_suffix} PRIVATE cmocka m)
+    target_include_directories(test_isolation${board_suffix} PRIVATE
+        ${cmocka_SOURCE_DIR}/include
+        include
+        ../bms
+    )
+    add_test(NAME test_isolation${board_suffix} COMMAND ${MEMORY_CHECK} test_isolation${board_suffix})
+
+    add_executable(test_board_id${board_suffix}
+        test_board_id.c
+        ../bms/app/board_id.c
+    )
+    if(board_suffix STREQUAL "_rev1")
+        target_compile_definitions(test_board_id${board_suffix} PRIVATE BMS_BOARD=2)
+    endif()
+    target_link_libraries(test_board_id${board_suffix} PRIVATE cmocka m)
+    target_include_directories(test_board_id${board_suffix} PRIVATE
+        ${cmocka_SOURCE_DIR}/include
+        include
+        ../bms
+    )
+    add_test(NAME test_board_id${board_suffix} COMMAND ${MEMORY_CHECK} test_board_id${board_suffix})
+endforeach()

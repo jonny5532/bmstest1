@@ -1,0 +1,104 @@
+.0C (0 ohm)
+Batt: 58.543V (0.020) | Out:  0.045V (0.065) | NegCtr: -8.946V (0.035) | PosCtr: 50.668V (0.135)
+Link: -0.018V (0.068) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -1 mC | SoC: 82.25 % | SoC(VB): 69.64 % | SoC(BC): 99.99 % | SoC(FC): 12.34 %
+Current filtered: -0.990124 mA (0.156924)
+CV: 144.0/504.0 A | W: 30.0 A | T: 49.4/59.4 A | Inv. min: 49.5 V | Inv. max: 60.7 V
+
+midpoint is 13493.4 | Vpos: -1.069 V | Vneg: 1.185 V | Riso: -4.74 Mohm
+Updating balance requests took 10 us
+Balance mask now: 00000000 00000000 00000000 00000080
+[2J[H[c  0]: 3909 mV | [c  1]: 3916 mV | [c  2]: 3875 mV | [c  3]: 3915 mV | [c  4]: 3908 mV | 
+[c  5]: 3916 mV | [c  6]: 3876 mV | [c  7]: 3917 mV | [c  8]: 3914 mV | [c  9]: 3878 mV | 
+[c 10]: 3915 mV | [c 11]: 3912 mV | [c 12]: 3912 mV | [c 13]: 3912 mV | [c 14]: 3912 mV | 
+Total: 58587mV | Temps: 24.8C - 24.8C | Delta: 4 mV  | Balancing
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+MCU: 328 dC | 3V3: 3273 mV | 5V: 5223 mV | 12V: 13214 mV | CtrV: 13457 mV
+ModTemps: [0]=24.8C | ShuntDie: 0.0C | ShuntNTC: 0.0C (0 ohm)
+Batt: 58.543V (0.029) | Out:  0.045V (0.059) | NegCtr: -8.945V (0.039) | PosCtr: 50.673V (0.132)
+Link: -0.019V (0.062) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -2 mC | SoC: 82.25 % | SoC(VB): 69.64 % | SoC(BC): 68.74 % | SoC(FC): 12.34 %
+Current filtered: -0.985223 mA (0.227015)
+CV: 144.0/504.0 A | W: 30.0 A | T: 49.6/59.6 A | Inv. min: 49.5 V | Inv. max: 60.7 V
+
+midpoint is 13493.4 | Vpos: -1.069 V | Vneg: 1.185 V | Riso: -4.74 Mohm
+Updating balance requests took 8 us
+Balance mask now: 00000000 00000000 00000000 00000000
+6371ms [balancing] state 1->0
+Received command: ''
+Executing command: ''
+[2J[H[c  0]: 3909 mV | [c  1]: 3912 mV | [c  2]: 3911 mV | [c  3]: 3912 mV | [c  4]: 3908 mV | 
+[c  5]: 3912 mV | [c  6]: 3915 mV | [c  7]: 3877 mV | [c  8]: 3914 mV | [c  9]: 3911 mV | 
+[c 10]: 3912 mV | [c 11]: 3912 mV | [c 12]: 3912 mV | [c 13]: 3912 mV | [c 14]: 3912 mV | 
+Total: 58641mV | Temps: 24.9C - 24.9C | Delta: 4 mV  | Balancing
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+MCU: 330 dC | 3V3: 3273 mV | 5V: 5223 mV | 12V: 13213 mV | CtrV: 13457 mV
+ModTemps: [0]=24.9C | ShuntDie: 0.0C | ShuntNTC: 0.0C (0 ohm)
+Batt: 58.544V (0.049) | Out:  0.044V (0.063) | NegCtr: -8.945V (0.042) | PosCtr: 50.683V (0.152)
+Link: -0.020V (0.068) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -2 mC | SoC: 82.25 % | SoC(VB): 69.64 % | SoC(BC): 68.74 % | SoC(FC): 12.34 %
+Current filtered: -0.975395 mA (0.370582)
+CV: 144.0/504.0 A | W: 30.0 A | T: 49.8/59.8 A | Inv. min: 49.5 V | Inv. max: 60.7 V
+
+midpoint is 13493.4 | Vpos: -1.069 V | Vneg: 1.185 V | Riso: -4.74 Mohm
+Updating balance requests took 8 us
+Balance mask now: 00000000 00000000 00000000 00000000
+7668ms [balancing] state 0->1
+[2J[H[c  0]: 3909 mV | [c  1]: 3912 mV | [c  2]: 3911 mV | [c  3]: 3912 mV | [c  4]: 3908 mV | 
+[c  5]: 3912 mV | [c  6]: 3911 mV | [c  7]: 3912 mV | [c  8]: 3912 mV | [c  9]: 3912 mV | 
+[c 10]: 3912 mV | [c 11]: 3912 mV | [c 12]: 3912 mV | [c 13]: 3912 mV | [c 14]: 3912 mV | 
+Total: 58671mV | Temps: 24.9C - 24.9C | Delta: 4 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+MCU: 330 dC | 3V3: 3273 mV | 5V: 5223 mV | 12V: 13214 mV | CtrV: 13457 mV
+ModTemps: [0]=24.9C | ShuntDie: 0.0C | ShuntNTC: 0.0C (0 ohm)
+Batt: 58.545V (0.071) | Out:  0.043V (0.056) | NegCtr: -8.945V (0.036) | PosCtr: 50.694V (0.151)
+Link: -0.021V (0.062) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -2 mC | SoC: 82.25 % | SoC(VB): 69.64 % | SoC(BC): 68.74 % | SoC(FC): 12.34 %
+Current filtered: -0.965787 mA (0.457008)
+CV: 144.0/504.0 A | W: 30.0 A | T: 49.8/59.8 A | Inv. min: 49.5 V | Inv. max: 60.7 V
+
+midpoint is 13493.4 | Vpos: -1.069 V | Vneg: 1.185 V | Riso: -4.74 Mohm
+Updating balance requests took 8 us
+Balance mask now: 00000000 00000000 00000000 00000000
+8971ms [balancing] state 1->0
+[2J[H[c  0]: 3909 mV | [c  1]: 3912 mV | [c  2]: 3912 mV | [c  3]: 3911 mV | [c  4]: 3908 mV | 
+[c  5]: 3912 mV | [c  6]: 3912 mV | [c  7]: 3912 mV | [c  8]: 3912 mV | [c  9]: 3912 mV | 
+[c 10]: 3912 mV | [c 11]: 3912 mV | [c 12]: 3912 mV | [c 13]: 3912 mV | [c 14]: 3912 mV | 
+Total: 58672mV | Temps: 24.9C - 24.9C | Delta: 4 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+MCU: 330 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13214 mV | CtrV: 13457 mV
+ModTemps: [0]=24.9C | ShuntDie: 0.0C | ShuntNTC: 0.0C (0 ohm)
+Batt: 58.546V (0.076) | Out:  0.042V (0.063) | NegCtr: -8.945V (0.037) | PosCtr: 50.710V (0.147)
+Link: -0.022V (0.068) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -3 mC | SoC: 82.25 % | SoC(VB): 69.64 % | SoC(BC): 68.74 % | SoC(FC): 12.34 %
+Current filtered: -0.961154 mA (0.461001)
+CV: 144.0/504.0 A | W: 30.0 A | T: 49.8/59.8 A | Inv. min: 49.5 V | Inv. max: 60.7 V
+
+midpoint is 13493.4 | Vpos: -1.069 V | Vneg: 1.185 V | Riso: -4.74 Mohm
+Updating balance requests took 8 us
+Balance mask now: 00000000 00000000 00000000 00000000
+10274ms [balancing] state 0->1
+[2J[H[c  0]: 3909 mV | [c  1]: 3912 mV | [c  2]: 3912 mV | [c  3]: 3912 mV | [c  4]: 3908 mV | 
+[c  5]: 3912 mV | [c  6]: 3912 mV | [c  7]: 3912 mV | [c  8]: 3912 mV | [c  9]: 3912 mV | 
+[c 10]: 3912 mV | [c 11]: 3912 mV | [c 12]: 3912 mV | [c 13]: 3912 mV | [c 14]: 3912 mV | 
+Total: 58673mV | Temps: 24.9C - 24.9C | Delta: 4 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+MCU: 330 dC | 3V3: 3273 mV | 5V: 5223 mV | 12V: 13214 mV | CtrV: 13457 mV
+ModTemps: [0]=24.9C | ShuntDie: 0.0C | ShuntNTC: 0.0C (0 ohm)
+Batt: 58.547V (0.076) | Out:  0.042V (0.055) | NegCtr: -8.944V (0.037) | PosCtr: 50.718V (0.135)
+Link: -0.022V (0.059) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -3 mC | SoC: 82.25 % | SoC(VB): 69.64 % | SoC(BC): 68.74 % | SoC(FC): 12.34 %
+Current filtered: -0.951759 mA (0.521392)
+CV: 144.0/504.0 A | W: 30.0 A | T: 49.8/59.8 A | Inv. min: 49.5 V | Inv. max: 60.7 V
+
+midpoint is 13493.4 | Vpos: -1.069 V | Vneg: 1.185 V | Riso: -4.74 Mohm
+11030ms [system] state 1->3
+11050ms [system] state 3->4
+11070ms [contactors] state 0->1
+NVM: saved persistent fast data in 1821 us
+

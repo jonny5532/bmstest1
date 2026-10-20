@@ -13,6 +13,8 @@
 #include "../protocols/inverter/inverter.h"
 #include "../drivers/isospi/isosnoop.h"
 #include "../drivers/isospi/isospi_master.h"
+#include "board_id.h"
+#include "sys/events/events.h"
 #include "state_machines/contactors.h"
 #include "model.h"
 #include "sys/logging/logging.h"
@@ -20,15 +22,6 @@
 #include <math.h>
 
 ina228_t ina228_dev = {0};
-ads1115_t ads1115_dev = {0};
-
-static struct repeating_timer logging_timer;
-
-bool logging_timer_callback(struct repeating_timer *t) {
-    (void)t;
-    logging_flush_to_stdout();
-    return true;
-}
 
 static void init_hw() {
     init_watchdog();
@@ -71,17 +64,24 @@ static void init_hw() {
     if(!ads1115_init(&ads1115_dev, 0x48)) {
         error_printf("ADS1115 init failed!\n");
     }
+#ifdef HAS_ADS1115_SECONDARY
+    if(!ads1115_init(&ads1115_dev_b, 0x49)) {
+        error_printf("ADS1115 (secondary, 0x49) init failed!\n");
+    }
+#endif
 
     isospi_master_setup(
         PIN_ISOSPI_TX_EN,
         PIN_ISOSPI_RX_HIGH
     );
+#ifdef BMS_ISOSNOOP
     isosnoop_setup(
         PIN_ISOSPI_RX_HIGH,
         PIN_ISOSNOOP_RX_DEBUG,
         PIN_ISOSPI_RX_AND,
         PIN_ISOSNOOP_TIMER_DISABLE
     );
+#endif
 }
 
 static void init_comms() {
@@ -129,10 +129,28 @@ static void init_model() {
     }
 }
 
+static void check_board_id() {
+    float pull_up, pull_down, open;
+    internal_adc_board_strap(&pull_up, &pull_down, &open);
+    model.board_id = board_id_classify(pull_up, pull_down, open);
+    model.board_id_counts = open;
+
+    info_printf("Board strap: up %.0f down %.0f open %.0f -> code %u\n",
+        pull_up, pull_down, open, (unsigned)model.board_id);
+    if (!board_id_matches_build(model.board_id)) {
+        // Firmware for the wrong PCB: channel scaling and contactor sensing
+        // differ between revisions, so never operate
+        error_printf("Board revision code %u does not match this build (BMS_BOARD %d)\n",
+            (unsigned)model.board_id, BMS_BOARD);
+        raise_bms_event(ERR_BOARD_MISMATCH, ((uint64_t)model.board_id << 16) | BMS_BOARD);
+    }
+}
+
 void bms_init() {
     init_hw();
     init_comms();
     init_model();
+    check_board_id();
 
     // This will advance the time to a non-zero value
     update_millis();
@@ -145,6 +163,4 @@ void bms_init() {
     } else {
         error_printf("Failed to update boot count in LittleFS\n");
     }
-
-    add_repeating_timer_ms(10, logging_timer_callback, NULL, &logging_timer);
 }
