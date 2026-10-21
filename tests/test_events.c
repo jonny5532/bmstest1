@@ -306,7 +306,7 @@ static void test_current_stale_event(void **state) {
     bms_model_t model = {0};
     setup_model(&model);
 
-    model.current_millis = stored_millis - CURRENT_STALE_THRESHOLD_MS - 1;
+    model.current_millis = stored_millis - CURRENT_STALE_FAULT_THRESHOLD_MS - 1;
 
     confirm_battery_safety(&model);
     assert_int_equal(get_event_level(ERR_CURRENT_STALE), LEVEL_CRITICAL);

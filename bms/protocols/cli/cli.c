@@ -2,7 +2,11 @@
 #include "app/estimators/ekf.h"
 #include "app/model.h"
 #include "app/state_machines/system.h"
+#include "drivers/bmb3y/bmb3y.h"
 #include "drivers/sensors/internal_adc.h"
+#include "drivers/sensors/ads1115.h"
+#include "drivers/sensors/ina228.h"
+#include "shared/cell_map.h"
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
 
@@ -103,6 +107,24 @@ static void cli_handle_command(const char *cmd) {
                      model.ekf.R, model.ekf.R0, model.ekf.R1, model.ekf.C1);
         debug_printf("EKF State: Ah_used=%.4f Ah, V_c1=%.4f V, Capacity=%.2f Ah\n",
            model.ekf.x[0], model.ekf.x[1], model.ekf.x[2]);
+    } else if(strcmp(cmd, "cells_raw") == 0) {
+        bmb3y_print_physical_cells();
+    } else if(strcmp(cmd, "module_ids") == 0) {
+        // Only bmb3y_tick may use the isoSPI bus, so it does the read on its
+        // next idle tick (after the first full cell read) and prints the
+        // result with bmb3y_print_module_ids()
+        printf("Module IDs: reading\n");
+        model.module_ids_read_requested = true;
+    } else if(strcmp(cmd, "supervisor") == 0) {
+        millis_t now = millis();
+        printf("Supervisor: %s, state %u reasons 0x%04x latch 0x%04x, v%u, map %08lx (ours %08lx)\n",
+            supervisor_contactors_enabled(&model) ? "ENABLED" : "disabled",
+            model.supervisor.state, model.supervisor.reasons, model.supervisor.latch_reasons,
+            model.supervisor.version, (unsigned long)model.supervisor.map_hash, (unsigned long)cell_map_hash());
+        printf("Supervisor: snooped %d-%d mV, %u cells ok, %lu scans, reply age %lu ms\n",
+            model.supervisor.cell_min_mV, model.supervisor.cell_max_mV, model.supervisor.cells_ok,
+            (unsigned long)model.supervisor.scans,
+            model.supervisor_millis ? (unsigned long)(now - model.supervisor_millis) : 0UL);
     } else if(strcmp(cmd, "adc") == 0) {
         // printf directly (not debug_printf) so the response is visible even
         // when the buffered logger is saturated by other errors
@@ -116,6 +138,24 @@ static void cli_handle_command(const char *cmd) {
             internal_adc_read_12v_mv(), now - internal_adc_read_12v_millis());
         printf("ADC: Ctr: %5ld mV (age %lu ms)\n",
             internal_adc_read_contactor_mv(), now - internal_adc_read_contactor_millis());
+    } else if(strcmp(cmd, "ads") == 0) {
+        millis_t now = millis();
+        printf("ADS A (0x48): %s\n", ads1115_dev.present ? "present" : "NOT DETECTED");
+#ifdef HAS_ADS1115_SECONDARY
+        printf("ADS B (0x49): %s\n", ads1115_dev_b.present ? "present" : "NOT DETECTED");
+#endif
+        for(int ch = 0; ch < ADS1115_CHANNEL_COUNT; ch++) {
+            printf("ADS ch%d: raw %8.1f (age %lu ms)\n",
+                ch, (double)filtered_samples[ch], now - ads1115_get_sample_millis(ch));
+        }
+        extern ina228_t ina228_dev;
+        printf("INA228 (0x40): %s\n", ina228_dev.present ? "present" : "NOT DETECTED");
+        if(model.current_millis > 0) {
+            printf("INA228 current: %ld mA (age %lu ms)\n",
+                model.current_mA, now - model.current_millis);
+        } else {
+            printf("INA228 current: no reading yet\n");
+        }
     } else if(strcmp(cmd, "print_working_charge_settings") == 0) {
         debug_printf("working_charge_internal_resistance_uR = %f\n", working_charge_internal_resistance_uR);
         debug_printf("working_charge_ceiling_dA = %f\n", working_charge_ceiling_dA);

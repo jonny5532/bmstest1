@@ -1,0 +1,58 @@
+[2J[H[c  0]: 3805 mV | [c  1]: 3804 mV | [c  2]: 3806 mV | [c  3]: 3808 mV | [c  4]: 3808 mV | 
+[c  5]: 3805 mV | [c  6]: 3805ADC: now=2930 ms | Temp: 323 dC
+ADC: 3V3: 3273 mV (age 421 ms)
+ADC: 5V:  5224 mV (age 421 ms)
+ADC: 12V: 13217 mV (age 421 ms)
+ADC: Ctr: 13459 mV (age 421 ms)
+ mV | [c  7]: 3807 mV | [c  8]: 3805 mV | [c  9]: 3805 mV | 
+[c 10]: 3805 mV | [c 11]: 3808 mV | [c 12]: 3806 mV | [c 13]: 3805 mV | [c 14]: 3804 mV | 
+Total: 57086mV | Temps: 24.3C - 24.3C | Delta: 4 mV 
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+MCU: 323 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13217 mV | CtrV: 13459 mV
+ModTemps: [0]=24.3C (age 361ms) | ShuntDie: 0.0C (age 0ms) | ShuntNTC: 0.0C / 0 ohm (age 0ms)
+Batt: 55.980V (0.234) | Out: -0.047V (0.047) | NegCtr: -8.250V (0.027) | PosCtr: 49.850V (0.136)
+Link: -0.479V (0.076) | Fuse: -0.000V (0.002)
+Current:     -2 mA | Charge: -1 mC | SoC: 67.43 % | SoC(VB): 58.15 % | SoC(BC): 99.99 % | SoC(FC): 12.34 %
+Current filtered: -1.005000 mA (0.100000)
+CV: 196.0/452.0 A | W: 30.0 A | T: 48.5/58.5 A | Inv. min: 49.5 V | Inv. max: 60.7 V
+
+midpoint is 13475.0 | Vpos: -1.073 V | Vneg: 1.185 V | Riso: -4.75 Mohm
+Received command: 'adc'
+Executing command: 'adc'
+Updating balance requests took 11 us
+Balance mask now: 00000000 00000000 00000000 00000810
+[2J[H[c  0]: 3805 mV | [c  1]: 3804 mV | [c  2]: 3806 mV | [c  3]: 3812 mV | [c  4]: 3785 mV | 
+[c  5]: 3808 mV | [c  6]: 3805 mV | [c  7]: 3807 mV | [c  8]: 3805 mV | [c  9]: 3805 mV | 
+[c 10]: 3807 mV | [c 11]: 3789 mV | [c 12]: 3808 mV | [c 13]: 3805 mV | [c 14]: 3804 mV | 
+Total: 57055mV | Temps: 24.4C - 24.4C | Delta: 4 mV  | Balancing
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+MCU: 323 dC | 3V3: 3274 mV | 5V: 5224 mV | 12V: 13217 mV | CtrV: 13460 mV
+ModTemps: [0]=24.4C (age 360ms) | ShuntDie: 0.0C (age 0ms) | ShuntNTC: 0.0C / 0 ohm (age 0ms)
+Batt: 55.985V (0.221) | Out: -0.046V (0.052) | NegCtr: -8.250V (0.032) | PosCtr: 49.858V (0.130)
+Link: -0.471V (0.078) | Fuse: -0.000V (0.003)
+Current:     -1 mA | Charge: -2 mC | SoC: 67.41 % | SoC(VB): 58.15 % | SoC(BC): 99.99 % | SoC(FC): 12.34 %
+Current filtered: -1.004950 mA (0.081947)
+CV: 196.0/452.0 A | W: 30.0 A | T: 48.8/58.8 A | Inv. min: 49.5 V | Inv. max: 60.7 V
+
+midpoint is 13475.0 | Vpos: -1.073 V | Vneg: 1.185 V | Riso: -4.75 Mohm
+Updating balance requests took 9 us
+Balance mask now: 00000000 00000000 00000000 00000000
+4990ms [balancing] state 1->0
+[2J[H[c  0]: 3805 mV | [c  1]: 3804 mV | [c  2]: 3806 mV | [c  3]: 3812 mV | [c  4]: 3784 mV | 
+[c  5]: 3808 mV | [c  6]: 3805 mV | [c  7]: 3807 mV | [c  8]: 3805 mV | [c  9]: 3805 mV | 
+[c 10]: 3807 mV | [c 11]: 3788 mV | [c 12]: 3808 mV | [c 13]: 3805 mV | [c 14]: 3804 mV | 
+Total: 57053mV | Temps: 24.5C - 24.5C | Delta: 4 mV  | Balancing
+
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+MCU: 324 dC | 3V3: 3274 mV | 5V: 5225 mV | 12V: 13217 mV | CtrV: 13460 mV
+ModTemps: [0]=24.5C (age 360ms) | ShuntDie: 0.0C (age 0ms) | ShuntNTC: 0.0C / 0 ohm (age 0ms)
+Batt: 55.990V (0.232) | Out: -0.045V (0.054) | NegCtr: -8.250V (0.032) | PosCtr: 49.866V (0.135)
+Link: -0.465V (0.076) | Fuse: -0.000V (0.000)
+Current:     -1 mA | Charge: -4 mC | SoC: 67.40 % | SoC(VB): 58.15 % | SoC(BC): 52.83 % | SoC(FC): 12.34 %
+Current filtered: -1.009852 mA (0.150688)
+CV: 196.0/452.0 A | W: 30.0 A | T: 48.9/58.9 A | Inv. min: 49.5 V | Inv. max: 60.7 V
+
+midpoint is 13475.0 | Vpos: -1.073 V | Vneg: 1.185 V | Riso: -4.75 Mohm
+

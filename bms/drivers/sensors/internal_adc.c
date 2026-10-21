@@ -50,6 +50,35 @@ static uint32_t last_read_addr;
 static millis64_t last_drain_millis64;
 static int sample_index = 0;
 
+static float strap_pull_up, strap_pull_down, strap_open;
+
+// One-off averaged reading of the board revision strap, with the given pull
+// (+1 up, -1 down, 0 none). Only valid before the round robin is started.
+static float read_strap(int pull) {
+    if (pull > 0) {
+        gpio_pull_up(PIN_BOARD_REV);
+    } else if (pull < 0) {
+        gpio_pull_down(PIN_BOARD_REV);
+    } else {
+        gpio_disable_pulls(PIN_BOARD_REV);
+    }
+    sleep_us(500);
+
+    adc_select_input(PIN_BOARD_REV - ADC_CHANNEL_GPIO_OFFSET);
+    (void)adc_read();
+    uint32_t sum = 0;
+    for (int i = 0; i < 16; i++) {
+        sum += adc_read();
+    }
+    return sum / 16.0f;
+}
+
+void internal_adc_board_strap(float *pull_up, float *pull_down, float *open) {
+    *pull_up = strap_pull_up;
+    *pull_down = strap_pull_down;
+    *open = strap_open;
+}
+
 static void internal_adc_start() {
     sample_index = 0;
 
@@ -78,6 +107,13 @@ static void internal_adc_start() {
 
 void init_internal_adc() {
     adc_init();
+
+    // Board revision strap. adc_gpio_init leaves the digital input disabled,
+    // so the internal pulls can be used on a floating pin (RP2350-E9).
+    adc_gpio_init(PIN_BOARD_REV);
+    strap_pull_up = read_strap(1);
+    strap_pull_down = read_strap(-1);
+    strap_open = read_strap(0);
 
     adc_gpio_init(PIN_3V3_SENSE);
     adc_gpio_init(PIN_5V_SENSE);
