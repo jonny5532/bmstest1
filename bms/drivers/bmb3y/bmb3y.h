@@ -50,8 +50,11 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 #define BMB3Y_CMD_READ_CONFIG  0x50009400    // Config register
 #define BMB3Y_CMD_WRITE_CONFIG 0x112F        // Write config
 
-// Sniffed BMS traffic seems to use these shorter commands for cellvoltage reads
-// rather than the longer ones. However the CRCs seem to work differently.
+// Short cell voltage reads, as used by the real BMS. Each BMB replies with
+// eight bytes: three little-endian cells and a CRC14 with initial value 0x0010
+// (as for every short-form reply). The long reads above instead carry a tag
+// byte (0x00) before each BMB's data, which the CRC covers: initial value
+// 0x1000 over the data is the same as 0x0010 over the tag and the data.
 #define BMB3Y_CMD_READ_A_SHORT 0x0763
 #define BMB3Y_CMD_READ_B_SHORT 0x08F9
 #define BMB3Y_CMD_READ_C_SHORT 0x09D6
@@ -137,3 +140,5 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 
 
 void bmb3y_tick(bms_model_t *model);
+// Print the last reading of every BMB channel, populated or not
+void bmb3y_print_physical_cells(void);

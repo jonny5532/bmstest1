@@ -118,7 +118,7 @@ uint16_t calculate_delta_charge_current_limit(bms_model_t *model) {
 }
 
 uint16_t calculate_temperature_charge_current_limit(float temperature_min, float temperature_max) {
-    if(temperature_max >= MAX_CHARGE_TEMPERATURE_LIMIT || temperature_min <= MIN_CHARGE_TEMPERATURE_LIMIT) {
+    if(isnan(temperature_min) || isnan(temperature_max) || temperature_max >= MAX_CHARGE_TEMPERATURE_LIMIT || temperature_min <= MIN_CHARGE_TEMPERATURE_LIMIT) {
         return 0;
     } else {
         // Limit is in dA
@@ -130,7 +130,7 @@ uint16_t calculate_temperature_charge_current_limit(float temperature_min, float
 }
 
 uint16_t calculate_temperature_discharge_current_limit(float temperature_min, float temperature_max) {
-    if(temperature_max >= MAX_DISCHARGE_TEMPERATURE_LIMIT || temperature_min <= MIN_DISCHARGE_TEMPERATURE_LIMIT) {
+    if(isnan(temperature_min) || isnan(temperature_max) || temperature_max >= MAX_DISCHARGE_TEMPERATURE_LIMIT || temperature_min <= MIN_DISCHARGE_TEMPERATURE_LIMIT) {
         return 0;
     } else {
         // Limit is in dA

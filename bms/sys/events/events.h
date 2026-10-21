@@ -27,6 +27,7 @@
 // so could iterate list to start with, then selection-sort the remainder? (based on timestamp)
 // should we ensure no two events have the same timestamp?
 
+#include "../../config/limits.h"
 #include "../../sys/time/time.h"
 
 #include <stdint.h>
@@ -87,7 +88,7 @@ typedef enum {
     X(BATTERY_VOLTAGE_STALE, LEVEL_CRITICAL, 2000)              \
     X(BATTERY_TEMPERATURE_STALE, LEVEL_CRITICAL, 20000)         \
     X(CURRENT_STALE, LEVEL_CRITICAL, 2000)                      \
-    X(CELL_VOLTAGES_STALE, LEVEL_CRITICAL, 1000)                \
+    X(CELL_VOLTAGES_STALE, LEVEL_CRITICAL, CELL_VOLTAGES_STALE_ESCALATION_MS) \
     X(SUPPLY_VOLTAGE_3V3_LOW, LEVEL_WARNING, 0)                 \
     X(SUPPLY_VOLTAGE_3V3_HIGH, LEVEL_WARNING, 0)                \
     X(SUPPLY_VOLTAGE_5V_LOW, LEVEL_WARNING, 0)                  \
@@ -104,9 +105,9 @@ typedef enum {
     X(BATTERY_VOLTAGE_LOW, LEVEL_CRITICAL, 3600000)             \
     X(BATTERY_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, 1000)           \
     X(CELL_VOLTAGE_HIGH, LEVEL_WARNING, 0)                      \
-    X(CELL_VOLTAGE_VERY_HIGH, LEVEL_CRITICAL, 1000)             \
+    X(CELL_VOLTAGE_VERY_HIGH, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS) \
     X(CELL_VOLTAGE_LOW, LEVEL_WARNING, 0)                       \
-    X(CELL_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, 1000)              \
+    X(CELL_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS) \
     X(SOFT_CHARGE_BUFFER_EXCEEDED, LEVEL_CRITICAL, 1000)        \
     X(OVERCURRENT_CHARGING, LEVEL_WARNING, 0 /*LEVEL_CRITICAL, 1000*/ )               \
     X(OVERCURRENT_DISCHARGING, LEVEL_WARNING, 0 /*LEVEL_CRITICAL, 1000*/ )            \
@@ -128,7 +129,23 @@ typedef enum {
     X(BOOT_NORMAL, LEVEL_INFO, 0)                               \
     X(BOOT_WATCHDOG, LEVEL_WARNING, 0)                          \
     X(LOOP_OVERRUN, LEVEL_WARNING, 0)                           \
-    X(RESTARTING, LEVEL_FATAL, 0)
+    X(RESTARTING, LEVEL_FATAL, 0)                               \
+                                                                \
+    /* Rev1 board events. New events must be appended at the */ \
+    /* end of this list: the numeric event IDs are consumed  */ \
+    /* by the HMI, so inserting mid-list breaks its decoding */ \
+    X(LINK_VOLTAGE_MISMATCH, LEVEL_WARNING, 0)                  \
+    X(FUSE_VOLTAGE_DROP_HIGH, LEVEL_WARNING, 0)                 \
+    X(ISOLATION_ASYMMETRY, LEVEL_WARNING, 0)                    \
+    X(CONTACTOR_PORT_ENERGIZED, LEVEL_INFO, 0)                  \
+    /* PCB revision strap doesn't match the BMS_BOARD build */  \
+    X(BOARD_MISMATCH, LEVEL_FATAL, 0)                           \
+    /* Closing held off as the supervisor isn't enabling the */ \
+    /* contactor drivers (data: state, latch, reasons)       */ \
+    X(SUPERVISOR_NOT_ENABLED, LEVEL_WARNING, 0)                 \
+    /* The supervisor cut the contactor drivers while the    */ \
+    /* contactors were being driven                          */ \
+    X(SUPERVISOR_DISABLED_CONTACTORS, LEVEL_CRITICAL, 0)
 
 typedef enum {
 #define X(name, _1, _2) ERR_##name,

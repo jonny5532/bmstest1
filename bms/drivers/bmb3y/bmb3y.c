@@ -6,14 +6,30 @@
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
 #include "drivers/isospi/isospi_master.h"
+#include "shared/cell_map.h"
 
 #include "pico/stdlib.h"
 
 #include <stdint.h>
+#include <stdio.h>
 
 const uint8_t CELLS_PER_MODULE = 15;
 const uint8_t CELLS_PER_BANK = 3;
 const uint8_t MODULE_COUNT = 8;
+
+// CRC14 initial value for short-form replies
+#define BMB3Y_RX_CRC_INIT 0x0010
+
+// Cell voltage bank reads: per BMB three cells and a CRC14
+#ifdef BMB3Y_LONG_CELL_READS
+// Plus the next BMB's tag byte, which the CRC covers
+#define BANK_READ_SLOT_BYTES 9
+#define BANK_READ_CRC_INIT 0x1000
+#else
+#define BANK_READ_SLOT_BYTES 8
+#define BANK_READ_CRC_INIT BMB3Y_RX_CRC_INIT
+#endif
+#define BANK_READ_REPLY_BYTES (CELL_MAP_MODULES * BANK_READ_SLOT_BYTES)
 
 // Low level functions
 
@@ -131,7 +147,11 @@ void bmb3y_send_balancing_blocking(bms_model_t *model) {
                 int module = 7 - (balance_index >> 4);
                 int module_cell_index = balance_index & 0x0F;
 
-                tx_buf[2 + 2 + module * 6 + (module_cell_index / 8)] |= (1 << (module_cell_index & 0x07));
+                // A presence mask bit beyond the 8x15 channel slots would make
+                // module negative and write before tx_buf - refuse it.
+                if(module >= 0 && module < 8) {
+                    tx_buf[2 + 2 + module * 6 + (module_cell_index / 8)] |= (1 << (module_cell_index & 0x07));
+                }
             }
             logical_index++;
         }
@@ -169,6 +189,7 @@ static void bmb3y_update_balancing_active(bms_model_t *model) {
                   balancing_sm->balance_request_mask[3] != 0;
 }
 
+#ifdef BMB3Y_LONG_CELL_READS
 static const uint32_t READ_COMMANDS[] = {
     BMB3Y_CMD_READ_A,
     BMB3Y_CMD_READ_B,
@@ -176,7 +197,7 @@ static const uint32_t READ_COMMANDS[] = {
     BMB3Y_CMD_READ_D,
     BMB3Y_CMD_READ_E
 };
-
+#else
 static const uint16_t SHORT_READ_COMMANDS[] = {
     BMB3Y_CMD_READ_A_SHORT,
     BMB3Y_CMD_READ_B_SHORT,
@@ -184,95 +205,105 @@ static const uint16_t SHORT_READ_COMMANDS[] = {
     BMB3Y_CMD_READ_D_SHORT,
     BMB3Y_CMD_READ_E_SHORT
 };
+#endif
+
+// Every channel's last reading, populated or not (for checking the cell map)
+static int16_t physical_cell_voltages_mV[CELL_MAP_CHANNELS];
+
+void bmb3y_print_physical_cells(void) {
+    // Present channels are marked with *, and NOT_READ means no valid reading
+    for(int module=0; module<CELL_MAP_MODULES; module++) {
+        printf("BMB %d:", module);
+        for(int cell=0; cell<CELL_MAP_CELLS_PER_MODULE; cell++) {
+            int physical_index = module * CELL_MAP_CELLS_PER_MODULE + cell;
+            int16_t mV = physical_cell_voltages_mV[physical_index];
+            char mark = cell_map_is_present(physical_index) ? '*' : ' ';
+            if(mV == CELL_MV_NOT_READ) {
+                printf(" %c----", mark);
+            } else {
+                printf(" %c%4d", mark, mV);
+            }
+        }
+        printf("\n");
+    }
+}
 
 bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
-    uint8_t rx_buf[72];
-    uint32_t cmd = READ_COMMANDS[bank_index];
+    static bool physical_cells_cleared = false;
+    if(!physical_cells_cleared) {
+        for(int i=0; i<CELL_MAP_CHANNELS; i++) {
+            physical_cell_voltages_mV[i] = CELL_MV_NOT_READ;
+        }
+        physical_cells_cleared = true;
+    }
+
+    uint8_t rx_buf[BANK_READ_REPLY_BYTES];
+#ifdef BMS_ISOSNOOP
     isosnoop_flush();
-    if (!bmb3y_long_command_get_data_blocking(cmd, rx_buf, 72)) {
-        error_printf("BMB3Y read failed for cmd 0x%02lX\n", cmd);
+#endif
+#ifdef BMB3Y_LONG_CELL_READS
+    uint32_t cmd = READ_COMMANDS[bank_index];
+    if (!bmb3y_long_command_get_data_blocking(cmd, rx_buf, BANK_READ_REPLY_BYTES)) {
+        error_printf("BMB3Y read failed for cmd 0x%08lX\n", cmd);
         count_bms_event(ERR_BMB_READ_ERROR, 0x0100000000000000 | bank_index);
         return false;
     }
-    // Short commands need different CRC handling
-    // uint16_t cmd = SHORT_READ_COMMANDS[bank_index];
-    // if (!bmb3y_short_command_get_data_blocking(cmd, rx_buf, 72)) {
-    //     error_printf("BMB3Y read failed for cmd 0x%02X\n", cmd);
-    //     count_bms_event(ERR_BMB_READ_ERROR, 0x0100000000000000 | bank_index);
-    //     return false;
-    // }
+#else
+    uint16_t cmd = SHORT_READ_COMMANDS[bank_index];
+    if (!bmb3y_short_command_get_data_blocking(cmd, rx_buf, BANK_READ_REPLY_BYTES)) {
+        error_printf("BMB3Y read failed for cmd 0x%04X\n", cmd);
+        count_bms_event(ERR_BMB_READ_ERROR, 0x0100000000000000 | bank_index);
+        return false;
+    }
+#endif
 
-    uint8_t cell_offset = bank_index * 3;
-    uint32_t cell_presence_mask[] = CELL_PRESENCE_MASK;
     bool crc_ok = true;
 
     for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
-        uint16_t module_crc = (uint16_t)(rx_buf[module * 9 + 6] << 8) | (uint16_t)(rx_buf[module * 9 + 7]);
-        //uint16_t calc_crc = crc14(&rx_buf[module * 9], 6, 0x1000);
-        uint16_t calc_crc = crc14(&rx_buf[module * 9], 6, 0x1000, module_crc);
+        uint8_t *slot = &rx_buf[module * BANK_READ_SLOT_BYTES];
+        uint16_t module_crc = (uint16_t)(slot[6] << 8) | (uint16_t)(slot[7]);
+        uint16_t calc_crc = crc14(slot, 6, BANK_READ_CRC_INIT, module_crc);
 
         if((module_crc & 0x3fff) != calc_crc) {
-            error_printf("CRC: %s %d %02X %02X %02X %02X %02X %02X %02X %02X %02X calc %04X\n",
+            error_printf("CRC: %s %d %02X %02X %02X %02X %02X %02X %02X %02X calc %04X\n",
                 module_crc == calc_crc ? "OK" : "FAIL",
                 bank_index,
-                rx_buf[module * 9 + 0],
-                rx_buf[module * 9 + 1],
-                rx_buf[module * 9 + 2],
-                rx_buf[module * 9 + 3],
-                rx_buf[module * 9 + 4],
-                rx_buf[module * 9 + 5],
-                rx_buf[module * 9 + 6],
-                rx_buf[module * 9 + 7],
-                rx_buf[module * 9 + 8],
+                slot[0],
+                slot[1],
+                slot[2],
+                slot[3],
+                slot[4],
+                slot[5],
+                slot[6],
+                slot[7],
                 calc_crc
             );
+#ifdef BMS_ISOSNOOP
             isosnoop_print_buffer();
-            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | (module_crc << 16) | calc_crc);
+#endif
+            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0100000000000000 | ((uint64_t)bank_index << 48) | ((uint64_t)module << 40) | ((uint32_t)module_crc << 16) | calc_crc);
             crc_ok = false;
             continue;
         }
 
         // Go through each cell (three per bank)
         for(int cell=0; cell<3; cell++) {
-            int physical_index = (module * 15) + cell_offset + cell;
-
             // Physical index is the channel number of the cell on the BMBs,
             // however not every channel is populated.
+            int physical_index = cell_map_physical_index(module, bank_index, cell);
+
+            uint16_t voltage =
+                (uint16_t)(slot[cell * 2]) |
+                (uint16_t)(slot[cell * 2 + 1] << 8);
+
+            int16_t converted = cell_raw_to_mV(voltage);
+            physical_cell_voltages_mV[physical_index] = converted;
 
             // Logical index is the actual cell number (with no gaps).
-
-            // To calculate logical from physical, we need to count how many
-            // bits are set in the cell presence mask up to the physical index.
-
-            uint8_t logical_index = 0;
-            // Calculate which presence mask word the physical index is in
-            int word_offset = physical_index / 32;
-            // Is this cell actually present according to the presence mask?
-            if((cell_presence_mask[word_offset] & (1U << (physical_index % 32))) == 0) {
+            int logical_index = cell_map_logical_index(physical_index);
+            if(logical_index < 0) {
                 // Not present, skip
                 continue;
-            }
-            // Count all the bits in previous presence mask words
-            for(int word=0; word<word_offset; word++) {
-                logical_index += __builtin_popcount(cell_presence_mask[word]);
-            }
-            // Count the bits in the presence mask word up to the physical index
-            logical_index += __builtin_popcount(cell_presence_mask[word_offset] & ((1 << (physical_index % 32)) - 1));
-
-            uint16_t voltage = 
-                (uint16_t)(rx_buf[module * 9 + cell * 2]) |
-                (uint16_t)(rx_buf[module * 9 + cell * 2 + 1] << 8);
-
-            int16_t converted = 0;
-
-            if(voltage == 0xFFFF) {
-                // A non-existent cell
-                converted = -1;
-            } else if(voltage == 0) {
-                // Record as 1mV to distinguish from unmeasured
-                converted = 1;
-            } else {
-                converted = (voltage * 2) / 25;
             }
 
             model->raw_cell_voltages_mV[logical_index] = converted;
@@ -353,7 +384,7 @@ bool bmb3y_read_more_temps_blocking(bms_model_t *model) {
                 module, module_crc, calc_crc, calc_crc ^ 0x425b, calc_crc ^ 0xc6ed);
             crc_ok = false;
             if(millis64() > 2000) {
-                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
+                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | ((uint32_t)module_crc << 16) | calc_crc);
             }
             continue;
         }
@@ -409,7 +440,7 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
                 module, module_crc, calc_crc, calc_crc ^ 0x425b, calc_crc ^ 0xc6ed);
             crc_ok = false;
             if(millis64() > 2000) {
-                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | (module_crc << 16) | calc_crc);
+                count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0200000000000000 | ((uint64_t)module << 48) | ((uint32_t)module_crc << 16) | calc_crc);
             }
             continue;
         }
@@ -482,6 +513,13 @@ static bool should_stop(bms_model_t *model) {
 
 static bool should_use_slow_mode(bms_model_t *model) {
     // Determine whether we should enter slow mode to reduce battery self-discharge.
+
+    if(model->system_sm.state == SYSTEM_STATE_OPERATING ||
+       model->contactor_sm.state != CONTACTORS_STATE_OPEN) {
+        // Never while the contactors may close: the supervisor needs fresh
+        // scans to keep the contactor drivers enabled
+        return false;
+    }
 
     if(model->system_sm.state == SYSTEM_STATE_INACTIVE && 
        state_time(&model->system_sm) > 60000 && 

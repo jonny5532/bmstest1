@@ -7,6 +7,7 @@
 #include "drivers/sensors/internal_adc.h"
 #include "drivers/sensors/ads1115.h"
 #include "hardware_checks.h"
+#include "isolation.h"
 #include "config/limits.h"
 #include "config/pins.h"
 #include "estimators/ekf.h"
@@ -29,6 +30,7 @@
 #include "pico/stdlib.h"
 #include "../vendor/littlefs/lfs.h"
 
+#include <math.h>
 #include <stdio.h>
 
 void read_supply_voltages(supply_voltages_t *supply_voltages) {
@@ -52,32 +54,114 @@ void read_inputs(bms_model_t *model) {
     // For differential readings, full scale should be 436V
     // const int32_t full_scale_mv = 436000;
 
-    float battery_voltage_mul = fabs(model->battery_voltage_mul) > 0.001f ? model->battery_voltage_mul : 0.013f;
+    float battery_voltage_mul = fabs(model->battery_voltage_mul) > 0.001f ? model->battery_voltage_mul : ADS1115_DEFAULT_MUL;
     model->high_voltages.battery_millis = ads1115_get_sample_millis(0);
     model->high_voltages.battery = ads1115_float_sample(0, battery_voltage_mul);
     model->high_voltages.battery_deviation = ads1115_float_deviation(0, battery_voltage_mul);
 
-    float output_voltage_mul = fabs(model->output_voltage_mul) > 0.001f ? model->output_voltage_mul : 0.013f;
+    float output_voltage_mul = fabs(model->output_voltage_mul) > 0.001f ? model->output_voltage_mul : ADS1115_DEFAULT_MUL;
     model->high_voltages.output_millis = ads1115_get_sample_millis(1);
     model->high_voltages.output = ads1115_float_sample(1, output_voltage_mul);
     model->high_voltages.output_deviation = ads1115_float_deviation(1, output_voltage_mul);
 
-    float neg_contactor_mul = fabs(model->neg_contactor_mul) > 0.001f ? model->neg_contactor_mul : 0.013f;
+    float neg_contactor_mul = fabs(model->neg_contactor_mul) > 0.001f ? model->neg_contactor_mul : ADS1115_DEFAULT_MUL;
     model->high_voltages.neg_contactor_millis = ads1115_get_sample_millis(2);
     model->high_voltages.neg_contactor = ads1115_float_sample(2, neg_contactor_mul) + (0.001f * model->neg_contactor_offset_mV);
     model->high_voltages.neg_contactor_deviation = ads1115_float_deviation(2, neg_contactor_mul);
 
+    float pos_contactor_mul = fabs(model->pos_contactor_mul) > 0.001f ? model->pos_contactor_mul : ADS1115_DEFAULT_MUL;
+
+#if BMS_BOARD == BMS_BOARD_REV1
+    // Rev1 measures directly across the pos (Link Positive) contactor via
+    // ADC B channel 6 (BatPos - LinkPos)
+    model->high_voltages.pos_contactor_millis = ads1115_get_sample_millis(6);
+    model->high_voltages.pos_contactor = ads1115_float_sample(6, pos_contactor_mul) + (0.001f * model->pos_contactor_offset_mV);
+    model->high_voltages.pos_contactor_deviation = ads1115_float_deviation(6, pos_contactor_mul);
+
+    // Link rail voltage (channel 7 measures LinkNeg - LinkPos, so negate)
+    float link_voltage_mul = fabs(model->link_voltage_mul) > 0.001f ? model->link_voltage_mul : ADS1115_DEFAULT_MUL;
+    model->high_voltages.link_millis = ads1115_get_sample_millis(7);
+    model->high_voltages.link = -ads1115_float_sample(7, link_voltage_mul);
+    model->high_voltages.link_deviation = ads1115_float_deviation(7, link_voltage_mul);
+
+    // Drop across the F4 fuse / drive-unit jumper (channel 8, OutPos - LinkPos)
+    float fuse_drop_mul = fabs(model->fuse_drop_mul) > 0.001f ? model->fuse_drop_mul : ADS1115_DEFAULT_MUL;
+    model->high_voltages.fuse_drop_millis = ads1115_get_sample_millis(8);
+    model->high_voltages.fuse_drop = ads1115_float_sample(8, fuse_drop_mul);
+    model->high_voltages.fuse_drop_deviation = ads1115_float_deviation(8, fuse_drop_mul);
+#else
     // Positive contactor voltage has to be derived from the difference between (battery+
     // to output-) and (output+ to output-), since we can't sample relative to battery+.
 
-    float pos_contactor_mul = fabs(model->pos_contactor_mul) > 0.001f ? model->pos_contactor_mul : 0.013f;
     millis_t raw_bat_pos_to_out_neg_millis = ads1115_get_sample_millis(3);
     float raw_bat_plus_to_out_neg = ads1115_float_sample(3, pos_contactor_mul);
     
     model->high_voltages.pos_contactor_millis = raw_bat_pos_to_out_neg_millis < model->high_voltages.output_millis ? raw_bat_pos_to_out_neg_millis : model->high_voltages.output_millis;
     model->high_voltages.pos_contactor = raw_bat_plus_to_out_neg - model->high_voltages.output;
     model->high_voltages.pos_contactor_deviation = ads1115_float_deviation(3, pos_contactor_mul) + model->high_voltages.output_deviation;
-    
+#endif
+
+    // Isolation monitor (ADS1115 channels 4/5, battery+ and battery- to chassis)
+    model->high_voltages.isolation_millis = min(ads1115_get_sample_millis(4), ads1115_get_sample_millis(5));
+    model->high_voltages.isolation_pos_raw = ads1115_float_sample(4, 1.0f);
+    model->high_voltages.isolation_neg_raw = ads1115_float_sample(5, 1.0f);
+    {
+        int32_t temp_dC = get_temperature_c_times10();
+        if (model->isolation_zero_cal_pending) {
+            model->isolation_zero_cal_pending = false;
+            float pos = model->high_voltages.isolation_pos_raw;
+            float neg = model->high_voltages.isolation_neg_raw;
+            if (model->high_voltages.isolation_millis > 0 && pos - neg > ISOLATION_MIN_SPAN_COUNTS) {
+                model->persistent_slow.isolation_zero_ref_counts = isolation_zero_ref_from_counts((pos + neg) / 2.0f, temp_dC);
+                nvm_save_persistent_slow(model);
+            }
+        }
+        float zero = isolation_zero_counts(model->persistent_slow.isolation_zero_ref_counts, temp_dC);
+        float pos = model->high_voltages.isolation_pos_raw;
+        float neg = model->high_voltages.isolation_neg_raw;
+        bool contactors_open = model->contactor_sm.state == CONTACTORS_STATE_OPEN;
+
+        // Automatic zero check, once per boot while the pack floats: only with
+        // the contactors open, before the system starts operating, and with
+        // valid readings. Large offsets are reported as a possible leak.
+        {
+            static isolation_autozero_t autozero;
+            int sys = model->system_sm.state;
+            bool boot_states = sys == SYSTEM_STATE_UNINITIALIZED || sys == SYSTEM_STATE_INITIALIZING ||
+                               sys == SYSTEM_STATE_INACTIVE;
+            bool usable = contactors_open && boot_states && model->high_voltages.isolation_millis > 0 &&
+                          model->high_voltages.battery > ISOLATION_MIN_BATTERY_V && pos - neg > ISOLATION_MIN_SPAN_COUNTS;
+            float new_zero = zero, measured_mid = zero;
+            isolation_autozero_status_t az = isolation_autozero_step(&autozero, millis(), usable, !boot_states,
+                                                                     pos, neg, zero, &new_zero, &measured_mid);
+            if (az == ISOLATION_AUTOZERO_ACCEPTED) {
+                float new_ref = isolation_zero_ref_from_counts(new_zero, temp_dC);
+                if (fabsf(new_ref - model->persistent_slow.isolation_zero_ref_counts) >= 1.0f) {
+                    model->persistent_slow.isolation_zero_ref_counts = new_ref;
+                    nvm_save_persistent_slow(model);
+                }
+                clear_bms_event(ERR_ISOLATION_ASYMMETRY);
+                debug_printf("Isolation zero check: midpoint %1.1f, zero %1.1f -> %1.1f\n", measured_mid, zero, new_zero);
+                zero = new_zero;
+            } else if (az == ISOLATION_AUTOZERO_REJECTED) {
+                raise_bms_event(ERR_ISOLATION_ASYMMETRY, (uint64_t)(int64_t)lroundf(measured_mid - zero));
+                debug_printf("Isolation zero check: midpoint %1.1f is %1.1f counts from zero %1.1f, possible leak\n",
+                             measured_mid, measured_mid - zero, zero);
+            }
+        }
+
+        isolation_result_t iso = isolation_compute(pos, neg, zero, model->high_voltages.battery, contactors_open);
+        model->high_voltages.pack_pos_to_chassis = iso.pos_to_chassis_V;
+        model->high_voltages.pack_neg_to_chassis = iso.neg_to_chassis_V;
+        if (contactors_open && !isnan(iso.resistance_ohms)) {
+            model->high_voltages.isolation_open_resistance_ohms = iso.resistance_ohms;
+            model->high_voltages.isolation_open_millis = millis() ? millis() : 1;
+        }
+        // Live while the contactors are open, otherwise the last open reading
+        model->high_voltages.isolation_resistance_ohms = contactors_open ? iso.resistance_ohms
+            : (model->high_voltages.isolation_open_millis ? model->high_voltages.isolation_open_resistance_ohms : NAN);
+    }
+
     // INA228 current and charge readings
     
     //if((timestep() & 0x7) == 0) {
@@ -215,7 +299,7 @@ void bms_tick() {
 
     nvm_tick(&model);
     inverter_tick(&model.inverter_outputs);
-    internal_serial_tick();
+    internal_serial_tick(&model);
     hmi_serial_tick(&model);
 
     timings[8] = time_us_32();
@@ -248,15 +332,33 @@ void bms_tick() {
     if((timestep() & 0x3f) == 32) {
         // every 64 ticks, output stuff
         //isosnoop_print_buffer();
+        debug_printf("Now: %lu ms (uptime %llu ms)\n", (unsigned long)millis(), (unsigned long long)millis64());
         print_bms_events();
+        inverter_debug_print();
         
-        debug_printf("Temp: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
+        debug_printf("MCU: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
             get_temperature_c_times10(),
             model.supply_voltages.voltage_3V3_mV,
             model.supply_voltages.voltage_5V_mV,
             model.supply_voltages.voltage_12V_mV,
             model.supply_voltages.voltage_contactor_mV
         );
+
+        {
+            millis_t now = millis();
+            debug_printf("ModTemps:");
+            for(int i=0; i<NUM_MODULE_TEMPS; i++) {
+                debug_printf(" [%d]=%.1fC", i, model.module_temperatures[i]);
+            }
+            debug_printf(" (age %lums) | ShuntDie: %.1fC (age %lums) | ShuntNTC: %.1fC / %.0f ohm (age %lums)\n",
+                model.module_temperatures_millis ? (now - model.module_temperatures_millis) : 0,
+                model.shunt_die_temperature,
+                model.shunt_die_temperature_millis ? (now - model.shunt_die_temperature_millis) : 0,
+                model.shunt_ntc_temperature,
+                model.shunt_ntc_resistance_ohms,
+                model.shunt_ntc_millis ? (now - model.shunt_ntc_millis) : 0
+            );
+        }
 
         debug_printf("Batt: %6.3fV (%3.3f) | Out: %6.3fV (%3.3f) | NegCtr: %6.3fV (%3.3f) | PosCtr: %6.3fV (%3.3f)\n",
             model.high_voltages.battery,
@@ -268,6 +370,14 @@ void bms_tick() {
             model.high_voltages.pos_contactor,
             model.high_voltages.pos_contactor_deviation
         );
+#if BMS_BOARD == BMS_BOARD_REV1
+        debug_printf("Link: %6.3fV (%3.3f) | Fuse: %6.3fV (%3.3f)\n",
+            model.high_voltages.link,
+            model.high_voltages.link_deviation,
+            model.high_voltages.fuse_drop,
+            model.high_voltages.fuse_drop_deviation
+        );
+#endif
         int64_t charge_mC = raw_charge_to_mC(model.charge_raw);
         debug_printf("Current: %6ld mA | Charge: %lld mC | SoC: %2.2f %% | SoC(VB): %2.2f %% | SoC(BC): %2.2f %% | SoC(FC): %2.2f %%\n",
             model.current_mA,
@@ -306,23 +416,13 @@ void bms_tick() {
         //     debug_counters.uart1_packets_received, debug_counters.uart1_crc_errors
         // );
 
-        float cal_midpoint = 22496.4f;
-        float cal_midpoint_temp_dC = 285.0f;
-
-        cal_midpoint += (get_temperature_c_times10() - cal_midpoint_temp_dC) * 0.28f; //compensate for temp drift
-
-        float vp = ads1115_float_sample(4, 1.0f);
-        float vn = ads1115_float_sample(5, 1.0f);
-        debug_printf("midpoint is %1.1f | ", (vp + vn)/2.0f);
-
-        float vpos = (vp - cal_midpoint) * (4.096f/32768);
-        float vneg = (cal_midpoint - vn) * (4.096f/32768);
-        float r = vpos / vneg;
-        // Cap at 1Gohm
-        float r_iso = 10000000 * fminf(r / fmaxf(fabsf(1.0f - r), 0.009f), 100.0f);
-
-        debug_printf("Vpos: %1.3f V | Vneg: %1.3f V | Riso: %1.2f Mohm\n",
-            vpos, vneg, r_iso/1000000
+        float vp = model.high_voltages.isolation_pos_raw;
+        float vn = model.high_voltages.isolation_neg_raw;
+        debug_printf("Isolation raw pos %1.1f neg %1.1f (mid %1.1f, zero %1.1f) | Pack+ %1.1f V | Pack- %1.1f V | Riso: %1.2f Mohm\n",
+            vp, vn, (vp + vn)/2.0f,
+            isolation_zero_counts(model.persistent_slow.isolation_zero_ref_counts, get_temperature_c_times10()),
+            model.high_voltages.pack_pos_to_chassis, model.high_voltages.pack_neg_to_chassis,
+            model.high_voltages.isolation_resistance_ohms/1000000
         );
 
     }
