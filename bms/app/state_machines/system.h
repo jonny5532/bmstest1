@@ -28,6 +28,7 @@ typedef enum system_requests
     SYSTEM_REQUEST_CALIBRATE_OFFLINE_LONG = 3,
     SYSTEM_REQUEST_CALIBRATE_OFFLINE_SHORT = 4,
     SYSTEM_REQUEST_CALIBRATE_ONLINE = 5,
+    SYSTEM_REQUEST_CALIBRATE_ISOLATION_ZERO = 6, // contactors open only
 } system_requests_t;
 
 void system_sm_tick(bms_model_t *model);

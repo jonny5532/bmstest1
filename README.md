@@ -103,6 +103,44 @@ damage where possible. External safety equipment should be used for more
 time-critical protection against overcurrent (fuses) or leakage (an RCD).
 
 
+### Supervisor
+
+A second MCU, the supervisor (firmware in `supervisor/`), holds the contactor
+gate drivers disabled (`CTR_EN`) unless its own checks pass. It doesn't trust
+the BMS's readings: it snoops the BMB cell voltage reads off the isoSPI bus and
+checks them against the same cell map and hard limits as the BMS
+(`bms/shared/cell_map.h`, from `BMS_PROFILE` in `bms/config/limits.h`).
+
+It enables the drivers once the BMS is sending status over the internal serial
+link, both were built for the same pack (the cell map hash matches), three scans
+in a row have every populated cell read and within the hard limits, and the
+BMS's cell min/max agree with the snooped ones. The BMS holds off closing the
+contactors until the supervisor reports that it is enabled.
+
+Once enabled, the supervisor cuts the drivers if:
+- the BMS stops sending status for twice its watchdog timeout, or the scans
+  stop for twice as long as the BMS tolerates stale cell data (e.g. the BMB
+  chain unplugged). It re-enables once fresh scans check out again. The BMS's
+  slow mode doesn't extend this, so the BMS only uses slow mode while idle with
+  the contactors open;
+- a populated cell stays out of range or unread for twice as long as the BMS
+  takes to open the contactors itself. This latches until the BMS restarts.
+
+The doubled delays mean the BMS always gets to open the contactors first.
+
+Build the supervisor with the same `BMS_PROFILE` and `BMS_BOARD` as the BMS:
+
+```bash
+cd supervisor
+mkdir build-desk-rev1-vbus && cd build-desk-rev1-vbus
+cmake .. -DBMS_PROFILE=1 -DBMS_BOARD=2 -DBMS_USB_VBUS_SENSE=ON
+make -j4
+```
+
+Over its USB serial, `s` prints the status and `r` the last snooped scan (with
+`*` on the populated channels). The BMS CLI has `supervisor` and `cells_raw`.
+
+
 ## Balancing
 
 There are five settings that control balancing:
