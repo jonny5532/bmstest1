@@ -103,6 +103,100 @@ damage where possible. External safety equipment should be used for more
 time-critical protection against overcurrent (fuses) or leakage (an RCD).
 
 
+### Supervisor
+
+A second MCU, the supervisor (firmware in `supervisor/`), holds the contactor
+gate drivers disabled (`CTR_EN`) unless its own checks pass. It doesn't trust
+the BMS's readings: it snoops the BMB cell voltage reads off the isoSPI bus and
+checks them against the same cell map and hard limits as the BMS
+(`bms/shared/cell_map.h`, from `BMS_PROFILE` in `bms/config/limits.h`).
+
+It enables the drivers once the BMS is sending status over the internal serial
+link, both were built for the same pack (the cell map hash matches), three scans
+in a row have every populated cell read and within the hard limits, and the
+BMS's cell min/max agree with the snooped ones. The BMS holds off closing the
+contactors until the supervisor reports that it is enabled.
+
+Once enabled, the supervisor cuts the drivers if:
+- the BMS stops sending status for twice its watchdog timeout, or the scans
+  stop for twice as long as the BMS tolerates stale cell data (e.g. the BMB
+  chain unplugged). It re-enables once fresh scans check out again. The BMS's
+  slow mode doesn't extend this, so the BMS only uses slow mode while idle with
+  the contactors open;
+- a populated cell stays out of range or unread for twice as long as the BMS
+  takes to open the contactors itself. This latches until the BMS restarts.
+
+The doubled delays mean the BMS always gets to open the contactors first.
+
+Build the supervisor with the same `BMS_PROFILE` and `BMS_BOARD` as the BMS:
+use the same preset (see [Build configurations](#build-configurations)), e.g.
+
+```bash
+cd supervisor
+cmake --preset desk && cmake --build --preset desk
+```
+
+Over its USB serial, `s` prints the status and `r` the last snooped scan (with
+`*` on the populated channels). The BMS CLI has `supervisor` and `cells_raw`.
+
+
+## Build configurations
+
+`BMS_PROFILE` picks the pack and `BMS_BOARD` the PCB. Both default to the old
+setup (BlueTesla, Rev0), so a plain `cmake ..` is wrong for a Rev1 board: it
+scales the pack voltage for Rev0's dividers and raises `VOLTAGE_MISMATCH`.
+
+Each board's configuration is a CMake preset, with the same name in
+`CMakePresets.json` (BMS) and `supervisor/CMakePresets.json` (supervisor). The
+pack itself is a `BMS_PROFILE` in `bms/config/limits.h`; a preset only picks
+the profile and adds the board and USB options. A preset builds into
+`build-<preset>/`.
+
+| Preset | Pack (`BMS_PROFILE`) | PCB (`BMS_BOARD`) | USB |
+|---|---|---|---|
+| `desk` | Desk bench, 15 cells (1) | Rev1 (2) | VBUS sense on GPIO3 |
+| `ck0-bluetesla` | BlueTesla 96s NMC (2) | Rev1 (2) | external VBUS-powered D+ pull-up |
+| `ck1-lfp-rev0` | LFP1 108s (3) | Rev0 (1) | stock |
+| `rev1-nmc-jpwhit` | BlueTesla 96s NMC (2) | Rev1 (2) | stock: no pull-up mod, no VBUS sense |
+
+```bash
+cmake --preset rev1-nmc-jpwhit && cmake --build --preset rev1-nmc-jpwhit
+cd supervisor && cmake --preset rev1-nmc-jpwhit && cmake --build --preset rev1-nmc-jpwhit
+```
+
+Use `BMS_USB_EXTERNAL_PULLUP` or `BMS_USB_VBUS_SENSE` only on boards with that
+modification: an unmodified board built with either one never connects over USB.
+A new board gets a new preset rather than a hand-typed `cmake` line.
+
+### Building on Windows
+
+Each preset has a `-win` twin (e.g. `desk-win`), listed only on Windows. It
+builds natively with the tools the Raspberry Pi Pico VS Code extension installs
+in `%USERPROFILE%\.pico-sdk`, so nothing needs to be on `PATH`.
+`cmake/pico_extension_tools.cmake` picks the versions at configure time:
+
+- **pioasm and picotool:** the versions matching the Pico SDK in `../pico-sdk`
+  (SDK 2.2.0 uses `tools/2.2.0` and `picotool/2.2.0-*`)
+- **Arm GCC and Ninja:** the newest installed
+
+Nothing needs editing after an SDK or extension update. If the extension hasn't
+installed the tools for your SDK version yet, the configure step says which one
+is missing: open the project in VS Code and let the extension install them, or
+set that variable yourself. A tool set on the command line wins, e.g.
+`-DPICO_TOOLCHAIN_PATH=...` for a different Arm GCC.
+
+```powershell
+cmake --preset desk-win; cmake --build --preset desk-win
+```
+
+A clean build of both chips takes seconds this way. A WSL build of a checkout on
+the Windows drive (`/mnt/c`) takes minutes, mostly in file access and in
+compiling picotool from source for every new build folder.
+
+Run `version` on the BMS console to check what a board is running. Built
+images can be kept in `firmware/`, which git ignores.
+
+
 ## Balancing
 
 There are five settings that control balancing:

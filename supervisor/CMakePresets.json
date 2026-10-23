@@ -1,0 +1,72 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "cacheVariables": {
+        "BMS_USB_EXTERNAL_PULLUP": "OFF",
+        "BMS_USB_VBUS_SENSE": "OFF"
+      }
+    },
+    {
+      "name": "windows",
+      "hidden": true,
+      "description": "Native Windows build with the tools the Pico VS Code extension installs; cmake/pico_extension_tools.cmake picks the versions",
+      "generator": "Ninja",
+      "cacheVariables": { "PICO_EXTENSION_DIR": "$env{USERPROFILE}/.pico-sdk" }
+    },
+    {
+      "name": "desk",
+      "inherits": "base",
+      "displayName": "Desk bench (Rev1, VBUS sense)",
+      "description": "Supervisor for the 15-cell desk bench pack on a Rev1 PCB with the USB VBUS divider",
+      "cacheVariables": { "BMS_PROFILE": "1", "BMS_BOARD": "2", "BMS_USB_VBUS_SENSE": "ON" }
+    },
+    {
+      "name": "ck0-bluetesla",
+      "inherits": "base",
+      "displayName": "ck0 BlueTesla NMC (Rev1, external pull-up)",
+      "description": "Supervisor for the BlueTesla 96s NMC pack on ck0's Rev1 PCB with the external USB D+ pull-up",
+      "cacheVariables": { "BMS_PROFILE": "2", "BMS_BOARD": "2", "BMS_USB_EXTERNAL_PULLUP": "ON" }
+    },
+    {
+      "name": "ck1-lfp-rev0",
+      "inherits": "base",
+      "displayName": "ck1 LFP shed (Rev0)",
+      "description": "Supervisor for the 108s LFP shed pack on ck1's Rev0 PCB (snooper flag on GPIO5)",
+      "cacheVariables": { "BMS_PROFILE": "3", "BMS_BOARD": "1" }
+    },
+    {
+      "name": "rev1-nmc-jpwhit",
+      "inherits": "base",
+      "displayName": "Rev1 NMC (jpwhit)",
+      "description": "Supervisor for the BlueTesla 96s NMC pack on a stock Rev1 PCB: no external USB pull-up, no VBUS sense",
+      "cacheVariables": { "BMS_PROFILE": "2", "BMS_BOARD": "2" }
+    },
+    { "name": "desk-win", "inherits": ["windows", "desk"], "displayName": "Desk bench (Rev1, VBUS sense) - Windows",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } },
+    { "name": "ck0-bluetesla-win", "inherits": ["windows", "ck0-bluetesla"], "displayName": "ck0 BlueTesla NMC (Rev1, external pull-up) - Windows",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } },
+    { "name": "ck1-lfp-rev0-win", "inherits": ["windows", "ck1-lfp-rev0"], "displayName": "ck1 LFP shed (Rev0) - Windows",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } },
+    { "name": "rev1-nmc-jpwhit-win", "inherits": ["windows", "rev1-nmc-jpwhit"], "displayName": "Rev1 NMC (jpwhit) - Windows",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } }
+  ],
+  "buildPresets": [
+    { "name": "desk", "configurePreset": "desk", "targets": ["supervisor"] },
+    { "name": "ck0-bluetesla", "configurePreset": "ck0-bluetesla", "targets": ["supervisor"] },
+    { "name": "ck1-lfp-rev0", "configurePreset": "ck1-lfp-rev0", "targets": ["supervisor"] },
+    { "name": "rev1-nmc-jpwhit", "configurePreset": "rev1-nmc-jpwhit", "targets": ["supervisor"] },
+    { "name": "desk-win", "configurePreset": "desk-win", "targets": ["supervisor"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } },
+    { "name": "ck0-bluetesla-win", "configurePreset": "ck0-bluetesla-win", "targets": ["supervisor"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } },
+    { "name": "ck1-lfp-rev0-win", "configurePreset": "ck1-lfp-rev0-win", "targets": ["supervisor"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } },
+    { "name": "rev1-nmc-jpwhit-win", "configurePreset": "rev1-nmc-jpwhit-win", "targets": ["supervisor"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" } }
+  ]
+}
