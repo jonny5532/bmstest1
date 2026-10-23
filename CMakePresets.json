@@ -1,0 +1,49 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build-${presetName}",
+      "cacheVariables": {
+        "BMS_USB_EXTERNAL_PULLUP": "OFF",
+        "BMS_USB_VBUS_SENSE": "OFF"
+      }
+    },
+    {
+      "name": "desk",
+      "inherits": "base",
+      "displayName": "Desk bench (Rev1, VBUS sense)",
+      "description": "15-cell desk bench pack on a Rev1 PCB with the USB VBUS divider on GPIO3",
+      "cacheVariables": { "BMS_PROFILE": "1", "BMS_BOARD": "2", "BMS_USB_VBUS_SENSE": "ON" }
+    },
+    {
+      "name": "ck0-bluetesla",
+      "inherits": "base",
+      "displayName": "ck0 BlueTesla NMC (Rev1, external pull-up)",
+      "description": "BlueTesla 96s NMC pack on ck0's Rev1 PCB, modified with a VBUS-powered USB D+ pull-up",
+      "cacheVariables": { "BMS_PROFILE": "2", "BMS_BOARD": "2", "BMS_USB_EXTERNAL_PULLUP": "ON" }
+    },
+    {
+      "name": "ck1-lfp-rev0",
+      "inherits": "base",
+      "displayName": "ck1 LFP shed (Rev0)",
+      "description": "108s LFP shed pack on ck1's Rev0 PCB, stock USB",
+      "cacheVariables": { "BMS_PROFILE": "3", "BMS_BOARD": "1" }
+    },
+    {
+      "name": "rev1-nmc-jpwhit",
+      "inherits": "base",
+      "displayName": "Rev1 NMC (jpwhit)",
+      "description": "BlueTesla 96s NMC pack on a stock Rev1 PCB: no external USB pull-up, no VBUS sense",
+      "cacheVariables": { "BMS_PROFILE": "2", "BMS_BOARD": "2" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "desk", "configurePreset": "desk", "targets": ["bms"] },
+    { "name": "ck0-bluetesla", "configurePreset": "ck0-bluetesla", "targets": ["bms"] },
+    { "name": "ck1-lfp-rev0", "configurePreset": "ck1-lfp-rev0", "targets": ["bms"] },
+    { "name": "rev1-nmc-jpwhit", "configurePreset": "rev1-nmc-jpwhit", "targets": ["bms"] }
+  ]
+}

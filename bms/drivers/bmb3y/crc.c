@@ -42,6 +42,21 @@ uint16_t crc14(uint8_t *data, int len, uint16_t initial_crc, uint16_t extra_mix)
 
 
 
+// BMB module ID check bits: a Hamming SECDED code over the 11-bit ID. Each
+// check bit is the parity of the ID masked with its row; bits 2 and 3 are
+// inverted. E.g. ID 0x004 is sent as 0xF804.
+static const uint16_t MODULE_ID_CHECK_MASKS[5] = { 0x72E, 0x557, 0x799, 0x3E3, 0x1FC };
+static const uint8_t MODULE_ID_CHECK_INVERT = 0x0C;
+
+uint8_t module_id_check_bits(uint16_t module_id) {
+    uint8_t check = 0;
+    for(int i=0; i<5; i++) {
+        check |= (uint8_t)(__builtin_parity(module_id & MODULE_ID_CHECK_MASKS[i]) << i);
+    }
+    return check ^ MODULE_ID_CHECK_INVERT;
+}
+
+
 /*
 def crc14(data, initial):
     crc = initial
