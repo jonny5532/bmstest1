@@ -1,0 +1,943 @@
+stamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3274 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.518V (0.031) | Out: -0.029V (0.038) | NegCtr: -7.928V (0.066) | PosCtr: 43.947V (0.131)
+Link: -0.092V (0.041) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -33 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.260129 mA (0.519920)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV |CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+ [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 105633, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 105633, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.518V (0.030) | Out: -0.029V (0.036) | NegCtr: -7.928V (0.063) | PosCtr: 43.947V (0.137)
+Link: -0.092V (0.040) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -33 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.257534 mA (0.470430)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Max timings (us): 1595 6 1586 1669 1648 1656 1604 3338 7164 
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 106931, Data 0x00000CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+00000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 106931, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 319 dC | 3V3: 3274 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.519V (0.031) | Out: -0.029V (0.038) | NegCtr: -7.929V (0.062) | PosCtr: 43.946V (0.128)
+Link: -0.092V (0.036) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -34 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.263616 mA (0.496065)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 108231, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 108231, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13449 mV
+Batt: 50.519V (0.030) | Out: -0.029V (0.039) | NegCtr: -7.929V (0.061) | PosCtr: 43.946V (0.120)
+Link: -0.092V (0.035) | Fuse:  0.03CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+1V (0.001)
+Current:     -1 mA | Charge: -35 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.265986 mA (0.499308)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 109531, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 109531, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.520V (0.031) | Out: -0.029V (0.041) | NegCtr: -7.929V (0.064) | PosCtr: 43.946V (0.126)
+Link: -0.092V (0.034) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -35 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.266991 mA (0.478555)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV |CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+ [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 110830, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 110830, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.520V (0.031) | Out: -0.028V (0.038) | NegCtr: -7.930V (0.062) | PosCtr: 43.946V (0.124)
+Link: -0.092V (0.037) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -36 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.274303 mA (0.526535)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 112130, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 112130, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3274 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.521V (0.031) | Out: -0.028V (0.037) | NeCTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+gCtr: -7.930V (0.066) | PosCtr: 43.945V (0.125)
+Link: -0.092V (0.036) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -37 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.275209 mA (0.503469)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 113429, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 113429, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.521V (0.030) | Out: -0.028V (0.038) | NegCtr: -7.931V (0.063) | PosCtr: 43.945V (0.122)
+Link: -0.092V (0.035) | Fuse:  0.031V (0.002)
+Current:      0 mA | Charge: -37 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.272464 mA (0.459962)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2JCTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 114731, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 114731, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13450 mV
+Batt: 50.522V (0.028) | Out: -0.028V (0.040) | NegCtr: -7.931V (0.066) | PosCtr: 43.945V (0.130)
+Link: -0.091V (0.039) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -37 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.268397 mA (0.408756)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 116029, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Level FATAL, Count 1, Last Timestamp 116029, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13451 mV
+Batt: 50.522V (0.027) | Out: -0.028V (0.038) | NegCtr: -7.931V (0.059) | PosCtr: 43.945V (0.121)
+Link: -0.091V (0.040) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -37 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.265720 mA (0.381953)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 117329, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 117329, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.522V (0.028) | Out: -0.027V (0.035) | NegCtr: -7.932V (0.064) | PosCtr: 43.945V (0.123)
+Link: -0.091V (0.038) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+37 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.268070 mA (0.406858)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 118628, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 118628, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 50.523V (0.028) | Out: -0.027V (0.035) | NegCtr: -7.932V (0.060) | PosCtr: 43.944V (0.127)
+Link: -0.091V (0.037) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -38 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.269019 mA (0.407378)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 119929, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 119929, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.523V (0.027) | Out: -0.027V (0.038) | NegCtr: -7.933V (0.061) | PosCtr: 43.944V (0.128)
+Link: -0.091V (0.037) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -38 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.266335 mA (0.380956)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'restart'
+Executing command: 'restart'
+Requesting inactive mode
+Received command: 'ctr'
+Executing command: 'ctr'
+Received command: 'ctr'
+Executing command: 'ctr'
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 121226, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, LCTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+ast Timestamp 121226, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3274 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.523V (0.026) | Out: -0.027V (0.038) | NegCtr: -7.933V (0.060) | PosCtr: 43.944V (0.128)
+Link: -0.091V (0.038) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -39 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.267310 mA (0.388309)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+Received command: 'ctr'
+Executing command: 'ctr'
+Received command: 'ctr'
+Executing command: 'ctr'
+Received command: 'ctr'
+Executing command: 'ctr'
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 122529, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 122529, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13450 mV
+Batt: 50.524V (CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+0.027) | Out: -0.027V (0.041) | NegCtr: -7.933V (0.067) | PosCtrCTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+: 43.944V (0.122)
+Link: -0.091V (0.038) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -39 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.264644 mA (0.365186)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+Received command: 'ctr'
+Executing command: 'ctr'
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 123835, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 123835, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13450 mV
+Batt: 50.52CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+4V (0.025) | Out: -0.026V (0.039) | NegCtr: -7.934V (0.060) | PosCtr: 43.944V (0.131)
+Link: -0.091V (0.042) | Fuse:  0.031V (0.001)
+Current:     -1 mA | Charge: -39 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.270644 mA (0.423235)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 125135, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 125135, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 320 dC | 3V3: 3274 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.525V (0.025) | Out: -0.026V (0.038) | NegCtr: -7.934V (0.063) | PoCTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+sCtr: 43.943V (0.116)
+Link: -0.091V (0.035) | Fuse:  0.031V (0.001)
+Current:     -1 mA | Charge: -40 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.277919 mA (0.481033)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 126432, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 126432, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.525V (0.026) | Out: -0.026V (0.037) | NegCtr: -7.934V (0.062) | PosCtr: 43.943V (0.125)
+Link: -0.091V (0.038) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -41 mC | SoC: 6.75 % | SoC(VB):CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.52V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+ 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.283746 mA (0.510282)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Max timings (us): 1659 1602 3748 1727 1668 3323 1610 3497 7298 
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 127734, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 127734, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13450 mV
+Batt: 50.525V (0.024) | Out: -0.026V (0.036) | NegCtr: -7.935V (0.058) | PosCtr: 43.943V (0.127)
+Link: -0.090V (0.035) | Fuse:  0.031V (0.001)
+Current:     -1 mA | Charge: -42 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.290891 mA (0.549059)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.93V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 129034, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 129034, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.526V (0.025) | Out: -0.026V (0.039) | NegCtr: -7.935V (0.063) | PosCtr: 43.942V (0.129)
+Link: -0.090V (0.039) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -43 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.301475 mA (0.591406)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 130341, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 130341, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 322 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 50.526V (0.023) | Out: -0.026V (0.037) | NegCtr: -7.936V (0.062) | PosCtr: 43.942V (0.125)
+Link: -0.090V (0.038) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -43 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.303442 mA (0.572403)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 131639, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 131639, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.526V (0.025) | Out: -0.025V (0.036) | NegCtr: -7.936V (0.061) | PosCtr: 43.942V (0.131)
+Link: -0.090V (0.038) | Fuse:  0.031V (0.001)
+Current:     -1 mA | Charge: -44 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.303913 mA (0.538992)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 132939, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 132939, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.527V (0.025) | Out: -0.025V (0.036) | NegCtr: -7.936V (0.060) | PosCtr: 43.942V (0.117)
+Link: -0.090V (0.041) | Fuse:  0.031V (0.001)
+Current:      0 mA | Charge: -44 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.300882 mA (0.494175)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | VCTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+pos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.03V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 134239, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 134239, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.527V (0.025) | Out: -0.025V (0.034) | NegCtr: -7.936V (0.063) | PosCtr: 43.942V (0.118)
+Link: -0.090V (0.035) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -44 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+0.297881 mA (0.457299)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 135537, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 135537, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5224 mV | 12V: 13209 mV | CtrV: 13449 mV
+Batt: 50.527V (0.024) | Out: -0.025V (0.036) | NegCtr: -7.937V (0.059) | PosCtr: 43.942V (0.133)
+Link: -0.090V (0.038) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -44 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.298385 mA (0.447356)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | VCTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+pos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 136838, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 136838, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13450 mV
+Batt: 50.528V (0.022) | Out: -0.025V (0.037) | NegCtr: -7.937V (0.065) | PosCtr: 43.941V (0.129)
+Link: -0.090V (0.038) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -44 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.300383 mA (0.455693)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5Received command: 'c
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+tr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 138140, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 138140, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3274 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13450 mV
+Batt: 50.528V (0.023) | Out: -0.025V (0.035) | NegCtr: -7.938V (0.065) | PosCtr: 43.941V (0.124)
+Link: -0.090V (0.037) | Fuse:  0.031V (0.000)
+Current:     -1 mA | Charge: -45 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.305850 mA (0.485982)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 139439, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 139439, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3273 mV | 5V: 5225 mV | 12V: 13208 mV | CtrV: 13449 mV
+Batt: 50.528V (0.024) | Out: -0.024V (0.037) | NegCtr: -7.938V (0.065) | PosCtr: 43.941V (0.121)
+Link: -0.090V (0.034) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -45 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.307774 mA (0.487051)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | VCTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+pos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+ReceiCTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+ved command: 'ctr'
+Executing command: 'ctr'
+[2J[H[c  0]: 3365 mV | [c  1]: 3499 mV | [c  2]: 3544 mV | [c  3]: 2699 mV | [c  4]: 3206 mV | 
+[c  5]: 3521 mV | [c  6]: 3453 mV | [c  7]: 3402 mV | [c  8]: 3454 mV | [c  9]: 3505 mV | 
+[c 10]: 3507 mV | [c 11]: 3366 mV | [c 12]: 3514 mV | [c 13]: 3440 mV | [c 14]: 3388 mV | 
+Total: 50863mV | Temps: 23.0C - 23.0C | Delta: 845 mV  | Slow
+
+Event CELL_VOLTAGE_LOW: Level WARNING, Count 1, Last Timestamp 140739, Data 0x0000000000000A8B
+Event CELL_VOLTAGE_VERY_LOW: Level FATAL, Count 1, Last Timestamp 140739, Data 0x0000000000000A8B
+Event BOOT_NORMAL: Level INFO, Count 1, Last Timestamp 0, Data 0x0000000000000000
+Temp: 321 dC | 3V3: 3274 mV | 5V: 5225 mV | 12V: 13209 mV | CtrV: 13450 mV
+Batt: 50.529V (0.019) | Out: -0.024V (0.035) | NegCtr: -7.938V (0.060) | PosCtr: 43.941V (0.121)
+Link: -0.090V (0.036) | Fuse:  0.031V (0.000)
+Current:      0 mA | Charge: -46 mC | SoC: 6.75 % | SoC(VB): 0.00 % | SoC(BC): 6.79 % | SoC(FC): 12.34 %
+Current filtered: -0.308131 mA (0.470110)
+CV: 0.0/0.0 A | W: 30.0 A | T: 46.0/56.0 A | Inv. min: 59.8 V | Inv. max: 58.4 V
+
+midpoint is 13440.1 | Vpos: -1.083 V | Vneg: 1.184 V | Riso: -4.78 Mohm
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+CTR: contactor_sm state=0, system_sm state=5
+CTR: pwm pos=0x0 pre=0x0 neg=0x0 (0x1000 = full on)
+CTR: aux FC_POS (gpio9)=0, aux FC_NEG (gpio10)=0, estop=0
+CTR: batt=50.53V out=-0.02V link=-0.09V posctr=43.94V negctr=-7.94V
+Received command: 'ctr'
+Executing command: 'ctr'
+

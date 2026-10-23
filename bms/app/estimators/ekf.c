@@ -391,9 +391,14 @@ void ekf_step(ekf_t *ekf, float charge_Ah, float current_amps, float voltage_mea
 
     // Constraints
     // Capacity cannot be <= 0
-    if(ekf->x[2] < 0.1f) ekf->x[2] = 0.1f; 
+    if(ekf->x[2] < 0.1f) ekf->x[2] = 0.1f;
     // Ah_used cannot be negative (cannot be "more than full")
     if(ekf->x[0] < 0.0f) ekf->x[0] = 0.0f;
+    // Ah_used cannot exceed capacity (cannot be "less than empty") - without
+    // this a sustained fault (e.g. stuck current reading) lets the raw state
+    // run away and distorts the capacity Jacobian even though the reported
+    // SoC is clamped downstream.
+    if(ekf->x[0] > ekf->x[2]) ekf->x[0] = ekf->x[2];
 
     // --- Update Covariance P ---
     // P = (I - K * H) * P
