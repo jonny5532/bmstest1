@@ -2,6 +2,9 @@
 #define PIN_5V_SENSE 41
 #define PIN_12V_SENSE 42
 #define PIN_CONTACTOR_SENSE 43
+// PCB revision strap (see app/board_id.h): Rev0 floating, Rev1.0 to GND,
+// Rev1.1+ 10k to 3V3 plus a per-revision resistor to GND
+#define PIN_BOARD_REV 47
 
 #define PIN_CONTACTOR_POS 18
 #define PIN_CONTACTOR_NEG 17
@@ -44,12 +47,20 @@
 #define PIN_ISOSPI_RX_AND 30
 #define PIN_ISOSPI_RX_DEBUG 31
 #define PIN_ISOSNOOP_RX_DEBUG 32
-#define PIN_ISOSNOOP_TIMER_DISABLE 3 // spare GPIO that isn't used for anything else
+// The isosnoop state machines pass a flag through this pin (one sets it, another
+// tests it with jmp pin), so it must be in the PIO's GPIO window and driven by
+// nothing else. GPIO30 isn't bonded to anything on the rev1 PCB.
+#define PIN_ISOSNOOP_TIMER_DISABLE 30
+
+// USB VBUS through a 3.3k/5.1k divider (J12 pin 2), for BMS_USB_VBUS_SENSE
+#define PIN_USB_VBUS_SENSE 3
 
 // Each PIO SM can only see 32 GPIOs (0-31 by default? but can be remapped to
 // 16-47 via the GPIOBASE register)
 
 /* ADS1115 inputs:
+
+ADC A (0x48, all board revs):
 AIN0 = bat pos
 AIN1 = bat neg
 AIN2 = FC pos
@@ -58,5 +69,13 @@ AIN3 = FC neg
 bat voltage: AIN0 - AIN1
 fc voltage: AIN2 - AIN3
 
+ADC B (0x49, rev1 boards only):
+AIN0 = link neg
+AIN1 = out pos (drive unit positive, before the F4 fuse/jumper)
+AIN2 = bat pos
+AIN3 = link pos
 
+pos contactor (K6 Link Positive): AIN2 - AIN3
+link voltage (negated): AIN0 - AIN3
+fuse/jumper drop: AIN1 - AIN3
 */

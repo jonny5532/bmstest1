@@ -1,6 +1,7 @@
 #include "logging.h"
 
 #include "tusb.h"
+#include "hardware/sync.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -54,6 +55,11 @@ static void rb_init(ringbuffer_t *rb, uint8_t *buffer, uint32_t size) {
 static void rb_write(ringbuffer_t *rb, const uint8_t *data, uint32_t len) {
     if (len == 0) return;
 
+    // Writers exist in both main-loop and ISR context (e.g. error_printf from
+    // the DUART DMA IRQ). The head/write_count update below is a non-atomic
+    // read-modify-write, so exclude concurrent writers for the duration.
+    uint32_t irq_state = save_and_disable_interrupts();
+
     // 1. Copy data handling the wrap-around
     uint32_t head = rb->head;
     uint32_t size = rb->size;
@@ -97,6 +103,8 @@ static void rb_write(ringbuffer_t *rb, const uint8_t *data, uint32_t len) {
 
     // 3. Update monotonic counter
     rb->write_count += len;
+
+    restore_interrupts(irq_state);
 }
 
 /**
