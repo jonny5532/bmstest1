@@ -27,7 +27,13 @@ bool successfully_initialized(const bms_model_t *model) {
         return false;
     }
 
-    if(!millis_recent_enough(model->current_millis, CURRENT_STALE_THRESHOLD_MS)) {
+#if BMS_BOARD == BMS_BOARD_REV1
+    if(!millis_recent_enough(model->high_voltages.link_millis, CONTACTOR_VOLTAGE_STALE_THRESHOLD_MS)) {
+        return false;
+    }
+#endif
+
+    if(!millis_recent_enough(model->current_millis, CURRENT_STALE_FAULT_THRESHOLD_MS)) {
         return false;
     }
 
@@ -53,6 +59,15 @@ void system_sm_tick(bms_model_t *model) {
             model->operating = false; // TODO: avoid setting this if RESTARTING?
             nvm_schedule_save_persistent_fast(model);
             state_transition((sm_t*)system_sm, SYSTEM_STATE_FAULT);
+        }
+    }
+
+    // The isolation zero is the reading with the pack floating, so it can only
+    // be taken while inactive with the contactors open; read_inputs() does it.
+    if(model->system_req == SYSTEM_REQUEST_CALIBRATE_ISOLATION_ZERO) {
+        model->system_req = SYSTEM_REQUEST_NULL;
+        if(system_sm->state == SYSTEM_STATE_INACTIVE && model->contactor_sm.state == CONTACTORS_STATE_OPEN) {
+            model->isolation_zero_cal_pending = true;
         }
     }
 

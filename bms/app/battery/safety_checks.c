@@ -102,7 +102,7 @@ void confirm_battery_safety(const bms_model_t *model) {
     }
 
     check_or_confirm(
-        millis_recent_enough(model->current_millis, CURRENT_STALE_THRESHOLD_MS),
+        millis_recent_enough(model->current_millis, CURRENT_STALE_FAULT_THRESHOLD_MS),
         // Don't raise faults if we're still initializing
         !not_fully_initialized,
         ERR_CURRENT_STALE,
@@ -111,8 +111,11 @@ void confirm_battery_safety(const bms_model_t *model) {
 
     // TODO: Is this the right place for this?
 
-    // Check for battery vs cell voltage discrepancy
-    if(model->high_voltages.battery_millis > 0 && model->cell_voltage_millis > 0 && (model->high_voltages.battery_millis - model->cell_voltage_millis) < 1000) {
+    // Check for battery vs cell voltage discrepancy. The signed difference
+    // handles either reading being the more recent one (and wraparound).
+    int32_t voltage_reading_gap_ms = (int32_t)(model->high_voltages.battery_millis - model->cell_voltage_millis);
+    if(model->high_voltages.battery_millis > 0 && model->cell_voltage_millis > 0 &&
+       voltage_reading_gap_ms > -1000 && voltage_reading_gap_ms < 1000) {
         // If we have a recent cell voltage reading, compare total to battery
         // voltage. We may be sampling the cell voltages very infrequently, so
         // only do this check if the voltage readings are close in time.
@@ -121,7 +124,7 @@ void confirm_battery_safety(const bms_model_t *model) {
         confirm(
             voltage_diff > -(VOLTAGE_MISMATCH_THRESHOLD_mV * 0.001f) && voltage_diff < (VOLTAGE_MISMATCH_THRESHOLD_mV * 0.001f),
             ERR_VOLTAGE_MISMATCH,
-            ((uint64_t)model->cell_voltage_total_mV << 32) | (uint32_t)(expected_total * 1000)
+            ((uint64_t)(uint32_t)model->cell_voltage_total_mV << 32) | (uint32_t)(expected_total * 1000)
         );
     }
 

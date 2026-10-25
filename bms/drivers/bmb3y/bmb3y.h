@@ -50,8 +50,11 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 #define BMB3Y_CMD_READ_CONFIG  0x50009400    // Config register
 #define BMB3Y_CMD_WRITE_CONFIG 0x112F        // Write config
 
-// Sniffed BMS traffic seems to use these shorter commands for cellvoltage reads
-// rather than the longer ones. However the CRCs seem to work differently.
+// Short cell voltage reads, as used by the real BMS. Each BMB replies with
+// eight bytes: three little-endian cells and a CRC14 with initial value 0x0010
+// (as for every short-form reply). The long reads above instead carry a tag
+// byte (0x00) before each BMB's data, which the CRC covers: initial value
+// 0x1000 over the data is the same as 0x0010 over the tag and the data.
 #define BMB3Y_CMD_READ_A_SHORT 0x0763
 #define BMB3Y_CMD_READ_B_SHORT 0x08F9
 #define BMB3Y_CMD_READ_C_SHORT 0x09D6
@@ -63,6 +66,19 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 // to be some kind of wakeup. Does ensure that a subsequent SNAPSHOT actually
 // works, after a long sleep.
 #define BMB3Y_CMD_HELLO        0x2710
+
+// Module ID (register 0x33). Each BMB replies with a 2-byte little-endian word:
+// an 11-bit module ID plus 5 Hamming SECDED check bits (bits 11-15, see
+// module_id_check_bits() in crc.h). Registers 0x83/0x93 have the same format.
+#define BMB3Y_CMD_READ_MODULE_ID_SHORT       0x3302      // primary: 4 bytes per BMB, CRC14 init 0x0010
+#define BMB3Y_CMD_READ_MODULE_ID             0x7300CA00  // long form, tag 0x00: 5 bytes per BMB, CRC14 init 0x1000
+#define BMB3Y_CMD_READ_MODULE_ID_BANK1_SHORT 0x833C      // register 0x83
+#define BMB3Y_CMD_READ_MODULE_ID_BANK2_SHORT 0x9392      // register 0x93
+#define BMB3Y_CMD_PATTERN_5555               0x254E      // test pattern; may be needed before reading 0x33
+#define BMB3Y_CMD_PATTERN_AAAA               0x263F      // test pattern (pairs with 0x30-0x32 reads)
+
+#define BMB3Y_MODULE_ID_MASK 0x07FF
+#define BMB3Y_MODULE_ID_CHECK_SHIFT 11
 
 #define BMB3Y_CMD_READ_TEMPS   0x0E1B
 #define BMB3Y_CMD_READ_TEMPS2  0x0F34 // returns 4 + CRC?
@@ -137,3 +153,16 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 
 
 void bmb3y_tick(bms_model_t *model);
+// Print the last reading of every BMB channel, populated or not
+void bmb3y_print_physical_cells(void);
+// Read the module ID of every BMB into the model (module_ids_*). Wakes the
+// BMBs itself. Returns true if at least one BMB gave a valid ID.
+bool bmb3y_read_module_ids_blocking(bms_model_t *model);
+// Print the last module ID read of every BMB slot, then the pack verdict
+void bmb3y_print_module_ids(const bms_model_t *model);
+// Number of BMB channels whose last reading is a plausible cell voltage, or -1
+// before the first cell reading
+int bmb3y_count_live_channels(void);
+// Number of BMBs that passed the CRC on every bank of the last full cell read,
+// or -1 before the first one
+int bmb3y_count_cell_modules(void);

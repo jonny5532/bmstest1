@@ -1,2 +1,6 @@
 build
+build_*
 tmp
+/build*
+build-*
+/firmware/

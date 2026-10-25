@@ -4,14 +4,18 @@
 #include "config/pins.h"
 #include "sys/time/time.h"
 #include "drivers/sensors/ina228.h"
+#include "drivers/sensors/internal_adc.h"
 #include "app/estimators/ekf.h"
 #include "app/model.h"
+#include "app/firmware_id.h"
 #include "drivers/chip/nvm.h"
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
 
 #include "pico/stdlib.h"
 #include "pico/unique_id.h"
+
+#include <math.h>
 
 // BMS defaults to address 1
 uint8_t device_address = 1;
@@ -104,6 +108,20 @@ static bool hmi_register_is_available(uint16_t reg_id, bms_model_t *model) {
             return model->high_voltages.pos_contactor_millis > 0;
         case HMI_REG_NEG_CONTACTOR_VOLTAGE:
             return model->high_voltages.neg_contactor_millis > 0;
+        case HMI_REG_LINK_VOLTAGE:
+            return model->high_voltages.link_millis > 0;
+        case HMI_REG_SHUNT_DIE_TEMP:
+            return model->shunt_die_temperature_millis > 0;
+        case HMI_REG_SHUNT_NTC_TEMP:
+        case HMI_REG_SHUNT_NTC_RESISTANCE:
+            return model->shunt_ntc_millis > 0;
+        case HMI_REG_ISOLATION_POS_RAW:
+        case HMI_REG_ISOLATION_NEG_RAW:
+        case HMI_REG_ISOLATION_RESISTANCE:
+        case HMI_REG_PACK_POS_TO_CHASSIS:
+        case HMI_REG_PACK_NEG_TO_CHASSIS:
+        case HMI_REG_ISOLATION_CHECK_AGE:
+            return model->high_voltages.isolation_millis > 0;
         case HMI_REG_TEMPERATURE_MIN:
         case HMI_REG_TEMPERATURE_MAX:
             return model->temperature_millis > 0;
@@ -173,6 +191,73 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
         case HMI_REG_NEG_CONTACTOR_VOLTAGE:
             buf[idx++] = HMI_TYPE_INT32;
             idx += hmi_buf_append_uint32(&buf[idx], (uint32_t)(model->high_voltages.neg_contactor * 1000));
+            break;
+        case HMI_REG_LINK_VOLTAGE:
+            buf[idx++] = HMI_TYPE_INT32;
+            idx += hmi_buf_append_uint32(&buf[idx], (uint32_t)(model->high_voltages.link * 1000));
+            break;
+        case HMI_REG_SHUNT_DIE_TEMP:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->shunt_die_temperature);
+            break;
+        case HMI_REG_SHUNT_NTC_TEMP:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->shunt_ntc_temperature);
+            break;
+        case HMI_REG_SHUNT_NTC_RESISTANCE:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->shunt_ntc_resistance_ohms);
+            break;
+        case HMI_REG_ISOLATION_POS_RAW:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->high_voltages.isolation_pos_raw);
+            break;
+        case HMI_REG_ISOLATION_NEG_RAW:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->high_voltages.isolation_neg_raw);
+            break;
+        case HMI_REG_ISOLATION_RESISTANCE:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->high_voltages.isolation_resistance_ohms);
+            break;
+        case HMI_REG_PACK_POS_TO_CHASSIS:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->high_voltages.pack_pos_to_chassis);
+            break;
+        case HMI_REG_PACK_NEG_TO_CHASSIS:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->high_voltages.pack_neg_to_chassis);
+            break;
+        case HMI_REG_ISOLATION_CHECK_AGE: {
+            float age = NAN;
+            if (model->contactor_sm.state == CONTACTORS_STATE_OPEN && !isnan(model->high_voltages.isolation_resistance_ohms)) {
+                age = 0.0f;
+            } else if (model->high_voltages.isolation_open_millis) {
+                age = (millis() - model->high_voltages.isolation_open_millis) / 1000.0f;
+            }
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], age);
+            break;
+        }
+        case HMI_REG_BOARD_REVISION:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->board_id);
+            break;
+        case HMI_REG_BOARD_STRAP_COUNTS:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->board_id_counts);
+            break;
+        case HMI_REG_BUILD_HASH:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], bms_build_hash);
+            break;
+        case HMI_REG_BUILD_TIME:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], bms_build_time);
+            break;
+        case HMI_REG_MCU_TEMPERATURE:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], get_temperature_c_times10() / 10.0f);
             break;
         case HMI_REG_TEMPERATURE_MIN:
             buf[idx++] = HMI_TYPE_FLOAT;
@@ -369,15 +454,6 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
                 if (temp_idx < 8) {
                     buf[idx++] = HMI_TYPE_FLOAT;
                     idx += hmi_buf_append_float(&buf[idx], model->module_temperatures[temp_idx]);
-                } else {
-                    // Unknown temp
-                    idx -= 2; // rollback reg_id
-                }
-            } else if (reg_id >= HMI_REG_RAW_TEMPS_START && reg_id <= HMI_REG_RAW_TEMPS_END) {
-                uint16_t temp_idx = reg_id - HMI_REG_RAW_TEMPS_START;
-                if (temp_idx < (16+24+8)) {
-                    buf[idx++] = HMI_TYPE_UINT16;
-                    idx += hmi_buf_append_uint16(&buf[idx], model->raw_temperatures[temp_idx]);
                 } else {
                     // Unknown temp
                     idx -= 2; // rollback reg_id

@@ -21,7 +21,9 @@
 #define NUM_MODULE_TEMPS 1
 #define NAMEPLATE_CAPACITY_AH 1
 #define INA228_SHUNT_CAL 3088
-    
+// Custom pack: its BMB comes from a 108s1p LFP pack but measures these 15 cells
+#define CUSTOM_PACK_MODULE_IDS { 0x023 }
+
 #elif BMS_PROFILE == BMS_BLUETESLA
     // for the 96-cell NMC pack:
 #define CHEMISTRY NMC
@@ -48,6 +50,60 @@
 #else
     #error "Unsupported BMS_PROFILE"
 #endif
+
+// A custom pack is built from stock BMBs whose module IDs describe the pack
+// they came from, so no stock pack type fits it and its BMS would raise a
+// fatal BMB_MODULE_ID_CONFLICT. Its profile lists the IDs its BMBs report as
+// CUSTOM_PACK_MODULE_IDS (e.g. { 0x023 }), which adds a pack type for it to the
+// table: NUM_CELLS series, CHEMISTRY, NUM_MODULE_VOLTAGES BMBs. The module
+// ID, cell count and BMB count checks then apply to it like any other pack.
+
+
+// PCB revision selection (orthogonal to the pack profile above)
+
+#define BMS_BOARD_REV0 1
+#define BMS_BOARD_REV1 2
+
+#ifndef BMS_BOARD
+#define BMS_BOARD BMS_BOARD_REV0
+#endif
+
+#if BMS_BOARD == BMS_BOARD_REV1
+// Rev1 adds a second ADS1115 (0x49) sensing the Link and Drive Unit rails
+#define HAS_ADS1115_SECONDARY 1
+// Rev1's default contactor arrangement precharges via the FC negative contactor
+#ifndef PRECHARGE_ON_NEGATIVE
+#define PRECHARGE_ON_NEGATIVE 1
+#endif
+// Rev1 uses 501:1 dividers (12M/24k): 501 * 1.024/32768 V per count
+#define ADS1115_DEFAULT_MUL 0.015656f
+// Isolation monitor zero (ADC counts with the pack floating), measured on ck0
+// with the contactors open; no temperature drift measured yet
+#define ISOLATION_ZERO_DEFAULT_COUNTS 13317.0f
+#define ISOLATION_ZERO_TEMPCO_COUNTS_PER_DC 0.0f
+#elif BMS_BOARD == BMS_BOARD_REV0
+// Rev0 divider ratio is ~416:1
+#define ADS1115_DEFAULT_MUL 0.013f
+// Isolation monitor zero from the original Rev0 calibration, with its drift
+#define ISOLATION_ZERO_DEFAULT_COUNTS 22496.4f
+#define ISOLATION_ZERO_TEMPCO_COUNTS_PER_DC 0.28f
+#else
+    #error "Unsupported BMS_BOARD"
+#endif
+
+// Isolation monitor, all boards. The divider ratio is derived at run time from
+// the battery voltage and the channel span, so only the zero needs calibrating.
+#define ISOLATION_ZERO_CAL_TEMP_DC 285.0f       // temperature the zero is referred to
+#define ISOLATION_DIVIDER_BOTTOM_OHMS 24000.0f  // bottom resistor of each HV divider
+#define ISOLATION_RESISTANCE_CAP_OHMS 100e6f    // report at most 100 Mohm
+#define ISOLATION_MIN_SPAN_COUNTS 100.0f        // below this the channels are unusable
+#define ISOLATION_MIN_BATTERY_V 20.0f
+// Automatic zero check at boot (see isolation_autozero_step)
+#define ISOLATION_AUTOZERO_SETTLE_MS 3000        // contactors open this long before averaging
+#define ISOLATION_AUTOZERO_WINDOW_MS 3000        // averaging period
+#define ISOLATION_AUTOZERO_MAX_NOISE_COUNTS 40.0f // midpoint must stay within this band
+#define ISOLATION_AUTOZERO_MAX_STEP_COUNTS 150.0f // larger offsets are treated as a leak
+#define ISOLATION_AUTOZERO_BLEND 0.5f            // fraction of the offset taken per boot
 
 
 // TODO - derate voltage limits based on temperature
@@ -230,6 +286,13 @@
 // must wait this long to ensure it isn't using pre-precharge readings.
 #define CURRENT_STALE_THRESHOLD_MS 800
 
+// Current sampling is briefly paused (~1.2s worst case between samples) every
+// ~53s while the INA228 takes a shunt temperature measurement, so fault/
+// readiness checks must tolerate a longer gap. The contactor logic keeps the
+// tight threshold above; it never sees the pause because temperature
+// measurements are deferred unless the contactors are settled.
+#define CURRENT_STALE_FAULT_THRESHOLD_MS 1500
+
 #define TEMPERATURE_STALE_THRESHOLD_MS(model) (  \
     (model)->cell_voltage_slow_mode ?              \
         CELL_TEMPERATURE_STALE_THRESHOLD_SLOW_MS  \
@@ -276,9 +339,28 @@
 #define CONTACTORS_CLOSED_VOLTAGE_THRESHOLD_MV 2000
 // Min voltage across a contactor to consider it open
 #define CONTACTORS_OPEN_VOLTAGE_THRESHOLD_MV 3000 // was 5000
+// An inverter can keep its battery port energized while the contactors are open
+// (Deye HV). Output at or above this fraction of the battery voltage with both
+// contactors commanded open means "energized from outside", not welded: the
+// weld test is skipped for that start and the BMS precharges onto the port.
+// See docs/contactor-test-energized-port.md.
+#define CONTACTORS_PORT_ENERGIZED_FRACTION 0.8f
+#if BMS_BOARD == BMS_BOARD_REV1
+// Rev1 measures directly across the pos (Link Positive) contactor, so the
+// tight generic thresholds apply
+#define CONTACTORS_POS_CLOSED_VOLTAGE_THRESHOLD_MV 2000
+#define CONTACTORS_POS_OPEN_VOLTAGE_THRESHOLD_MV 3000
+// Max discrepancy between battery and link voltage while closed (measured by
+// two different ADCs which may be independently [un]calibrated)
+#define CONTACTORS_LINK_MISMATCH_THRESHOLD_MV 16000
+// Max sustained drop across the F4 fuse/jumper (while current is flowing)
+// before warning that it may have blown
+#define FUSE_DROP_WARNING_THRESHOLD_MV 10000
+#else
 // Pos contactor has wider tolerances due to the way it is measured
 #define CONTACTORS_POS_CLOSED_VOLTAGE_THRESHOLD_MV 5000
 #define CONTACTORS_POS_OPEN_VOLTAGE_THRESHOLD_MV 10000
+#endif
 
 
 // Precharge thresholds
@@ -296,6 +378,11 @@
 #define PRECHARGE_SUCCESS_MAX_MA 225
 // Maximum voltage difference to consider precharge successful (allowing for uncalibrated contactors)
 #define PRECHARGE_SUCCESS_MAX_MV 16000
+#if BMS_BOARD == BMS_BOARD_REV1
+// Rev1 also senses the link rail directly, so the voltage across the PTC + FC
+// negative contactor path (link vs output) can be held to a tighter limit
+#define PRECHARGE_SUCCESS_LINK_MAX_MV 8000
+#endif
 
 
 // Contactor opening thresholds
@@ -310,3 +397,49 @@
 #define CONTACTORS_OPEN_TIMEOUT_MS 30000
 // How long we wait when force-opening contactors
 #define CONTACTORS_FORCE_OPEN_TIMEOUT_MS 2000
+// How long a requested (not forced) open holds the zero current limits before
+// opening, even when the current is already below CONTACTORS_INSTANT_OPEN_MA.
+// The Deye 50K passes the BMS limits to its DSP only every 6.14 s. Opening at
+// 0.9 A one second after sending zero limits left the DSP still charging
+// the port: the port collapsed below the BMS voltage it last had, which
+// latched F57 and cut the inverter output for 30 s (2026-10-22).
+#define CONTACTORS_REQUESTED_OPEN_HOLD_MS 8000
+
+
+// SUPERVISOR
+
+// Escalation times of the BMS cell voltage events (see sys/events/events.h),
+// named so the supervisor delays below follow them
+#define CELL_VOLTAGE_FAULT_ESCALATION_MS 1000
+#define CELL_VOLTAGES_STALE_ESCALATION_MS 1000
+
+// The BMS watchdog reboots it (which opens the contactors) after this long
+#define BMS_WATCHDOG_TIMEOUT_MS 5000
+
+// The supervisor independently checks the cell voltages it snoops off the
+// isoSPI bus against the same hard limits as the BMS. Before cutting the
+// contactor drivers it waits twice as long as the BMS takes to open the
+// contactors itself (fault escalation plus the force-open wait for the current
+// to fall), so the BMS always gets to open them first.
+#define SUPERVISOR_CELL_FAULT_DROP_MS \
+    (2 * (CELL_VOLTAGE_FAULT_ESCALATION_MS + CONTACTORS_FORCE_OPEN_TIMEOUT_MS))
+// Scans stopping cuts the drivers after the same doubled delay, without the
+// longer slow-mode allowance: the BMS only uses slow mode with the contactors
+// open, and the supervisor enables again once fresh scans arrive.
+#define SUPERVISOR_SCAN_STALE_DROP_MS \
+    (2 * (CELL_VOLTAGE_STALE_THRESHOLD_MS + CELL_VOLTAGES_STALE_ESCALATION_MS + CONTACTORS_FORCE_OPEN_TIMEOUT_MS))
+// Without a BMS status for this long, the BMS is taken to be hung or gone
+#define SUPERVISOR_HEARTBEAT_DROP_MS (2 * BMS_WATCHDOG_TIMEOUT_MS)
+
+// Enabling needs a BMS status at least this recent...
+#define SUPERVISOR_HEARTBEAT_ENABLE_MS 1000
+// ...and this many complete, in-range scans in a row
+#define SUPERVISOR_GOOD_SCANS_TO_ENABLE 3
+// How closely the BMS's cell min/max must match the snooped ones to enable
+#define SUPERVISOR_BMS_AGREE_TOLERANCE_mV 100
+// An unpopulated channel reading above this looks like a connected cell
+#define SUPERVISOR_ABSENT_CHANNEL_MAX_mV 500
+
+// The BMS treats the contactor drivers as disabled without a supervisor reply
+// this recent
+#define SUPERVISOR_REPLY_STALE_MS 2000
