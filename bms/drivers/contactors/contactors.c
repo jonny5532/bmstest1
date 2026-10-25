@@ -16,15 +16,28 @@
 #define INVERT_B true
 #endif
 
+#ifdef BMS_FC_POS_CONTACTOR
+#ifndef PRECHARGE_ON_NEGATIVE
+#error "BMS_FC_POS_CONTACTOR needs PRECHARGE_ON_NEGATIVE: otherwise GPIO16 is the precharge output"
+#endif
+#endif
+
 // should these go in the model? or the state machine?
 uint32_t pos_level = 0;
 uint32_t pre_level = 0;
 uint32_t neg_level = 0;
+#ifdef BMS_FC_POS_CONTACTOR
+uint32_t fc_pos_level = 0;
+#endif
 
 void contactors_init() {
     init_pwm_pin(PIN_CONTACTOR_POS, INVERT_B);
     init_pwm_pin(PIN_CONTACTOR_PRE, INVERT_B);
     init_pwm_pin(PIN_CONTACTOR_NEG, INVERT_B);
+#ifdef BMS_FC_POS_CONTACTOR
+    // FC+ (channel A) shares a slice with neg (channel B), so it runs in phase with neg
+    init_pwm_pin(PIN_CONTACTOR_FC_POS, INVERT_B);
+#endif
 
     // Since the contactors will be on most of the time, at a low duty cycle, we
     // should stagger their PWM phases to reduce peak current draw. Oddly, in
@@ -113,6 +126,11 @@ void contactors_set_pos_pre_neg(bool pos, bool pre, bool neg) {
     set_with_pwm(PIN_CONTACTOR_PRE, actual_pre, &pre_level);
     set_with_pwm(PIN_CONTACTOR_POS, actual_pos, &pos_level);
     set_with_pwm(PIN_CONTACTOR_NEG, actual_neg, &neg_level);
+#ifdef BMS_FC_POS_CONTACTOR
+    // FC+ connects the FC port to Link+, so it follows Link+ exactly: closed for the
+    // precharge (the PTC on the negative side limits the inrush) and while closed
+    set_with_pwm(PIN_CONTACTOR_FC_POS, actual_pos, &fc_pos_level);
+#endif
 }
 
 void contactors_test_pre(bool closed) {
@@ -123,4 +141,7 @@ void contactors_test_pre(bool closed) {
     set_with_pwm(PIN_CONTACTOR_PRE, closed, &pre_level);
     set_with_pwm(PIN_CONTACTOR_POS, false, &pos_level);
     set_with_pwm(PIN_CONTACTOR_NEG, false, &neg_level);
+#ifdef BMS_FC_POS_CONTACTOR
+    set_with_pwm(PIN_CONTACTOR_FC_POS, false, &fc_pos_level);
+#endif
 }

@@ -1,3 +1,4 @@
+#include "config/limits.h"
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
 
@@ -14,7 +15,7 @@ void init_watchdog() {
         sleep_ms(3000);
     }
 
-    watchdog_enable(5000, 0); // second arg enables pause on debug
+    watchdog_enable(BMS_WATCHDOG_TIMEOUT_MS, 0); // second arg enables pause on debug
 
     if (was_watchdog) {
         warning_printf("Rebooted by Watchdog!\n");
