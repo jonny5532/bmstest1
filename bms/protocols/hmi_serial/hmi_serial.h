@@ -126,6 +126,23 @@
 #define HMI_REG_OCV_LEARN_CAPACITY_DEPTH_V 79 // float (V/cell), learned OCV at that bin
 #define HMI_REG_OCV_LEARN_CAPACITY_DEPTH_CYCLES 80 // float, that bin's decaying count of full charge cycles
 
+// Health and diagnostics, for a long-term record (the HMI firmware reads these from 96)
+#define HMI_REG_EKF_CAPACITY           96 // float (Ah), the EKF's estimate of the pack's capacity; absent until it runs
+#define HMI_REG_SOC_FANCY_COUNT        97 // uint16 (0.01%), the third SOC estimate (coulomb count with corrections)
+#define HMI_REG_OVERCURRENT_CHARGE_BUFFER    98 // float (%), how close charging is to an overcurrent trip (100 = trips)
+#define HMI_REG_OVERCURRENT_DISCHARGE_BUFFER 99 // float (%), the same for discharging
+#define HMI_REG_SOFT_CHARGE_BUFFER    100 // float (%), charge past the soft cell limits, of what trips it (+ charge, - discharge)
+#define HMI_REG_UART0_PACKETS_RECEIVED 101 // uint32, since boot (each serial port's counters wrap)
+#define HMI_REG_UART0_PACKETS_SENT     102 // uint32
+#define HMI_REG_UART0_CRC_ERRORS       103 // uint32
+#define HMI_REG_UART1_PACKETS_RECEIVED 104 // uint32
+#define HMI_REG_UART1_PACKETS_SENT     105 // uint32
+#define HMI_REG_UART1_CRC_ERRORS       106 // uint32
+#define HMI_REG_CAN_FRAMES_SENT        107 // uint32
+#define HMI_REG_CAN_FRAMES_RECEIVED    108 // uint32
+#define HMI_REG_BALANCING_STATE        109 // uint8, balancing_states (0 idle, 1 active...)
+#define HMI_REG_CALIBRATION_STATE      110 // uint8, calibration_state_t (0 idle)
+
 // Deprecated: these ranges and READ_CELL_VOLTAGES / READ_BALANCING_TIMES stay
 // for older HMIs, and are fixed at the first 120 cells and 8 modules. Use
 // READ_ARRAY instead.

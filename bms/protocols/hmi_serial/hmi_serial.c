@@ -7,6 +7,8 @@
 #include "drivers/sensors/ina228.h"
 #include "app/estimators/ekf.h"
 #include "app/model.h"
+#include "app/monitoring/counters.h"
+#include "config/limits.h"
 #include "drivers/chip/nvm.h"
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
@@ -119,6 +121,8 @@ static bool hmi_register_is_available(uint16_t reg_id, bms_model_t *model) {
         case HMI_REG_TEMPERATURE_MIN:
         case HMI_REG_TEMPERATURE_MAX:
             return model->temperature_millis > 0;
+        case HMI_REG_EKF_CAPACITY:
+            return model->ekf.initialized;
         case HMI_REG_CELL_VOLTAGE_MIN:
         case HMI_REG_CELL_VOLTAGE_MAX:
             return model->cell_voltage_millis > 0;
@@ -189,6 +193,69 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
         case HMI_REG_LINK_VOLTAGE:
             buf[idx++] = HMI_TYPE_INT32;
             idx += hmi_buf_append_uint32(&buf[idx], (uint32_t)(model->high_voltages.link * 1000));
+            break;
+        case HMI_REG_EKF_CAPACITY:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->ekf.x[2]);
+            break;
+        case HMI_REG_SOC_FANCY_COUNT:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->soc_fancy_count);
+            break;
+        case HMI_REG_OVERCURRENT_CHARGE_BUFFER:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->excess_charge_buffer_dC * 100.0f / OVERCURRENT_BUFFER_LIMIT_dC);
+            break;
+        case HMI_REG_OVERCURRENT_DISCHARGE_BUFFER:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->excess_discharge_buffer_dC * 100.0f / OVERCURRENT_BUFFER_LIMIT_dC);
+            break;
+        case HMI_REG_SOFT_CHARGE_BUFFER: {
+            int32_t b = model->soft_limit_charge_buffer_dC;
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], b >= 0 ? b * 100.0f / OVERCHARGE_BUFFER_LIMIT_dC
+                                                          : b * 100.0f / OVERDISCHARGE_BUFFER_LIMIT_dC);
+            break;
+        }
+        case HMI_REG_UART0_PACKETS_RECEIVED:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart0_packets_received);
+            break;
+        case HMI_REG_UART0_PACKETS_SENT:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart0_packets_sent);
+            break;
+        case HMI_REG_UART0_CRC_ERRORS:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart0_crc_errors);
+            break;
+        case HMI_REG_UART1_PACKETS_RECEIVED:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart1_packets_received);
+            break;
+        case HMI_REG_UART1_PACKETS_SENT:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart1_packets_sent);
+            break;
+        case HMI_REG_UART1_CRC_ERRORS:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart1_crc_errors);
+            break;
+        case HMI_REG_CAN_FRAMES_SENT:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.can_frames_sent);
+            break;
+        case HMI_REG_CAN_FRAMES_RECEIVED:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.can_frames_received);
+            break;
+        case HMI_REG_BALANCING_STATE:
+            buf[idx++] = HMI_TYPE_UINT8;
+            buf[idx++] = (uint8_t)model->balancing_sm.state;
+            break;
+        case HMI_REG_CALIBRATION_STATE:
+            buf[idx++] = HMI_TYPE_UINT8;
+            buf[idx++] = (uint8_t)model->calibration_sm.state;
             break;
         case HMI_REG_TEMPERATURE_MIN:
             buf[idx++] = HMI_TYPE_FLOAT;
