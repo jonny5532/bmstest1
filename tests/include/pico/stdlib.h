@@ -33,3 +33,5 @@ struct repeating_timer {
 };
 alarm_id_t add_alarm_in_ms(uint32_t ms, alarm_callback_t callback, void *user_data, bool fire_if_past);
 bool add_repeating_timer_ms(int32_t delay_ms, repeating_timer_callback_t callback, void *user_data, struct repeating_timer *out);
+bool add_repeating_timer_us(int64_t delay_us, repeating_timer_callback_t callback, void *user_data, struct repeating_timer *out);
+void sleep_ms(uint32_t ms);

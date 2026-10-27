@@ -194,7 +194,7 @@ void bms_tick() {
 
     // Phase 2: Update model
 
-    static int32_t last_charge_raw = 0;
+    static int64_t last_charge_raw = 0;
     millis_t now = millis();
     if(now - model.soc_millis >= 1000) {
         uint32_t soc = ekf_tick(
@@ -207,7 +207,6 @@ void bms_tick() {
             model.soc = (uint16_t)soc;
             model.soc_millis = now;
         }
-        // Truncates, but tick-to-tick changes will be small
         last_charge_raw = model.charge_raw;
     }
 

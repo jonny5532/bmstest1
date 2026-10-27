@@ -253,6 +253,19 @@ target_include_directories(test_sampler PRIVATE
 
 add_test(NAME test_sampler COMMAND ${MEMORY_CHECK} test_sampler)
 
+add_executable(test_ina228
+    test_ina228.c
+    ../bms/drivers/sensors/ina228.c
+)
+target_link_libraries(test_ina228 PRIVATE cmocka m)
+target_include_directories(test_ina228 PRIVATE
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_ina228 COMMAND ${MEMORY_CHECK} test_ina228)
+
 add_executable(test_model
     test_model.c
     ../bms/sys/events/events.c

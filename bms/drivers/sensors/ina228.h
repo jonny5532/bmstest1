@@ -42,6 +42,10 @@
 // measurements. Each trigger alternates between the die temp and the NTC.
 #define INA228_TEMP_MEASURE_INTERVAL_SAMPLES 100
 
+// Log a gap between current samples longer than this (normally ~531ms, or
+// up to ~1.2s around a temperature measurement)
+#define INA228_SAMPLE_GAP_LOG_US 5000000
+
 // Conversion from shunt input offset voltage (uV) to raw current counts.
 // One raw count is 0.25mA, which across the 1mOhm shunt is 0.25uV, so
 // counts = uV / 0.25. Adjust if a different shunt resistance is used.
@@ -69,12 +73,6 @@ typedef struct {
 bool ina228_init(ina228_t *dev, uint8_t i2c_addr, float shunt_resistor_ohms, float max_current_a);
 void ina228_configure(ina228_t *dev);
 
-// Blocking read functions
-bool ina228_read_current_blocking(ina228_t *dev);
-bool ina228_read_charge(ina228_t *dev);
-bool ina228_read_shunt_voltage(ina228_t *dev, float *voltage_mv);
-bool ina228_read_bus_voltage(ina228_t *dev, float *voltage_mv);
-
 /**
  * @brief Read the latest current measurement sampled by the background timer.
  * 
@@ -83,20 +81,13 @@ bool ina228_read_bus_voltage(ina228_t *dev, float *voltage_mv);
  */
 bool ina228_read_current_async(ina228_t *dev);
 
-// Getter functions for last read values
-int32_t ina228_get_current_raw();
-millis_t ina228_get_current_millis();
-int64_t ina228_get_charge_raw();
-millis_t ina228_get_charge_millis();
+// model.charge_raw is in current LSBs (0.25mA) x microseconds, i.e. 0.25nC
+#define INA228_CHARGE_RAW_PER_MC 4000000
 
 static inline int64_t raw_charge_to_mC(int64_t charge_raw) {
-    // Each LSB of charge_raw represents 0.132736 mC
-    // (0.25mA * 530.944ms)
-    return (charge_raw * 132736) / 1000000;
+    return charge_raw / INA228_CHARGE_RAW_PER_MC;
 }
 
-static inline float raw_charge_to_Ah(int32_t charge_raw) {
-    // Each LSB of charge_raw represents 0.132736 mC
-    // (0.25mA * 530.944ms)
-    return charge_raw * (0.132736f / 3600000.0f);
+static inline float raw_charge_to_Ah(int64_t charge_raw) {
+    return (float)charge_raw * (1.0f / (INA228_CHARGE_RAW_PER_MC * 3600000.0f));
 }
