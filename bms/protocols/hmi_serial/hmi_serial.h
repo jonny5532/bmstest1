@@ -107,6 +107,27 @@
 #define HMI_REG_BUILD_TIME             69 // uint32, firmware build time (Unix seconds, UTC); 0 = unknown
 #define HMI_REG_MCU_TEMPERATURE        70 // float (C), the controller chip's own temperature sensor (a few C accurate)
 
+// Health and diagnostics, for a long-term record (from 96: upstream uses 71-80 for its OCV learner)
+#define HMI_REG_EKF_CAPACITY           96 // float (Ah), the EKF's estimate of the pack's capacity; absent until it runs
+#define HMI_REG_SOC_FANCY_COUNT        97 // uint16 (0.01%), the third SOC estimate (coulomb count with corrections)
+#define HMI_REG_OVERCURRENT_CHARGE_BUFFER    98 // float (%), how close charging is to an overcurrent trip (100 = trips)
+#define HMI_REG_OVERCURRENT_DISCHARGE_BUFFER 99 // float (%), the same for discharging
+#define HMI_REG_SOFT_CHARGE_BUFFER    100 // float (%), charge past the soft cell limits, of what trips it (+ charge, - discharge)
+#define HMI_REG_UART0_PACKETS_RECEIVED 101 // uint32, since boot (each serial port's counters wrap)
+#define HMI_REG_UART0_PACKETS_SENT     102 // uint32
+#define HMI_REG_UART0_CRC_ERRORS       103 // uint32
+#define HMI_REG_UART1_PACKETS_RECEIVED 104 // uint32
+#define HMI_REG_UART1_PACKETS_SENT     105 // uint32
+#define HMI_REG_UART1_CRC_ERRORS       106 // uint32
+#define HMI_REG_CAN_FRAMES_SENT        107 // uint32
+#define HMI_REG_CAN_FRAMES_RECEIVED    108 // uint32
+#define HMI_REG_BALANCING_STATE        109 // uint8, balancing_states (0 idle, 1 active...)
+#define HMI_REG_CALIBRATION_STATE      110 // uint8, calibration_state_t (0 idle)
+#define HMI_REG_PACK_TYPE              111 // int8, the pack type the module IDs classify as (pack_types.h), -1 = none
+#define HMI_REG_MODULE_IDS_VALID_MASK  112 // uint8, the BMB slots whose module ID passed its checks
+#define HMI_REG_MODULE_ID_START        113 // uint16 each (113-120), BMB slot 0-7's module ID as received; absent until read
+#define HMI_REG_MODULE_ID_END          120
+
 
 #define HMI_REG_CELL_VOLTAGES_START 0x100
 #define HMI_REG_CELL_VOLTAGES_END   0x1FF

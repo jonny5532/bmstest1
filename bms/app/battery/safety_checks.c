@@ -82,22 +82,22 @@ void confirm_battery_safety(const bms_model_t *model) {
         confirm(
             model->temperature_max <= TEMPERATURE_SOFT_MAX,
             ERR_BATTERY_TEMPERATURE_HIGH,
-            model->temperature_max
+            (uint32_t)(int32_t)(model->temperature_max * 10.0f)
         );
         confirm(
             model->temperature_max <= TEMPERATURE_HARD_MAX,
             ERR_BATTERY_TEMPERATURE_VERY_HIGH,
-            model->temperature_max
+            (uint32_t)(int32_t)(model->temperature_max * 10.0f)
         );
         confirm(
             model->temperature_min >= TEMPERATURE_SOFT_MIN,
             ERR_BATTERY_TEMPERATURE_LOW,
-            model->temperature_min
+            (uint32_t)(int32_t)(model->temperature_min * 10.0f)
         );
         confirm(
             model->temperature_min >= TEMPERATURE_HARD_MIN,
             ERR_BATTERY_TEMPERATURE_VERY_LOW,
-            model->temperature_min
+            (uint32_t)(int32_t)(model->temperature_min * 10.0f)
         );
     }
 
@@ -143,7 +143,8 @@ void confirm_battery_safety(const bms_model_t *model) {
     if(model->excess_charge_buffer_dC > OVERCURRENT_BUFFER_LIMIT_dC) {
         raise_bms_event(
             ERR_OVERCURRENT_CHARGING,
-            (uint64_t)(int64_t)model->current_mA
+            // The current, and the limit it went over
+            ((uint64_t)(uint16_t)model->charge_current_limit_dA << 32) | (uint32_t)model->current_mA
         );
     } else {
         clear_bms_event(ERR_OVERCURRENT_CHARGING);
@@ -152,7 +153,8 @@ void confirm_battery_safety(const bms_model_t *model) {
     if(model->excess_discharge_buffer_dC > OVERCURRENT_BUFFER_LIMIT_dC) {
         raise_bms_event(
             ERR_OVERCURRENT_DISCHARGING,
-            (uint64_t)(int64_t)model->current_mA
+            // The current, and the limit it went over
+            ((uint64_t)(uint16_t)model->discharge_current_limit_dA << 32) | (uint32_t)model->current_mA
         );
     } else {
         clear_bms_event(ERR_OVERCURRENT_DISCHARGING);

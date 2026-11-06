@@ -55,10 +55,12 @@ void record_bms_event(bms_event_type_t type, uint64_t data, bool repeat) {
     bms_event_slot_t *slot = &bms_event_slots[type];
     millis_t now = millis();
 
-    slot->timestamp = now;
-    slot->data64 = data;
     if(slot->level == LEVEL_NONE || repeat) {
-        // Only increment count if new event or repeating
+        // A new occurrence: keep its time and data (the reading that raised it) until the
+        // next one. While it stays raised, the checks call this every tick with the latest
+        // failing reading, which would otherwise overwrite them.
+        slot->timestamp = now;
+        slot->data64 = data;
         slot->count = sadd_u16(slot->count, 1);
     }
 

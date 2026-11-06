@@ -263,6 +263,39 @@ static void test_event_timestamp_recorded(void **state) {
     assert_int_equal(bms_event_slots[ERR_CELL_VOLTAGE_HIGH].timestamp, stored_millis);
 }
 
+static void test_occurrence_keeps_its_data_while_raised(void **state) {
+    (void) state;
+    extern bms_event_slot_t bms_event_slots[];
+
+    // The reading that raised it, and when
+    raise_bms_event(ERR_CELL_VOLTAGE_HIGH, 4250);
+    millis_t raised_at = stored_millis;
+    // Later failing readings while it stays raised don't overwrite them
+    advance_time(500);
+    raise_bms_event(ERR_CELL_VOLTAGE_HIGH, 4210);
+    assert_int_equal(bms_event_slots[ERR_CELL_VOLTAGE_HIGH].data64, 4250);
+    assert_int_equal(bms_event_slots[ERR_CELL_VOLTAGE_HIGH].timestamp, raised_at);
+    assert_int_equal(get_event_count(ERR_CELL_VOLTAGE_HIGH), 1);
+
+    // The next occurrence has its own
+    clear_bms_event(ERR_CELL_VOLTAGE_HIGH);
+    advance_time(500);
+    raise_bms_event(ERR_CELL_VOLTAGE_HIGH, 4300);
+    assert_int_equal(bms_event_slots[ERR_CELL_VOLTAGE_HIGH].data64, 4300);
+    assert_int_equal(bms_event_slots[ERR_CELL_VOLTAGE_HIGH].timestamp, stored_millis);
+    assert_int_equal(get_event_count(ERR_CELL_VOLTAGE_HIGH), 2);
+}
+
+static void test_counted_event_keeps_each_occurrences_data(void **state) {
+    (void) state;
+    extern bms_event_slot_t bms_event_slots[];
+
+    count_bms_event(ERR_BMB_READ_ERROR, 1);
+    count_bms_event(ERR_BMB_READ_ERROR, 2);
+    assert_int_equal(bms_event_slots[ERR_BMB_READ_ERROR].data64, 2);
+    assert_int_equal(get_event_count(ERR_BMB_READ_ERROR), 2);
+}
+
 // ============================================================================
 // Exhaustive event coverage tests
 // ============================================================================
@@ -348,6 +381,8 @@ int main(void) {
         // Edge cases
         cmocka_unit_test_setup(test_invalid_event_type_ignored, setup),
         cmocka_unit_test_setup(test_event_timestamp_recorded, setup),
+        cmocka_unit_test_setup(test_occurrence_keeps_its_data_while_raised, setup),
+        cmocka_unit_test_setup(test_counted_event_keeps_each_occurrences_data, setup),
 
         // Exhaustive coverage across all events in events.h
         cmocka_unit_test_setup(test_all_event_metadata_matches_definitions, setup),
