@@ -5,7 +5,7 @@
 #include "app/bms.h"
 #include "config/limits.h"
 
-#if IS_USB_EXTERNAL_PULLUP() || defined(BMS_USB_VBUS_SENSE)
+#if IS_USB_EXTERNAL_PULLUP() || IS_USB_VBUS_SENSE()
 #include "tusb.h"
 #endif
 
@@ -28,7 +28,7 @@ static void usb_external_pullup_init(void) {
 }
 #endif
 
-#ifdef BMS_USB_VBUS_SENSE
+#if IS_USB_VBUS_SENSE()
 #include "config/pins.h"
 
 // USB VBUS reaches PIN_USB_VBUS_SENSE through a 3.3k/5.1k divider. The chip's
@@ -95,7 +95,7 @@ int main() {
 #if IS_USB_EXTERNAL_PULLUP()
     usb_external_pullup_init();
 #endif
-#ifdef BMS_USB_VBUS_SENSE
+#if IS_USB_VBUS_SENSE()
     usb_vbus_sense_init();
 #endif
 
@@ -108,7 +108,7 @@ int main() {
 
     while(true) {
         bms_tick();
-#ifdef BMS_USB_VBUS_SENSE
+#if IS_USB_VBUS_SENSE()
         usb_vbus_sense_poll();
 #endif
         synchronize_time();

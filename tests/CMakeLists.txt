@@ -4,6 +4,7 @@ enable_testing()
 project(UnitTests LANGUAGES C)
 
 include(../profiles/profiles.cmake)
+include(../boards/boards.cmake)
 
 include(FetchContent)
 
@@ -44,7 +45,7 @@ add_executable(test_contactors_rev1
     ../bms/app/state_machines/contactors.c 
     ../bms/app/state_machines/base.c
 )
-target_compile_definitions(test_contactors_rev1 PRIVATE BMS_BOARD=2)
+bms_use_board(test_contactors_rev1 rev1)
 target_link_libraries(test_contactors_rev1 PRIVATE cmocka)
 target_include_directories(test_contactors_rev1 PRIVATE 
     ${cmocka_SOURCE_DIR}/include
@@ -61,7 +62,8 @@ add_executable(test_contactors_rev1_pos_pre
     ../bms/app/state_machines/contactors.c
     ../bms/app/state_machines/base.c
 )
-target_compile_definitions(test_contactors_rev1_pos_pre PRIVATE BMS_BOARD=2 PRECHARGE_ON_NEGATIVE=0)
+bms_use_board(test_contactors_rev1_pos_pre rev1)
+target_compile_definitions(test_contactors_rev1_pos_pre PRIVATE PRECHARGE_ON_NEGATIVE=0)
 target_link_libraries(test_contactors_rev1_pos_pre PRIVATE cmocka)
 target_include_directories(test_contactors_rev1_pos_pre PRIVATE
     ${cmocka_SOURCE_DIR}/include
@@ -218,7 +220,7 @@ foreach(variant IN ITEMS "" "_rev1")
     )
     add_test(NAME test_system_sm${variant} COMMAND ${MEMORY_CHECK} test_system_sm${variant})
 endforeach()
-target_compile_definitions(test_system_sm_rev1 PRIVATE BMS_BOARD=2)
+bms_use_board(test_system_sm_rev1 rev1)
 
 # Contactor offset calibration
 foreach(variant IN ITEMS "" "_rev1")
@@ -234,7 +236,7 @@ foreach(variant IN ITEMS "" "_rev1")
     )
     add_test(NAME test_calibration${variant} COMMAND ${MEMORY_CHECK} test_calibration${variant})
 endforeach()
-target_compile_definitions(test_calibration_rev1 PRIVATE BMS_BOARD=2)
+bms_use_board(test_calibration_rev1 rev1)
 
 # Calibration sequences, against fake ADC and current sensor drivers
 foreach(variant IN ITEMS "" "_rev1")
@@ -252,7 +254,7 @@ foreach(variant IN ITEMS "" "_rev1")
     )
     add_test(NAME test_calibration_sm${variant} COMMAND ${MEMORY_CHECK} test_calibration_sm${variant})
 endforeach()
-target_compile_definitions(test_calibration_sm_rev1 PRIVATE BMS_BOARD=2)
+bms_use_board(test_calibration_sm_rev1 rev1)
 
 # ADS1115 scan driver, against fake I2C and timer drivers
 foreach(variant IN ITEMS "" "_rev1")
@@ -269,7 +271,7 @@ foreach(variant IN ITEMS "" "_rev1")
     )
     add_test(NAME test_ads1115${variant} COMMAND ${MEMORY_CHECK} test_ads1115${variant})
 endforeach()
-target_compile_definitions(test_ads1115_rev1 PRIVATE BMS_BOARD=2)
+bms_use_board(test_ads1115_rev1 rev1)
 
 foreach(variant IN ITEMS "" "_rev1")
     add_executable(test_board_id${variant}
@@ -284,7 +286,7 @@ foreach(variant IN ITEMS "" "_rev1")
     )
     add_test(NAME test_board_id${variant} COMMAND ${MEMORY_CHECK} test_board_id${variant})
 endforeach()
-target_compile_definitions(test_board_id_rev1 PRIVATE BMS_BOARD=2)
+bms_use_board(test_board_id_rev1 rev1)
 
 foreach(variant IN ITEMS "" "_rev1")
     add_executable(test_isolation${variant}
@@ -301,7 +303,7 @@ foreach(variant IN ITEMS "" "_rev1")
     )
     add_test(NAME test_isolation${variant} COMMAND ${MEMORY_CHECK} test_isolation${variant})
 endforeach()
-target_compile_definitions(test_isolation_rev1 PRIVATE BMS_BOARD=2)
+bms_use_board(test_isolation_rev1 rev1)
 
 add_executable(test_sampler
     test_sampler.c
@@ -429,3 +431,13 @@ add_custom_target(coverage
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Run built tests and generate gcov coverage summary"
 )
+
+# Every other test builds for an unmodified Rev0 board
+get_property(test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+foreach(t IN LISTS test_targets)
+    get_target_property(board ${t} BMS_BOARD)
+    get_target_property(type ${t} TYPE)
+    if(NOT board AND type STREQUAL "EXECUTABLE")
+        bms_use_board(${t} rev0)
+    endif()
+endforeach()

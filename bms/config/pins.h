@@ -51,7 +51,7 @@
 // nothing else. GPIO30 isn't bonded to anything on the rev1 PCB.
 #define PIN_ISOSNOOP_TIMER_DISABLE 30
 
-// USB VBUS through a 3.3k/5.1k divider (J12 pin 2), for BMS_USB_VBUS_SENSE
+// USB VBUS through a 3.3k/5.1k divider (J12 pin 2), for USB_VBUS_SENSE boards
 #define PIN_USB_VBUS_SENSE 3
 
 // Each PIO SM can only see 32 GPIOs (0-31 by default? but can be remapped to

@@ -137,6 +137,7 @@ static void init_model() {
 
     info_printf("Firmware %s\n", bms_build_version);
     info_printf("Pack profile: %s\n", BMS_PROFILE_NAME);
+    info_printf("Board: %s\n", BMS_BOARD_NAME);
     info_printf("Capacity: %.1fAh%s (nameplate %.1fAh)\n", get_actual_capacity_mC(&model) / 3600000.0f,
                 model.actual_capacity_mC > 0 ? "" : " from the profile", (float)NAMEPLATE_CAPACITY_AH);
 
@@ -159,9 +160,9 @@ static void check_board_id() {
     if (!board_id_matches_build(model.board_id)) {
         // Firmware for the wrong PCB: channel scaling and contactor sensing
         // differ between revisions, so never operate
-        error_printf("Board revision code %u does not match this build (BMS_BOARD %d)\n",
-            (unsigned)model.board_id, BMS_BOARD);
-        raise_bms_event(ERR_BOARD_MISMATCH, ((uint64_t)model.board_id << 16) | BMS_BOARD);
+        error_printf("Board revision code %u does not match this build (board %s, revision %d)\n",
+            (unsigned)model.board_id, BMS_BOARD_NAME, BMS_BOARD_REVISION);
+        raise_bms_event(ERR_BOARD_MISMATCH, ((uint64_t)model.board_id << 16) | BMS_BOARD_REVISION);
     }
 }
 

@@ -20,6 +20,5 @@
 // on, the pull-down on, and no pulls.
 uint16_t board_id_classify(uint16_t pull_up_counts, uint16_t pull_down_counts, uint16_t counts);
 
-// Whether a detected code fits the board this firmware was built for
-// (BMS_BOARD). Every Rev1.x code fits a REV1 build.
+// Whether the detected board ID matches the build
 bool board_id_matches_build(uint16_t code);

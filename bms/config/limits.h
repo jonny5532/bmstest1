@@ -12,71 +12,57 @@
 #define CELL_PRESENCE_MASK { CELL_PRESENCE_WORDS }
 
 
-// PCB revision selection (orthogonal to the pack profile above)
+// The board: its PCB revision and any modifications (see boards/README.md),
+// orthogonal to the pack profile above
 
 #define BMS_BOARD_REV0 1
 #define BMS_BOARD_REV1 2
 
-#ifndef BMS_BOARD
-#define BMS_BOARD BMS_BOARD_REV0
+#ifndef BMS_BOARD_HEADER
+#error "BMS_BOARD_HEADER is not set (configure with -DBMS_BOARD=<name>)"
+#endif
+#include BMS_BOARD_HEADER
+
+// Check the revision with #if IS_BMS_BOARD(REV1), rather than comparing
+// BMS_BOARD_REVISION directly. If this header hasn't been included, an
+// undefined function-like macro is a compile error, whereas comparing would
+// quietly compare two undefined (zero) values and pick the wrong board.
+#define IS_BMS_BOARD(rev) (BMS_BOARD_REVISION == BMS_BOARD_##rev)
+#if !IS_BMS_BOARD(REV0) && !IS_BMS_BOARD(REV1)
+#error "The board must set BMS_BOARD_REVISION to BMS_BOARD_REV0 or BMS_BOARD_REV1"
 #endif
 
-// Check the board with #if IS_BMS_BOARD(REV1), rather than comparing BMS_BOARD
-// directly. If this header hasn't been included, an undefined function-like
-// macro is a compile error, whereas BMS_BOARD == BMS_BOARD_REV1 would quietly
-// compare two undefined (zero) values and pick the wrong board.
-#define IS_BMS_BOARD(rev) (BMS_BOARD == BMS_BOARD_##rev)
-
-#if IS_BMS_BOARD(REV1)
-// Rev1 adds a second ADS1115 (0x49) sensing the Link and Drive Unit rails.
-// Function-like for the same reason as IS_BMS_BOARD.
-#define HAS_ADS1115_SECONDARY() 1
-// Rev1 uses 501:1 dividers (12M/24k): 501 * 1.024/32768 V per count
-#define ADS1115_DEFAULT_MUL 0.015656f
-// Isolation monitor zero (ADC counts with the pack floating), measured on one
-// board; used until the board is zeroed (calibrate isolation)
-#define ISOLATION_ZERO_DEFAULT_COUNTS 13317.0f
-#elif IS_BMS_BOARD(REV0)
-#define HAS_ADS1115_SECONDARY() 0
-// Rev0 divider ratio is ~416:1
-#define ADS1115_DEFAULT_MUL 0.013f
-#define ISOLATION_ZERO_DEFAULT_COUNTS 22496.0f
-#else
-    #error "Unsupported BMS_BOARD"
+// USB_VBUS_SENSE: USB VBUS reaches GPIO3 (J12 pin 2) through a 3.3k/5.1k
+// divider, and the chip's D+ pull-up is only switched on while it is present.
+// USB_EXTERNAL_PULLUP: an external D+ pull-up powered from VBUS, and the
+// chip's own one stays off. Either way a switched-off host is never
+// back-powered through D+. Neither can be detected, and either one set on a
+// board without it means USB never connects. Check with #if IS_USB_VBUS_SENSE()
+// and #if IS_USB_EXTERNAL_PULLUP().
+#if !defined(USB_VBUS_SENSE) || !defined(USB_EXTERNAL_PULLUP)
+#error "The board must define USB_VBUS_SENSE and USB_EXTERNAL_PULLUP (include a revision, e.g. builtin/rev1.h)"
 #endif
+#if (USB_VBUS_SENSE != 0 && USB_VBUS_SENSE != 1) || (USB_EXTERNAL_PULLUP != 0 && USB_EXTERNAL_PULLUP != 1)
+#error "USB_VBUS_SENSE and USB_EXTERNAL_PULLUP must be 0 or 1"
+#endif
+#if USB_VBUS_SENSE && USB_EXTERNAL_PULLUP
+#error "USB_VBUS_SENSE and USB_EXTERNAL_PULLUP are alternatives; a board has one or neither"
+#endif
+#define IS_USB_VBUS_SENSE() (USB_VBUS_SENSE)
+#define IS_USB_EXTERNAL_PULLUP() (USB_EXTERNAL_PULLUP)
 
-// Which pole carries the precharge element. A profile (or -D) can set
-// PRECHARGE_ON_NEGATIVE to 0 or 1; otherwise Rev1 defaults to negative (via
-// the FC negative contactor) and Rev0 to positive. Check it with
+// Which pole carries the precharge element. Negative (via the FC negative
+// contactor) is the standard; a pack wired with it on the positive sets
+// PRECHARGE_ON_NEGATIVE to 0 in its profile. Check it with
 // #if IS_PRECHARGE_ON_NEGATIVE(), which, like IS_BMS_BOARD, fails to compile
 // if this header hasn't been included.
 #ifndef PRECHARGE_ON_NEGATIVE
-#if IS_BMS_BOARD(REV1)
 #define PRECHARGE_ON_NEGATIVE 1
-#else
-#define PRECHARGE_ON_NEGATIVE 0
-#endif
 #endif
 #if PRECHARGE_ON_NEGATIVE != 0 && PRECHARGE_ON_NEGATIVE != 1
 #error "PRECHARGE_ON_NEGATIVE must be 0 or 1"
 #endif
 #define IS_PRECHARGE_ON_NEGATIVE() (PRECHARGE_ON_NEGATIVE)
-
-// Boards modified with an external D+ pull-up powered from the host's VBUS, so
-// a switched-off host is never back-powered through D+. The chip's own pull-up
-// then stays off. A profile (or -D) sets USB_EXTERNAL_PULLUP to 1 for such a
-// board; never on an unmodified one, which would then never connect over USB.
-// Check it with #if IS_USB_EXTERNAL_PULLUP().
-#ifndef USB_EXTERNAL_PULLUP
-#define USB_EXTERNAL_PULLUP 0
-#endif
-#if USB_EXTERNAL_PULLUP != 0 && USB_EXTERNAL_PULLUP != 1
-#error "USB_EXTERNAL_PULLUP must be 0 or 1"
-#endif
-#if USB_EXTERNAL_PULLUP && defined(BMS_USB_VBUS_SENSE)
-#error "USB_EXTERNAL_PULLUP and BMS_USB_VBUS_SENSE are alternatives; a board has one or neither"
-#endif
-#define IS_USB_EXTERNAL_PULLUP() (USB_EXTERNAL_PULLUP)
 
 // Isolation monitor (app/isolation.h)
 #define ISOLATION_DIVIDER_BOTTOM_OHMS 24000.0f // bottom resistor of each HV divider

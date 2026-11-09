@@ -3,7 +3,8 @@
 A pack profile is a header that sets the chemistry and pack-specific settings
 (cell count and presence mask, capacity, shunt calibration, current limits...).
 The rest of the BMS limits, which don't depend on the pack, stay in
-`bms/config/limits.h`.
+`bms/config/limits.h`, and the PCB revision and board modifications are a
+separate choice (`boards/README.md`).
 
 ```
 profiles/
@@ -18,8 +19,8 @@ profiles/
 Pass the profile's file name (without `.h`):
 
 ```
-cmake -S bms -B bms/build -DBMS_PROFILE=lfp1
-./build_bms.sh lfp1
+cmake -S bms -B bms/build -DBMS_PROFILE=lfp1 -DBMS_BOARD=rev0
+./build_bms.sh lfp1 rev0
 ```
 
 The default is `bluetesla`. The profile is found in `profiles/custom/` or
@@ -62,6 +63,10 @@ The SOC estimator's tuning (EKF noise settings, the cell model, OCV
 learning) lives in the chemistry files and can be overridden the same way,
 e.g. to set `EKF_R_OHM` for your cells. What each setting does is described
 in `bms/app/estimators/ekf.c`.
+
+Precharge on the negative pole (via the FC negative contactor) is the
+standard. A pack wired with the precharge element on the positive sets
+`PRECHARGE_ON_NEGATIVE` to 0.
 
 `validate.h` then checks the result: that every required setting is present,
 that the voltage and temperature limits nest properly (hard outside soft,

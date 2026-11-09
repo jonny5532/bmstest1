@@ -138,8 +138,8 @@ typedef enum {
     /* (only once zeroed). Data: resistance in ohms           */ \
     X(ISOLATION_LOW, LEVEL_WARNING, 0)                          \
     X(RESERVED_54, LEVEL_INFO, 0)                               \
-    /* PCB revision strap doesn't match the BMS_BOARD build. */ \
-    /* Data: (detected code << 16) | BMS_BOARD               */ \
+    /* PCB revision strap doesn't match the board's revision */ \
+    /* Data: (detected code << 16) | BMS_BOARD_REVISION      */ \
     X(BOARD_MISMATCH, LEVEL_FATAL, 0)                           \
     X(RESERVED_56, LEVEL_INFO, 0)                               \
     X(RESERVED_57, LEVEL_INFO, 0)                               \

@@ -3,3 +3,5 @@ tmp
 profiles/custom/*
 !profiles/custom/README.md
 !profiles/custom/example.h.sample
+boards/custom/*
+!boards/custom/README.md

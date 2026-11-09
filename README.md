@@ -129,16 +129,13 @@ It is usual to top-balance a pack, evening the cell voltages when the pack is fu
 
 ## Build options
 
-Besides `BMS_PROFILE` and `BMS_BOARD`:
+The pack is chosen with `BMS_PROFILE` (see `profiles/README.md`) and the board,
+meaning its PCB revision and any modifications, with `BMS_BOARD` (see
+`boards/README.md`). Besides those:
 
 | Option | Default | Use |
 |---|---|---|
-| `BMS_USB_VBUS_SENSE` | OFF | Boards with USB VBUS wired to GPIO3 (J12 pin 2) through a 3.3k/5.1k divider, e.g. the desk bench board. The USB D+ pull-up is only switched on while the host supplies VBUS, so a switched-off host is never back-powered through D+. |
 | `BMS_ISOSNOOP` | OFF | Bench debugging: a passive isoSPI listener that dumps the raw bus symbols when a BMB CRC fails. Uses all of one PIO, a DMA channel and GPIO30. |
-
-Use `BMS_USB_VBUS_SENSE` only on boards with the divider: on a board without
-it, USB never connects, and `reflash_bms.sh` can't reach the board (it needs
-the BOOTSEL button).
 
 ## Internal architecture
 

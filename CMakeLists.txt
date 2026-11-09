@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_C_STANDARD 11)
 
+# The Pico SDK's description of the chip package and flash, the same on every
+# revision (not a BMS board: those are in boards/, selected with BMS_BOARD)
 set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR}/bms/config/boards)
 set(PICO_BOARD bms_rp2354b)
 set(PICO_PLATFORM rp2350)
@@ -27,6 +29,9 @@ pico_sdk_init()
 include_directories(bms vendor/can2040/src)
 
 include(profiles/profiles.cmake)
+include(boards/boards.cmake)
+
+set(BMS_BOARD "" CACHE STRING "Board to build for (see boards/README.md)")
 
 add_executable(bms
     bms/app/bms.c
@@ -75,7 +80,7 @@ add_executable(bms
     bms/app/state_machines/contactors.c
     bms/app/state_machines/system.c
     bms/lib/sampler.c
-    bms/config/profile_check.c
+    bms/config/config_check.c
     vendor/can2040/src/can2040.c
     vendor/littlefs/lfs.c
     vendor/littlefs/lfs_util.c
@@ -105,21 +110,10 @@ pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/bms/drivers/isospi/isosno
 target_compile_definitions(bms PRIVATE PICO_CXX_DISABLE_ALLOCATION_OVERRIDES=1)
 set_target_properties(bms PROPERTIES LINKER_LANGUAGE C)
 
-set_source_files_properties(bms/config/profile_check.c PROPERTIES COMPILE_OPTIONS -pedantic-errors)
-pico_set_program_description(bms "Pack profile: ${BMS_PROFILE}")
-
-if(BMS_BOARD)
-    add_compile_definitions(BMS_BOARD=${BMS_BOARD})
-endif()
-
-# Boards with USB VBUS wired to GPIO3 (J12 pin 2) through a 3.3k/5.1k divider.
-# The chip's D+ pull-up is then only switched on while the host supplies VBUS,
-# so a switched-off host is never back-powered through D+. Leave OFF on boards
-# without the divider, or USB never connects.
-option(BMS_USB_VBUS_SENSE "Board has USB VBUS sensed on GPIO3" OFF)
-if(BMS_USB_VBUS_SENSE)
-    add_compile_definitions(BMS_USB_VBUS_SENSE=1)
-endif()
+set_source_files_properties(bms/config/config_check.c PROPERTIES COMPILE_OPTIONS -pedantic-errors)
+bms_use_board(bms "${BMS_BOARD}")
+message(STATUS "Board: ${BMS_BOARD}")
+pico_set_program_description(bms "Pack profile: ${BMS_PROFILE}, board: ${BMS_BOARD}")
 
 # Passive isoSPI listener that dumps the raw bus symbols when a BMB CRC fails.
 # Bench debugging only: it uses all of one PIO, a DMA channel and GPIO30.

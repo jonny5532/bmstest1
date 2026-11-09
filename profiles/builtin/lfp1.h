@@ -13,7 +13,6 @@
 // Six years old: replaying 10 days of 1s data (kalman/replay, Sep-Oct 2026) put it at ~159Ah
 #define ACTUAL_CAPACITY_AH 159
 #define INA228_SHUNT_CAL 332
-#define PRECHARGE_ON_NEGATIVE 1
 #define INVERTER_MODEL_STRING "CellKeeper Tesla LFP 1\x00\x00\x00\x00\x00"
 
 // Absolute maximum current limits
