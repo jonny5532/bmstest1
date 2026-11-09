@@ -108,6 +108,20 @@ static void test_build_id_registers(void **state) {
     assert_int_equal(read_uint32_register(HMI_REG_BUILD_TIME), 1792576800u);
 }
 
+static void test_lifetime_registers(void **state) {
+    (void) state;
+    // Loaded from NVM at boot, so available from the start
+    assert_true(hmi_register_is_available(HMI_REG_LIFETIME_CHARGED_MAH, &model));
+    model.lifetime_charged_mAh = 0xFFFFFFF0u;
+    model.lifetime_discharged_mAh = 1234567u;
+    model.lifetime_charged_Wh = 89012u;
+    model.lifetime_discharged_Wh = 3456u;
+    assert_int_equal(read_uint32_register(HMI_REG_LIFETIME_CHARGED_MAH), 0xFFFFFFF0u);
+    assert_int_equal(read_uint32_register(HMI_REG_LIFETIME_DISCHARGED_MAH), 1234567u);
+    assert_int_equal(read_uint32_register(HMI_REG_LIFETIME_CHARGED_WH), 89012u);
+    assert_int_equal(read_uint32_register(HMI_REG_LIFETIME_DISCHARGED_WH), 3456u);
+}
+
 static void test_unknown_register_writes_nothing(void **state) {
     (void) state;
     uint8_t buf[16];
@@ -121,6 +135,7 @@ int main(void) {
         cmocka_unit_test_setup(test_module_temp_registers_are_floats, setup),
         cmocka_unit_test_setup(test_mcu_temperature_register, setup),
         cmocka_unit_test_setup(test_build_id_registers, setup),
+        cmocka_unit_test_setup(test_lifetime_registers, setup),
         cmocka_unit_test_setup(test_unknown_register_writes_nothing, setup),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);

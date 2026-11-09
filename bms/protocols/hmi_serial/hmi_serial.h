@@ -38,7 +38,8 @@
 //       the learned capacity, HMI_REG_OCV_LEARN_CAPACITY*
 //   4 = READ_SUPERVISOR (answered by the supervisor); the BMS doesn't announce
 //       over its response
-#define HMI_PROTOCOL_VERSION 4
+//   5 = the lifetime throughput totals, HMI_REG_LIFETIME_*
+#define HMI_PROTOCOL_VERSION 5
 
 #define HMI_ANNOUNCE_DEVICE_TYPE_BMS 0x01
 
@@ -150,6 +151,13 @@
 #define HMI_REG_OCV_LEARN_CAPACITY_DEPTH  78 // float (0-1), SOC below full of the deepest trusted bin
 #define HMI_REG_OCV_LEARN_CAPACITY_DEPTH_V 79 // float (V/cell), learned OCV at that bin
 #define HMI_REG_OCV_LEARN_CAPACITY_DEPTH_CYCLES 80 // float, that bin's decaying count of full charge cycles
+
+// Lifetime throughput into and out of the pack, bias-corrected, saved to NVM
+// (app/estimators/lifetime.h). They wrap at 2^32: take differences mod 2^32.
+#define HMI_REG_LIFETIME_CHARGED_MAH    81 // uint32 (mAh)
+#define HMI_REG_LIFETIME_DISCHARGED_MAH 82 // uint32 (mAh)
+#define HMI_REG_LIFETIME_CHARGED_WH     83 // uint32 (Wh)
+#define HMI_REG_LIFETIME_DISCHARGED_WH  84 // uint32 (Wh)
 
 // Deprecated: these ranges and READ_CELL_VOLTAGES / READ_BALANCING_TIMES stay
 // for older HMIs, and are fixed at the first 120 cells and 8 modules. Use

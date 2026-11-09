@@ -351,6 +351,17 @@ uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_model_t *mo
             buf[idx++] = HMI_TYPE_UINT16;
             idx += hmi_buf_append_uint16(&buf[idx], HMI_PROTOCOL_VERSION);
             break;
+        case HMI_REG_LIFETIME_CHARGED_MAH:
+        case HMI_REG_LIFETIME_DISCHARGED_MAH:
+        case HMI_REG_LIFETIME_CHARGED_WH:
+        case HMI_REG_LIFETIME_DISCHARGED_WH:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx],
+                reg_id == HMI_REG_LIFETIME_CHARGED_MAH ? model->lifetime_charged_mAh
+                : reg_id == HMI_REG_LIFETIME_DISCHARGED_MAH ? model->lifetime_discharged_mAh
+                : reg_id == HMI_REG_LIFETIME_CHARGED_WH ? model->lifetime_charged_Wh
+                : model->lifetime_discharged_Wh);
+            break;
 #ifdef OCV_LEARN
         case HMI_REG_OCV_LEARN_S_FULL:
             if (!model->ocv_learn.persistent.valid) {
