@@ -88,6 +88,7 @@ add_executable(test_soc
     ../bms/app/battery/current_limits.c
     ../bms/app/estimators/ekf.c
     ../bms/app/estimators/ocv_learn.c
+    ../bms/app/estimators/voltage_based.c
     ../bms/protocols/inverter/can.c
     ../bms/protocols/inverter/byd_can.c
     ../bms/sys/events/events.c

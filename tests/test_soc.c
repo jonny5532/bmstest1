@@ -10,6 +10,7 @@
 
 #include "app/model.h"
 #include "app/estimators/ekf.h"
+#include "app/estimators/estimators.h"
 #include "app/estimators/ocv_learn.h"
 #include "protocols/inverter/inverter.h"
 #include "can2040.h"
@@ -380,6 +381,48 @@ static void test_ocv_learn_reanchors_when_charge_voltage_moves(void **state) {
     assert_float_equal(learn.persistent.corr[6], corr6, 1e-12); // kept, see ocv_learn_tick
 }
 
+// All cells at the same voltage, with this current
+static uint16_t voltage_soc_at(int32_t cell_mV, int32_t current_mA) {
+    model.cell_voltage_min_mV = cell_mV;
+    model.cell_voltage_max_mV = cell_mV;
+    model.cell_voltage_total_mV = cell_mV * NUM_CELLS;
+    model.current_mA = current_mA;
+    return voltage_based_soc_estimate(&model);
+}
+
+static void test_voltage_soc_scaled_to_working_limits(void **state) {
+    (void)state;
+
+    // Working limits at 10% and 90% on the factory table
+    const float *ocv = ekf_factory_ocv_table();
+    memset(&model, 0, sizeof(bms_model_t));
+    int32_t min_mV = (int32_t)lroundf(ocv[10] * 1000.0f);
+    int32_t max_mV = (int32_t)lroundf(ocv[90] * 1000.0f);
+    model.cell_voltage_working_min_mV = min_mV;
+    model.cell_voltage_working_max_mV = max_mV;
+    model.cell_voltage_soft_min_mV = min_mV - 100;
+    model.cell_voltage_soft_max_mV = max_mV + 100;
+
+    assert_int_equal(voltage_soc_at(min_mV, 0), 0);
+    assert_int_equal(voltage_soc_at(max_mV, 0), 10000);
+    assert_int_equal(voltage_soc_at(min_mV - 50, 0), 0);
+    assert_int_equal(voltage_soc_at(max_mV + 50, 0), 10000);
+
+    // Halfway on the table is halfway between the limits (to the table's mV)
+    int32_t mid_mV = (int32_t)lroundf(ocv[50] * 1000.0f);
+    float s = table_soc(ocv, mid_mV / 1000.0f), s_min = table_soc(ocv, min_mV / 1000.0f),
+          s_max = table_soc(ocv, max_mV / 1000.0f);
+    uint16_t mid = voltage_soc_at(mid_mV, 0);
+    assert_int_equal(mid, (uint16_t)((s - s_min) / (s_max - s_min) * 10000.0f + 0.5f));
+    assert_true(mid > 4500 && mid < 5500);
+
+    // Charging lifts the terminal voltage by I * R, discharging drops it: either
+    // way the SOC is the same as at rest
+    int32_t ir_mV = (int32_t)lround(50000 * EKF_R_OHM); // 50A
+    assert_int_equal(voltage_soc_at(mid_mV + ir_mV, 50000), mid);
+    assert_int_equal(voltage_soc_at(mid_mV - ir_mV, -50000), mid);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_ekf_soc_scaling_midrange),
@@ -392,6 +435,7 @@ int main(void) {
         cmocka_unit_test(test_actual_capacity_default_and_saved),
         cmocka_unit_test(test_ekf_set_capacity_keeps_ah_used),
         cmocka_unit_test(test_ocv_learn_reanchors_when_charge_voltage_moves),
+        cmocka_unit_test(test_voltage_soc_scaled_to_working_limits),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
