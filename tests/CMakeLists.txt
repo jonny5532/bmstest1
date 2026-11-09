@@ -104,6 +104,19 @@ target_include_directories(test_soc PRIVATE
 
 add_test(NAME test_soc COMMAND ${MEMORY_CHECK} test_soc)
 
+add_executable(test_basic_count
+    test_basic_count.c
+    ../bms/app/estimators/basic_count.c
+)
+target_link_libraries(test_basic_count PRIVATE cmocka m)
+target_include_directories(test_basic_count PRIVATE
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_basic_count COMMAND ${MEMORY_CHECK} test_basic_count)
+
 add_executable(test_byd_can
     test_byd_can.c
     ../bms/protocols/inverter/can.c

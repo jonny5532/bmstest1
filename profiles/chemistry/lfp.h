@@ -54,6 +54,13 @@
 
 // STATE OF CHARGE ESTIMATION (see bms/app/estimators/ekf.c for what each setting does)
 
+// The basic coulomb count (bms/app/estimators/basic_count.c) resets to full when
+// the highest cell has settled within this of the working max. Generous, as the
+// inverter can stop short (one set to 3.45V settles at 3.42-3.43V, with a voltage
+// limit offset), but keep the threshold above ~3.40V: an LFP pack rests at
+// 3.32-3.37V across most of its range.
+#define BASIC_COUNT_FULL_MARGIN_mV 25
+
 // Learn the OCV curve only to report capacity, e.g. after a deliberate deep
 // discharge. The flat middle carries no SOC information and hysteresis would
 // bias a learned table, so the filter keeps the factory one (no OCV_LEARN_TABLE).

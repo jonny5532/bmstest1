@@ -66,6 +66,12 @@
 
 // STATE OF CHARGE ESTIMATION (see bms/app/estimators/ekf.c for what each setting does)
 
+// The basic coulomb count (bms/app/estimators/basic_count.c) resets to full when
+// the highest cell has settled within this of the working max. Generous, as the
+// inverter can stop short; near the top, ~10mV is about 1% SOC, but only a pack
+// that has settled there counts as full.
+#define BASIC_COUNT_FULL_MARGIN_mV 25
+
 #define OCV_LEARN       // learn a per-pack correction to the OCV table as we go...
 #define OCV_LEARN_TABLE // ...and use it, with the SOC pinned at full charge
 // Where the learned capacity is read off: steep, and somewhere packs actually rest
