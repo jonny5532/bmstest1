@@ -203,13 +203,14 @@ static const char *cmd_calibrate(char *args) {
         {"long", SYSTEM_REQUEST_CALIBRATE_OFFLINE_LONG, IN(INACTIVE)},
         {"short", SYSTEM_REQUEST_CALIBRATE_OFFLINE_SHORT, IN(INACTIVE)},
         {"online", SYSTEM_REQUEST_CALIBRATE_ONLINE, IN(INACTIVE) | IN(OPERATING)},
+        {"isolation", SYSTEM_REQUEST_CALIBRATE_ISOLATION, IN(INACTIVE)},
     };
     for(size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); i++) {
         if(strcmp(args, modes[i].mode) == 0) {
             return request(modes[i].req, modes[i].allowed_states);
         }
     }
-    return "usage: calibrate long|short|online";
+    return "usage: calibrate long|short|online|isolation";
 }
 
 static const char *cmd_ekf(char *args) {
@@ -341,7 +342,7 @@ static const cli_command_t commands[] = {
     {"run", NULL, cmd_run, "request operating mode (from inactive)"},
     {"stop", NULL, cmd_stop, "request inactive mode (from operating)"},
     {"restart", NULL, cmd_restart, "request inactive mode from any state (used by reflash_bms.sh)"},
-    {"calibrate", "long|short|online", cmd_calibrate, "contactor (offline) or online calibration"},
+    {"calibrate", "long|short|online|isolation", cmd_calibrate, "contactor (offline), online or isolation zero calibration"},
     {"ekf", NULL, cmd_ekf, "EKF constants and state"},
     {"adc", NULL, cmd_adc, "internal ADC readings"},
     {"ads", NULL, cmd_ads, "ADS1115 readings, scan rate and errors"},

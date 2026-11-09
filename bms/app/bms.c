@@ -16,6 +16,7 @@
 #include "state_machines/contactors.h"
 #include "battery/balancing.h"
 #include "battery/safety_checks.h"
+#include "isolation.h"
 #include "protocols/cli/cli.h"
 #include "protocols/hmi_serial/hmi_serial.h"
 #include "protocols/internal_serial/internal_serial.h"
@@ -105,6 +106,13 @@ void read_inputs(bms_model_t *model) {
     model->high_voltages.pos_contactor_deviation = ads1115_float_deviation(3, pos_contactor_mul) + model->high_voltages.output_deviation;
 #endif
     
+    // Isolation monitor (channels 4/5, single-ended raw counts)
+    if (ads1115_get_sample_millis(4) && ads1115_get_sample_millis(5)) {
+        bool open_settled = model->contactor_sm.state == CONTACTORS_STATE_OPEN &&
+                            state_time((sm_t*)&model->contactor_sm) >= ISOLATION_SETTLE_MS;
+        isolation_update(model, ads1115_float_sample(4, 1.0f), ads1115_float_sample(5, 1.0f), open_settled);
+    }
+
     // INA228 current and charge readings
     
     //if((timestep() & 0x7) == 0) {
@@ -242,24 +250,21 @@ void bms_print_status() {
     //     debug_counters.uart1_packets_received, debug_counters.uart1_crc_errors
     // );
 
-    float cal_midpoint = 22496.4f;
-    float cal_midpoint_temp_dC = 285.0f;
-
-    cal_midpoint += (get_temperature_c_times10() - cal_midpoint_temp_dC) * 0.28f; //compensate for temp drift
-
-    float vp = ads1115_float_sample(4, 1.0f);
-    float vn = ads1115_float_sample(5, 1.0f);
-    debug_printf("midpoint is %1.1f | ", (vp + vn)/2.0f);
-
-    float vpos = (vp - cal_midpoint) * (4.096f/32768);
-    float vneg = (cal_midpoint - vn) * (4.096f/32768);
-    float r = vpos / vneg;
-    // Cap at 1Gohm
-    float r_iso = 10000000 * fminf(r / fmaxf(fabsf(1.0f - r), 0.009f), 100.0f);
-
-    debug_printf("Vpos: %1.3f V | Vneg: %1.3f V | Riso: %1.2f Mohm\n",
-        vpos, vneg, r_iso/1000000
+    debug_printf("Isolation: Pack+ %+.1f V, Pack- %+.1f V to chassis | midpoint %.1f, zero %.1f (%s)",
+        model.isolation_pos_to_chassis_V,
+        model.isolation_neg_to_chassis_V,
+        (ads1115_float_sample(4, 1.0f) + ads1115_float_sample(5, 1.0f)) / 2.0f,
+        get_isolation_zero_counts(&model),
+        isolation_zeroed(&model) ? "calibrated" : "default, no events"
     );
+    if (model.isolation_open_millis) {
+        debug_printf(" | open: %.2f Mohm, %lus ago\n",
+            model.isolation_open_resistance_ohms / 1e6f,
+            (unsigned long)((millis() - model.isolation_open_millis) / 1000)
+        );
+    } else {
+        debug_printf(" | open: none this boot\n");
+    }
 }
 
 void bms_tick() {

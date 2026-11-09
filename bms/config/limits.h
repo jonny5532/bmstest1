@@ -37,13 +37,26 @@
 #endif
 // Rev1 uses 501:1 dividers (12M/24k): 501 * 1.024/32768 V per count
 #define ADS1115_DEFAULT_MUL 0.015656f
+// Isolation monitor zero (ADC counts with the pack floating), measured on one
+// board; used until the board is zeroed (calibrate isolation)
+#define ISOLATION_ZERO_DEFAULT_COUNTS 13317.0f
 #elif IS_BMS_BOARD(REV0)
 #define HAS_ADS1115_SECONDARY() 0
 // Rev0 divider ratio is ~416:1
 #define ADS1115_DEFAULT_MUL 0.013f
+#define ISOLATION_ZERO_DEFAULT_COUNTS 22496.0f
 #else
     #error "Unsupported BMS_BOARD"
 #endif
+
+// Isolation monitor (app/isolation.h)
+#define ISOLATION_DIVIDER_BOTTOM_OHMS 24000.0f // bottom resistor of each HV divider
+#define ISOLATION_RESISTANCE_CAP_OHMS 100e6f   // report at most 100 Mohm
+#define ISOLATION_MIN_BATTERY_V 20.0f          // below this the channels barely separate
+#define ISOLATION_SETTLE_MS 2000               // contactors open this long before a reading counts
+// ISOLATION_LOW below this many ohms per volt of pack voltage, with the
+// contactors open (500 ohm/V is the usual minimum for AC-connected systems)
+#define ISOLATION_LOW_OHMS_PER_V 500.0f
 
 
 // A deliberate overestimate of internal resistance of an individual cell, for working current limits

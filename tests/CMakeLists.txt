@@ -269,6 +269,23 @@ foreach(variant IN ITEMS "" "_rev1")
 endforeach()
 target_compile_definitions(test_board_id_rev1 PRIVATE BMS_BOARD=2)
 
+foreach(variant IN ITEMS "" "_rev1")
+    add_executable(test_isolation${variant}
+        test_isolation.c
+        ../bms/app/isolation.c
+        ../bms/sys/events/events.c
+        ../bms/app/state_machines/base.c
+    )
+    target_link_libraries(test_isolation${variant} PRIVATE cmocka m)
+    target_include_directories(test_isolation${variant} PRIVATE
+        ${cmocka_SOURCE_DIR}/include
+        include
+        ../bms
+    )
+    add_test(NAME test_isolation${variant} COMMAND ${MEMORY_CHECK} test_isolation${variant})
+endforeach()
+target_compile_definitions(test_isolation_rev1 PRIVATE BMS_BOARD=2)
+
 add_executable(test_sampler
     test_sampler.c
     ../bms/lib/sampler.c

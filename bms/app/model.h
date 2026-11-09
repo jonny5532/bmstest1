@@ -82,6 +82,9 @@ typedef struct {
     // older saves) for the profile's ACTUAL_CAPACITY_AH. See get_actual_capacity_mC.
     uint32_t actual_capacity_mC;
 
+    // Isolation monitor zero in ADC counts, as calibrated
+    float isolation_zero_counts;
+
 } bms_model_persistent_slow_t;
 
 static const uint32_t BMS_MODEL_PERSISTENT_SLOW_VERSION = 2;
@@ -313,6 +316,14 @@ typedef struct bms_model {
     // (eg, due to a slow flash write). This is reset each tick.
     bool ignore_missed_deadline;
 
+    // Isolation monitor (app/isolation.h). The terminal voltages to chassis are
+    // live in any contactor state; the open_ values are the last reading taken
+    // with the contactors open and settled, held while they are closed.
+    float isolation_pos_to_chassis_V;
+    float isolation_neg_to_chassis_V;
+    float isolation_open_resistance_ohms;
+    millis_t isolation_open_millis; // 0 = none this boot
+
     // PCB revision detected from the strap at boot (app/board_id.h)
     uint16_t board_id;
     uint16_t board_id_counts;
@@ -353,6 +364,15 @@ static inline uint16_t get_cell_voltage_working_max_mV(const bms_model_t *model)
 }
 
 // The capacity the SOC estimator uses: the one saved over the HMI, else the profile's
+static inline bool isolation_zeroed(const bms_model_t *model) {
+    return model->isolation_zero_counts > 0.0f;
+}
+
+// The isolation zero in use: the calibrated one, else the board default
+static inline float get_isolation_zero_counts(const bms_model_t *model) {
+    return isolation_zeroed(model) ? model->isolation_zero_counts : ISOLATION_ZERO_DEFAULT_COUNTS;
+}
+
 static inline uint32_t get_actual_capacity_mC(const bms_model_t *model) {
     return (model->actual_capacity_mC > 0) ? model->actual_capacity_mC
                                            : (uint32_t)(ACTUAL_CAPACITY_AH * 3600000.0 + 0.5);

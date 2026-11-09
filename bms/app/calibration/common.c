@@ -135,3 +135,20 @@ bool calibrate_current_offset(bms_model_t *model, int32_t raw_offset) {
         return false;
     }
 }
+
+// The zero is the channel midpoint with the pack floating. It doesn't depend on
+// the pack voltage, but a leak at the time would be zeroed out, so this must
+// only be run on a pack known to be healthy.
+bool calibrate_isolation_zero(bms_model_t *model, int32_t raw_pos, int32_t raw_neg, float sample_count) {
+    float zero = ((float)raw_pos + (float)raw_neg) / (2.0f * sample_count);
+
+    // An absent ADC sums to zero; the channels are single-ended, 0 to 32767
+    if(zero > 0.0f && zero < 32767.0f) {
+        info_printf("Isolation zero calibration complete: zero=%.1f (was %.1f)\n", zero, get_isolation_zero_counts(model));
+        model->isolation_zero_counts = zero;
+        return true;
+    } else {
+        error_printf("Isolation zero calibration out of range: %.1f\n", zero);
+        return false;
+    }
+}

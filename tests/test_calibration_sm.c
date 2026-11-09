@@ -320,6 +320,70 @@ static void test_other_settings_survive_failure(void **state) {
     assert_int_equal(m.user_charge_current_limit_dA, 123);
 }
 
+// Isolation zero: the midpoint of channels 4/5, with the contactors open
+#define PRIOR_ISOLATION_ZERO 13000.0f
+
+static void start_isolation(void) {
+    m.isolation_zero_counts = PRIOR_ISOLATION_ZERO;
+    m.contactor_sm.state = CONTACTORS_STATE_OPEN;
+    m.calibration_req = CALIBRATION_REQUEST_START_ISOLATION;
+    calibration_sm_tick(&m);
+    assert_int_equal(m.calibration_sm.state, CALIBRATION_STATE_ISOLATION_STABILIZING);
+    advance_ms(ISOLATION_SETTLE_MS);
+    calibration_sm_tick(&m);
+    assert_int_equal(m.calibration_sm.state, CALIBRATION_STATE_ISOLATION_MEASURING);
+}
+
+static void finish_isolation_adc(float pos_mean, float neg_mean) {
+    float n = SHORT_VOLTAGE_CALIBRATION_SAMPLES;
+    adc_calibration[4] = (int32_t)(pos_mean * n);
+    adc_calibration[5] = (int32_t)(neg_mean * n);
+    adc_finished = true;
+}
+
+static void test_isolation_zero_saved(void **state) {
+    (void)state;
+    start_isolation();
+    finish_isolation_adc(13500.0f, 13100.0f);
+    calibration_sm_tick(&m);
+
+    assert_int_equal(m.calibration_sm.state, CALIBRATION_STATE_IDLE);
+    assert_float_near(m.isolation_zero_counts, 13300.0f);
+    assert_int_equal(nvm_saves, 1);
+    // Only the zero changes
+    m.isolation_zero_counts = PRIOR_ISOLATION_ZERO;
+    nvm_saves = 0;
+    assert_calibration_unchanged();
+}
+
+static void test_isolation_needs_open_contactors(void **state) {
+    (void)state;
+    m.contactor_sm.state = CONTACTORS_STATE_CLOSED;
+    m.calibration_req = CALIBRATION_REQUEST_START_ISOLATION;
+    calibration_sm_tick(&m);
+    assert_int_equal(m.calibration_sm.state, CALIBRATION_STATE_IDLE);
+    assert_int_equal(m.calibration_req, CALIBRATION_REQUEST_NULL);
+
+    // Contactors leaving OPEN mid-measurement abandon it
+    start_isolation();
+    m.contactor_sm.state = CONTACTORS_STATE_PRECHARGING;
+    finish_isolation_adc(13500.0f, 13100.0f);
+    calibration_sm_tick(&m);
+    assert_int_equal(m.calibration_sm.state, CALIBRATION_STATE_IDLE);
+    assert_float_near(m.isolation_zero_counts, PRIOR_ISOLATION_ZERO);
+    assert_int_equal(nvm_saves, 0);
+}
+
+static void test_isolation_absent_adc_keeps_zero(void **state) {
+    (void)state;
+    start_isolation();
+    finish_isolation_adc(0.0f, 0.0f);
+    calibration_sm_tick(&m);
+    assert_int_equal(m.calibration_sm.state, CALIBRATION_STATE_IDLE);
+    assert_float_near(m.isolation_zero_counts, PRIOR_ISOLATION_ZERO);
+    assert_int_equal(nvm_saves, 0);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test_setup(test_long_success_saves_all, setup),
@@ -333,6 +397,9 @@ int main(void) {
         cmocka_unit_test_setup(test_long_pos_failure_restores_link, setup),
 #endif
         cmocka_unit_test_setup(test_other_settings_survive_failure, setup),
+        cmocka_unit_test_setup(test_isolation_zero_saved, setup),
+        cmocka_unit_test_setup(test_isolation_needs_open_contactors, setup),
+        cmocka_unit_test_setup(test_isolation_absent_adc_keeps_zero, setup),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

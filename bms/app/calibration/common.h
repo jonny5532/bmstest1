@@ -24,3 +24,5 @@ bool calibrate_pos_contactor(bms_model_t *model, int32_t raw_val, float sample_c
 bool calibrate_link_voltage(bms_model_t *model, int32_t raw_val, float sample_count);
 #endif
 bool calibrate_current_offset(bms_model_t *model, int32_t raw_offset);
+// Zero the isolation monitor from the summed readings of its two channels
+bool calibrate_isolation_zero(bms_model_t *model, int32_t raw_pos, int32_t raw_neg, float sample_count);

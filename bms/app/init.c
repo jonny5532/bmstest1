@@ -105,6 +105,10 @@ static void init_model() {
     sm_init((sm_t*)&model.balancing_sm, "balancing");
     sm_init((sm_t*)&model.calibration_sm, "calibration");
 
+    // No isolation reading yet (zero would read as both terminals at chassis)
+    model.isolation_pos_to_chassis_V = NAN;
+    model.isolation_neg_to_chassis_V = NAN;
+
     // load calibration data from NVM
     // if(nvm_load_calibration(&model)) {
     //     info_printf("Calibration data loaded from NVM\n");

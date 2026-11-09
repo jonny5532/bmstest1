@@ -123,6 +123,10 @@ void system_sm_tick(bms_model_t *model) {
             } else if(model->system_req == SYSTEM_REQUEST_CALIBRATE_ONLINE) {
                 model->system_req = SYSTEM_REQUEST_NULL;
                 model->calibration_req = CALIBRATION_REQUEST_START_ONLINE;
+            } else if(model->system_req == SYSTEM_REQUEST_CALIBRATE_ISOLATION) {
+                model->system_req = SYSTEM_REQUEST_NULL;
+                model->calibration_req = CALIBRATION_REQUEST_START_ISOLATION;
+                state_transition((sm_t*)system_sm, SYSTEM_STATE_CALIBRATING);
             }
             break;
         case SYSTEM_STATE_OPERATING:

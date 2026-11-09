@@ -211,6 +211,27 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
             buf[idx++] = HMI_TYPE_UINT16;
             idx += hmi_buf_append_uint16(&buf[idx], model->board_id);
             break;
+        case HMI_REG_ISOLATION_OPEN_RESISTANCE:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->isolation_open_millis ? model->isolation_open_resistance_ohms : NAN);
+            break;
+        case HMI_REG_PACK_POS_TO_CHASSIS:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->isolation_pos_to_chassis_V);
+            break;
+        case HMI_REG_PACK_NEG_TO_CHASSIS:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->isolation_neg_to_chassis_V);
+            break;
+        case HMI_REG_ISOLATION_OPEN_AGE:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->isolation_open_millis
+                ? (float)(millis() - model->isolation_open_millis) / 1000.0f : NAN);
+            break;
+        case HMI_REG_ISOLATION_ZEROED:
+            buf[idx++] = HMI_TYPE_UINT8;
+            buf[idx++] = isolation_zeroed(model) ? 1 : 0;
+            break;
         case HMI_REG_BOARD_STRAP_COUNTS:
             buf[idx++] = HMI_TYPE_UINT16;
             idx += hmi_buf_append_uint16(&buf[idx], model->board_id_counts);

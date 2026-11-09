@@ -134,9 +134,9 @@ typedef enum {
                                                                 \
     X(LINK_VOLTAGE_MISMATCH, LEVEL_WARNING, 0)                  \
     X(FUSE_VOLTAGE_DROP_HIGH, LEVEL_CRITICAL, FUSE_DROP_FAULT_DELAY_MS) \
-    /* Reserved: never raised. They keep the numbers of the  */ \
-    /* events around them fixed for the HMI.                 */ \
-    X(RESERVED_53, LEVEL_INFO, 0)                               \
+    /* Open-contactor isolation below ISOLATION_LOW_OHMS_PER_V */ \
+    /* (only once zeroed). Data: resistance in ohms           */ \
+    X(ISOLATION_LOW, LEVEL_WARNING, 0)                          \
     X(RESERVED_54, LEVEL_INFO, 0)                               \
     /* PCB revision strap doesn't match the BMS_BOARD build. */ \
     /* Data: (detected code << 16) | BMS_BOARD               */ \

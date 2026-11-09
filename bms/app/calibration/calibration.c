@@ -23,6 +23,7 @@ static struct {
     float pos_contactor_offset_mV;
     float link_voltage_mul;
 #endif
+    float isolation_zero_counts;
 } calibration_before;
 
 // The calibration values are embedded (anonymously) at the start of the
@@ -36,6 +37,7 @@ static calibration_data_t *calibration_data(bms_model_t *model) {
 
 static void start_sequence(bms_model_t *model, calibration_state_t first_state) {
     calibration_before.data = *calibration_data(model);
+    calibration_before.isolation_zero_counts = model->isolation_zero_counts;
 #if IS_BMS_BOARD(REV1)
     calibration_before.pos_contactor_offset_mV = model->pos_contactor_offset_mV;
     calibration_before.link_voltage_mul = model->link_voltage_mul;
@@ -50,6 +52,7 @@ static void finish_sequence(bms_model_t *model, bool ok) {
         nvm_save_persistent_slow(model);
     } else {
         *calibration_data(model) = calibration_before.data;
+        model->isolation_zero_counts = calibration_before.isolation_zero_counts;
 #if IS_BMS_BOARD(REV1)
         model->pos_contactor_offset_mV = calibration_before.pos_contactor_offset_mV;
         model->link_voltage_mul = calibration_before.link_voltage_mul;
@@ -81,6 +84,13 @@ void calibration_sm_tick(bms_model_t *model) {
                 } else {
                     sm->initial_contactor_state = model->contactor_sm.state;
                     start_sequence(model, CALIBRATION_STATE_ONLINE_STABILIZING);
+                }
+            } else if (model->calibration_req == CALIBRATION_REQUEST_START_ISOLATION) {
+                model->calibration_req = CALIBRATION_REQUEST_NULL;
+                if (model->contactor_sm.state != CONTACTORS_STATE_OPEN) {
+                    error_printf("Isolation calibration aborted: contactors must be OPEN (currently %d)\n", model->contactor_sm.state);
+                } else {
+                    start_sequence(model, CALIBRATION_STATE_ISOLATION_STABILIZING);
                 }
             }
             break;
@@ -240,6 +250,24 @@ void calibration_sm_tick(bms_model_t *model) {
                     }
                 }
                 finish_sequence(model, ok);
+            }
+            break;
+
+        /* ISOLATION zero: the channel midpoint with the pack floating */
+        case CALIBRATION_STATE_ISOLATION_STABILIZING:
+        case CALIBRATION_STATE_ISOLATION_MEASURING:
+            if (model->contactor_sm.state != CONTACTORS_STATE_OPEN) {
+                error_printf("Isolation calibration aborted: contactors not open\n");
+                finish_sequence(model, false);
+            } else if (sm->state == CALIBRATION_STATE_ISOLATION_STABILIZING) {
+                if (state_timeout((sm_t*)sm, ISOLATION_SETTLE_MS)) {
+                    ads1115_start_calibration(SHORT_VOLTAGE_CALIBRATION_SAMPLES);
+                    state_transition((sm_t*)sm, CALIBRATION_STATE_ISOLATION_MEASURING);
+                }
+            } else if (ads1115_calibration_finished()) {
+                finish_sequence(model, calibrate_isolation_zero(model,
+                    ads1115_get_calibration(4), ads1115_get_calibration(5),
+                    (float)SHORT_VOLTAGE_CALIBRATION_SAMPLES));
             }
             break;
     }

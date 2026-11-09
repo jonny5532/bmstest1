@@ -44,6 +44,10 @@ typedef enum {
     // ONLINE sequence
     CALIBRATION_STATE_ONLINE_STABILIZING,
     CALIBRATION_STATE_ONLINE_MEASURING,
+
+    // ISOLATION zero (contactors open, pack floating)
+    CALIBRATION_STATE_ISOLATION_STABILIZING,
+    CALIBRATION_STATE_ISOLATION_MEASURING,
 } calibration_state_t;
 
 typedef enum {
@@ -51,6 +55,7 @@ typedef enum {
     CALIBRATION_REQUEST_START_OFFLINE_LONG = 1,
     CALIBRATION_REQUEST_START_OFFLINE_SHORT = 2,
     CALIBRATION_REQUEST_START_ONLINE = 3,
+    CALIBRATION_REQUEST_START_ISOLATION = 4,
 } calibration_requests_t;
 
 typedef struct {

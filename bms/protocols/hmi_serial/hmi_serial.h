@@ -59,7 +59,7 @@
 #define HMI_REG_TEMPERATURE_MAX        11 // int16 (0.1C)
 #define HMI_REG_CELL_VOLTAGE_MIN       12 // int16 (mV)
 #define HMI_REG_CELL_VOLTAGE_MAX       13 // int16 (mV)
-#define HMI_REG_SYSTEM_REQUEST         14 // uint8
+#define HMI_REG_SYSTEM_REQUEST         14 // uint8, system_requests_t (6 = zero the isolation monitor)
 #define HMI_REG_SYSTEM_STATE           15 // uint8
 #define HMI_REG_CONTACTORS_STATE       16 // uint8
 #define HMI_REG_SOC_VOLTAGE_BASED      17 // uint16
@@ -111,6 +111,14 @@
 #define HMI_REG_SHUNT_NTC_RESISTANCE   59 // float (ohms), for NTC calibration
 #define HMI_REG_BOARD_REVISION         60 // uint16, PCB revision from the strap: major*10+minor (Rev1.3 = 13), 0 = Rev0
 #define HMI_REG_BOARD_STRAP_COUNTS     61 // uint16 (12-bit ADC counts), revision strap reading with no pulls
+// Isolation monitor (see app/isolation.h). The open_ values are the last reading
+// with the contactors open, held while they are closed. The terminal voltages
+// are live in any contactor state (closed, the inverter sets the chassis voltage).
+#define HMI_REG_ISOLATION_OPEN_RESISTANCE 62 // float (ohms), capped at 100 Mohm; NaN until measured this boot
+#define HMI_REG_PACK_POS_TO_CHASSIS       63 // float (V), pack+ to chassis; NaN if unusable
+#define HMI_REG_PACK_NEG_TO_CHASSIS       64 // float (V), pack- to chassis (normally negative); NaN if unusable
+#define HMI_REG_ISOLATION_OPEN_AGE        65 // float (s) since the open reading; 0 = live, NaN = none this boot
+#define HMI_REG_ISOLATION_ZEROED          66 // uint8, 1 once calibrated (system request 6); events need it
 
 #define HMI_REG_PROTOCOL_VERSION       71 // uint16, HMI_PROTOCOL_VERSION; absent before READ_ARRAY
 
