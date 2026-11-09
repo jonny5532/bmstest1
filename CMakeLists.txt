@@ -96,6 +96,22 @@ if(BMS_BOARD)
     add_compile_definitions(BMS_BOARD=${BMS_BOARD})
 endif()
 
+# Boards with USB VBUS wired to GPIO3 (J12 pin 2) through a 3.3k/5.1k divider.
+# The chip's D+ pull-up is then only switched on while the host supplies VBUS,
+# so a switched-off host is never back-powered through D+. Leave OFF on boards
+# without the divider, or USB never connects.
+option(BMS_USB_VBUS_SENSE "Board has USB VBUS sensed on GPIO3" OFF)
+if(BMS_USB_VBUS_SENSE)
+    add_compile_definitions(BMS_USB_VBUS_SENSE=1)
+endif()
+
+# Passive isoSPI listener that dumps the raw bus symbols when a BMB CRC fails.
+# Bench debugging only: it uses all of one PIO, a DMA channel and GPIO30.
+option(BMS_ISOSNOOP "Enable the isoSPI snooper debug dump" OFF)
+if(BMS_ISOSNOOP)
+    add_compile_definitions(BMS_ISOSNOOP=1)
+endif()
+
 target_compile_options(bms PUBLIC
     -Wall
     -Wextra

@@ -41,10 +41,15 @@
 #define PIN_ISOSPI_TX_DATA 27
 #define PIN_ISOSPI_RX_HIGH 28
 #define PIN_ISOSPI_RX_LOW 29
-#define PIN_ISOSPI_RX_AND 30
 #define PIN_ISOSPI_RX_DEBUG 31
 #define PIN_ISOSNOOP_RX_DEBUG 32
-#define PIN_ISOSNOOP_TIMER_DISABLE 3 // spare GPIO that isn't used for anything else
+// The isosnoop state machines pass a flag through this pin (one sets it, another
+// tests it with jmp pin), so it must be in the PIO's GPIO window and driven by
+// nothing else. GPIO30 isn't bonded to anything on the rev1 PCB.
+#define PIN_ISOSNOOP_TIMER_DISABLE 30
+
+// USB VBUS through a 3.3k/5.1k divider (J12 pin 2), for BMS_USB_VBUS_SENSE
+#define PIN_USB_VBUS_SENSE 3
 
 // Each PIO SM can only see 32 GPIOs (0-31 by default? but can be remapped to
 // 16-47 via the GPIOBASE register)

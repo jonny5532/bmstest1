@@ -99,10 +99,9 @@ timer_loop:
 % c-sdk {
 // this is a raw helper function for use by the user which sets up the GPIO output, and configures the SM to output on a particular pin
 
-void isosnoop_pio_setup(PIO pio, uint rx_pin_base, uint sampling_pin, uint rx_and_pin, uint timer_disable_pin) {
+void isosnoop_pio_setup(PIO pio, uint rx_pin_base, uint sampling_pin, uint timer_disable_pin) {
     // only referenced by the commented-out diagnostic code below
     (void)sampling_pin;
-    (void)rx_and_pin;
 
     // we don't need to init GPIOs as inputs
 

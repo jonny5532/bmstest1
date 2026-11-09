@@ -23,8 +23,8 @@ uint32_t last_write_addr;
 
 void isosnoop_dma_setup(PIO pio, uint sm);
 
-void isosnoop_setup(uint rx_pin_base, uint sampling_pin, uint rx_and_pin, uint timer_disable_pin) {
-    isosnoop_pio_setup(ISOSNOOP_PIO, rx_pin_base, sampling_pin, rx_and_pin, timer_disable_pin);
+void isosnoop_setup(uint rx_pin_base, uint sampling_pin, uint timer_disable_pin) {
+    isosnoop_pio_setup(ISOSNOOP_PIO, rx_pin_base, sampling_pin, timer_disable_pin);
     isosnoop_dma_setup(ISOSNOOP_PIO, ISOSNOOP_SM);
 
     dma_chan = dma_channel_hw_addr(dma_channel_rx);
