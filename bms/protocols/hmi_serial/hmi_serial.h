@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #define HMI_MSG_ANNOUNCE_DEVICE      0x81
 #define HMI_MSG_SET_DEVICE_ADDRESS   0x01
 
@@ -25,12 +27,18 @@
 
 #define HMI_MSG_WRITE_ARRAY          0x0A
 
+// Answered by the supervisor MCU at its BMS's address; the BMS ignores it (2.11)
+#define HMI_MSG_READ_SUPERVISOR      0x0B
+#define HMI_MSG_READ_SUPERVISOR_RESPONSE 0x8B
+
 // Version of this protocol, in HMI_REG_PROTOCOL_VERSION:
 //   1 = READ_ARRAY
 //   2 = WRITE_ARRAY, the EKF and OCV learner arrays, HMI_REG_OCV_LEARN_*
 //   3 = HMI_REG_NAMEPLATE_CAPACITY; HMI_REG_CAPACITY is the actual capacity, saved to NVM;
 //       the learned capacity, HMI_REG_OCV_LEARN_CAPACITY*
-#define HMI_PROTOCOL_VERSION 3
+//   4 = READ_SUPERVISOR (answered by the supervisor); the BMS doesn't announce
+//       over its response
+#define HMI_PROTOCOL_VERSION 4
 
 #define HMI_ANNOUNCE_DEVICE_TYPE_BMS 0x01
 
@@ -335,9 +343,48 @@ changes, which the HMI sees as the response not matching what it wrote. A
 large array is written a page at a time, so between pages it holds a mix of
 old and new values.
 
+2.11. Read supervisor (from HMI to supervisor)
+
+The supervisor MCU, next to each BMS, holds the contactor drivers disabled
+unless its own checks of the cell voltages pass (see supervisor/). It shares the
+HMI lines with its BMS, and answers to the BMS's address (which it learns from
+the BMS), but only this message. The BMS ignores it, apart from not announcing
+over the response. The format is:
+
+<message type byte = HMI_MSG_READ_SUPERVISOR (0x0B)>
+<device address (1 byte)>
+
+A supervisor that has never heard from its BMS doesn't know its address, and
+stays silent. One that has keeps answering at that address when the BMS stops
+(which is when its view is most useful). No response in ~20ms means no
+supervisor, or one that predates this message.
+
+2.12. Read supervisor response (from supervisor to HMI)
+
+<message type byte = HMI_MSG_READ_SUPERVISOR_RESPONSE (0x8B)>
+<device address (1 byte)>
+<supervisor protocol version (1 byte)> (SUP_PROTOCOL_VERSION, shared/supervisor_protocol.h)
+<state (1 byte)> (sup_state_t: 0 = contactor drivers disabled, 1 = enabled,
+                  2 = disabled after a fault, until the BMS restarts)
+<reasons (2 bytes)> (SUP_REASON_* bits: what stops it enabling)
+<latch reasons (2 bytes)> (SUP_REASON_* bits: why it latched)
+<cell min (2 bytes, int16 mV)> (from its last scan of the cells)
+<cell max (2 bytes, int16 mV)>
+<cells in range (1 byte)>
+<cells in the map (1 byte)> (0 until it has the BMS's cell map)
+<chemistry (1 byte)> (whose hard limits it enforces: 1 = LFP, 2 = NMC)
+<scans (4 bytes)> (cell scans checked since it booted)
+<ms since its last scan (4 bytes)> (0xFFFFFFFF: none yet)
+<ms since the last BMS status (4 bytes)> (0xFFFFFFFF: none yet)
+
+The supervisor is a separate device: its cell min/max come from its own reading
+of the BMB traffic, not from the BMS.
+
 */
 
 typedef struct bms_model bms_model_t;
 
 void init_hmi_serial(void);
 void hmi_serial_tick(bms_model_t *model);
+// Our address on the HMI bus (the supervisor answers READ_SUPERVISOR at it)
+uint8_t hmi_serial_device_address(void);

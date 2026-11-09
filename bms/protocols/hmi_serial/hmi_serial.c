@@ -424,6 +424,10 @@ static void hmi_handle_read_events(const uint8_t *rx_buf, size_t len, bms_model_
     duart_send_packet(&HMI_SERIAL_DUART, tx_buf, tx_idx);
 }
 
+uint8_t hmi_serial_device_address(void) {
+    return device_address;
+}
+
 void hmi_serial_tick(bms_model_t *model) {
     uint8_t rx_buf[256];
 
@@ -469,6 +473,13 @@ void hmi_serial_tick(bms_model_t *model) {
                 break;
             case HMI_MSG_WRITE_ARRAY:
                 hmi_handle_write_array(rx_buf, len, model);
+                break;
+            case HMI_MSG_READ_SUPERVISOR:
+                // Our supervisor answers this one. Keep the line clear for it
+                // by not announcing for a while.
+                if(len >= 2 && rx_buf[1] == device_address) {
+                    next_announce_timestep = timestep() + announce_period;
+                }
                 break;
             default:
                 // Ignore other messages (responses or unknown)
