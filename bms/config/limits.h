@@ -11,6 +11,10 @@
 
 #define CELL_PRESENCE_MASK { CELL_PRESENCE_WORDS }
 
+// Timing shared with the supervisor (the BMB stale threshold, the force-open
+// wait, the watchdog and the supervisor's own delays)
+#include "shared/supervisor_limits.h"
+
 
 // The board: its PCB revision and any modifications (see boards/README.md),
 // orthogonal to the pack profile above
@@ -145,9 +149,7 @@
         CELL_TEMPERATURE_STALE_THRESHOLD_SLOW_MS  \
         : CELL_TEMPERATURE_STALE_THRESHOLD_MS )
 
-// We only sample every 1.28s, and could have isospi/CRC issues, so be generous
-// (also allow long enough for stable readings during balancing)
-#define CELL_VOLTAGE_STALE_THRESHOLD_MS 15000
+// CELL_VOLTAGE_STALE_THRESHOLD_MS is in shared/supervisor_limits.h
 // In slow mode the BMBs are sampled every BMB3Y_SLOW_MODE_PERIOD_MS (at least:
 // main loop overruns stretch it). Must be a power-of-two number of timesteps.
 #define BMB3Y_SLOW_MODE_PERIOD_MS 40960
@@ -268,5 +270,4 @@ _Static_assert(FUSE_DROP_FAULT_DELAY_MS > CONTACTOR_VOLTAGE_STALE_THRESHOLD_MS,
 // NOTE: Some inverters (Deye!) take a long time to react to current changes (20
 // seconds!).
 #define CONTACTORS_OPEN_TIMEOUT_MS 30000
-// How long we wait when force-opening contactors
-#define CONTACTORS_FORCE_OPEN_TIMEOUT_MS 2000
+// CONTACTORS_FORCE_OPEN_TIMEOUT_MS is in shared/supervisor_limits.h
