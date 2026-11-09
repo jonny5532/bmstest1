@@ -455,6 +455,30 @@ foreach(t IN LISTS test_targets)
     endif()
 endforeach()
 
+# Supervisor firmware logic, its link to the BMS and the cell map. Built per
+# chemistry, as the supervisor is: the cell map comes from the BMS at runtime.
+foreach(chemistry IN ITEMS lfp nmc)
+    add_executable(test_supervisor_${chemistry}
+        test_supervisor.c
+        ../bms/shared/cell_map.c
+        ../bms/shared/supervisor_protocol.c
+        ../bms/drivers/bmb3y/crc.c
+        ../supervisor/cell_snoop.c
+        ../supervisor/supervisor_logic.c
+        ../supervisor/supervisor_hmi.c
+    )
+    target_compile_definitions(test_supervisor_${chemistry} PRIVATE
+        SUPERVISOR_CHEMISTRY_HEADER="chemistry/${chemistry}.h")
+    target_link_libraries(test_supervisor_${chemistry} PRIVATE cmocka)
+    target_include_directories(test_supervisor_${chemistry} PRIVATE
+        ${cmocka_SOURCE_DIR}/include
+        include
+        ../bms
+        ../supervisor
+    )
+    add_test(NAME test_supervisor_${chemistry} COMMAND ${MEMORY_CHECK} test_supervisor_${chemistry})
+endforeach()
+
 # Every built-in pack profile's cell map passes the supervisor's checks
 file(GLOB BUILTIN_PROFILES RELATIVE ${CMAKE_CURRENT_LIST_DIR}/../profiles/builtin
     ${CMAKE_CURRENT_LIST_DIR}/../profiles/builtin/*.h)
