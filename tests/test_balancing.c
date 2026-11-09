@@ -218,6 +218,28 @@ static void test_balancing_stops_in_slow_mode(void **state) {
     assert_int_equal(m.balancing_sm.state, BALANCING_STATE_IDLE);
 }
 
+static void test_balancing_session_resets_pause_counter(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    reset_model(&m);
+
+    // One cell high enough to need balancing
+    m.cell_voltages_mV[0] = 3950;
+    m.cell_voltage_max_mV = 3950;
+
+    // Left over from a previous session that stopped early
+    m.balancing_sm.pause_counter = 3;
+
+    advance_time(m.auto_balancing_period_ms + 1);
+    balancing_sm_tick(&m);
+    assert_int_equal(m.balancing_sm.state, BALANCING_STATE_ACTIVE);
+    assert_int_equal(m.balancing_sm.pause_counter, 0);
+
+    // The first pause comes after the full number of active periods
+    balancing_sm_tick(&m);
+    assert_false(m.balancing_sm.is_pause_cycle);
+}
+
 // ============================================================================
 // Main
 // ============================================================================
@@ -237,6 +259,7 @@ int main(void) {
         cmocka_unit_test_setup(test_balancing_does_not_start_with_fatal_event, setup),
         cmocka_unit_test_setup(test_balancing_pause_clears_mask, setup),
         cmocka_unit_test_setup(test_balancing_stops_in_slow_mode, setup),
+        cmocka_unit_test_setup(test_balancing_session_resets_pause_counter, setup),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

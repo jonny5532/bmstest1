@@ -83,7 +83,7 @@ static void update_balance_requests(balancing_sm_t *balancing_sm, int16_t decrem
 
                 if (balancing_sm->balance_time_remaining[logical_index] > 0 && !is_physically_adjacent) {
                     balancing_sm->balance_time_remaining[logical_index] -= decrement;
-                    balancing_sm->balance_request_mask[logical_index / 32] |= (1 << (logical_index % 32));
+                    balancing_sm->balance_request_mask[logical_index / 32] |= (1u << (logical_index % 32));
                     any_balancing = true;
                     last_balancing_physical_index = physical_index;
                 }
@@ -184,6 +184,9 @@ static bool start_balancing(bms_model_t *model) {
     }
 
     update_balance_requests(balancing_sm, 0, false);
+
+    // Each session counts periods to its first pause from zero
+    balancing_sm->pause_counter = 0;
 
     return true;
 }
