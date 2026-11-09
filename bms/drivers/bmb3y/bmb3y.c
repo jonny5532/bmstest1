@@ -577,7 +577,11 @@ bool started = false;
 void bmb3y_tick(bms_model_t *model) {
     int period_mask = 0x3f;
 
-    const int slow_mode_period_mask = 0x7ff;
+    // Slow mode loops every BMB3Y_SLOW_MODE_PERIOD_MS
+    const int slow_mode_period_mask = BMB3Y_SLOW_MODE_PERIOD_MS / TIMESTEP_PERIOD_MS - 1;
+    _Static_assert(BMB3Y_SLOW_MODE_PERIOD_MS % TIMESTEP_PERIOD_MS == 0 &&
+                   ((BMB3Y_SLOW_MODE_PERIOD_MS / TIMESTEP_PERIOD_MS) & (BMB3Y_SLOW_MODE_PERIOD_MS / TIMESTEP_PERIOD_MS - 1)) == 0,
+                   "BMB3Y_SLOW_MODE_PERIOD_MS must be a power-of-two number of timesteps");
 
     if(bmb3y_should_stop(model)) {
         // Stop talking to the BMBs to save power

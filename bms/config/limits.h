@@ -120,10 +120,17 @@
 // We only sample every 1.28s, and could have isospi/CRC issues, so be generous
 // (also allow long enough for stable readings during balancing)
 #define CELL_VOLTAGE_STALE_THRESHOLD_MS 15000
-// In slow mode we only sample every 81.92s, allow two bad reads
-#define CELL_VOLTAGE_STALE_THRESHOLD_SLOW_MS 270000
+// In slow mode the BMBs are sampled every BMB3Y_SLOW_MODE_PERIOD_MS (at least:
+// main loop overruns stretch it). Must be a power-of-two number of timesteps.
+#define BMB3Y_SLOW_MODE_PERIOD_MS 40960
+// Allow two bad slow-mode reads, plus up to one normal cycle on entering slow
+// mode (3 x 40.96s + 1.28s = 124.2s), with some margin
+#define CELL_VOLTAGE_STALE_THRESHOLD_SLOW_MS 135000
 #define CELL_TEMPERATURE_STALE_THRESHOLD_MS 5000
-#define CELL_TEMPERATURE_STALE_THRESHOLD_SLOW_MS 270000
+#define CELL_TEMPERATURE_STALE_THRESHOLD_SLOW_MS 135000
+_Static_assert(CELL_VOLTAGE_STALE_THRESHOLD_SLOW_MS > 3 * BMB3Y_SLOW_MODE_PERIOD_MS + 1280 &&
+               CELL_TEMPERATURE_STALE_THRESHOLD_SLOW_MS > 3 * BMB3Y_SLOW_MODE_PERIOD_MS + 1280,
+               "slow-mode stale thresholds must allow two bad reads");
 
 // How long a cell may stay below the soft minimum before the BMS faults and
 // opens the contactors. Long enough for a manual recovery charge, short enough
