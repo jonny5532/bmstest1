@@ -269,43 +269,43 @@ static void hmi_handle_write_registers(const uint8_t *rx_buf, size_t len, bms_mo
     }
 }
 
-static void hmi_handle_read_cell_voltages(const uint8_t *rx_buf, size_t len, bms_model_t *model) {
-    if (len < 2) return;
+static void hmi_handle_list_registers(const uint8_t *rx_buf, size_t len) {
+    if (len < 4) return;
     uint8_t addr = rx_buf[1];
     if (addr != device_address) return;
 
-    if(model->cell_voltages_millis == 0) {
-        // No valid data yet, don't reply
-        return;
-    }
-
-    uint8_t tx_buf[243];
-    uint16_t tx_idx = 0;
-
-    tx_buf[tx_idx++] = HMI_MSG_READ_CELL_VOLTAGES_RESPONSE;
-    tx_buf[tx_idx++] = device_address;
-    tx_buf[tx_idx++] = 120; // number of cell voltages
-
-    tx_idx += hmi_encode_int16_delta_array(&tx_buf[tx_idx], sizeof(tx_buf) - tx_idx, model->cell_voltages_mV, 120, NULL);
-
-    duart_send_packet(&HMI_SERIAL_DUART, tx_buf, tx_idx);
+    uint8_t tx_buf[256];
+    size_t tx_len = hmi_build_list_registers_response(tx_buf, sizeof(tx_buf), device_address,
+                                                      hmi_buf_get_uint16(&rx_buf[2]));
+    duart_send_packet(&HMI_SERIAL_DUART, tx_buf, tx_len);
 }
 
-static void hmi_handle_read_balancing_times(const uint8_t *rx_buf, size_t len, bms_model_t *model) {
-    if (len < 2) return;
-    uint8_t addr = rx_buf[1];
-    if (addr != device_address) return;
+// Tell the HMI we can't handle a request at our address (hmi_serial.h, 2.14)
+static void hmi_send_nack(uint8_t msg_type, uint8_t reason) {
+    uint8_t tx_buf[4];
+    tx_buf[0] = HMI_MSG_NACK;
+    tx_buf[1] = device_address;
+    tx_buf[2] = msg_type;
+    tx_buf[3] = reason;
+    duart_send_packet(&HMI_SERIAL_DUART, tx_buf, sizeof(tx_buf));
+}
 
-    uint8_t tx_buf[243];
-    uint16_t tx_idx = 0;
-
-    tx_buf[tx_idx++] = HMI_MSG_READ_BALANCING_TIMES_RESPONSE;
-    tx_buf[tx_idx++] = device_address;
-    tx_buf[tx_idx++] = 120; // number of cell balancing times
-
-    tx_idx += hmi_encode_int16_delta_array(&tx_buf[tx_idx], sizeof(tx_buf) - tx_idx, model->balancing_sm.balance_time_remaining, 120, NULL);
-
-    duart_send_packet(&HMI_SERIAL_DUART, tx_buf, tx_idx);
+// Minimum length of each request we handle, counting the type byte
+static size_t hmi_request_min_len(uint8_t msg_type) {
+    switch (msg_type) {
+        case HMI_MSG_READ_REGISTERS:
+        case HMI_MSG_WRITE_REGISTERS:
+        case HMI_MSG_READ_LOG:
+            return 2;
+        case HMI_MSG_READ_EVENTS:
+        case HMI_MSG_LIST_REGISTERS:
+            return 4;
+        case HMI_MSG_READ_ARRAY:
+            return 5;
+        case HMI_MSG_WRITE_ARRAY:
+            return HMI_ARRAY_WRITE_HEADER_LEN;
+    }
+    return 0;
 }
 
 static void hmi_handle_read_array(const uint8_t *rx_buf, size_t len, bms_model_t *model) {
@@ -443,6 +443,15 @@ void hmi_serial_tick(bms_model_t *model) {
     size_t len = duart_read_packet(&HMI_SERIAL_DUART, rx_buf, sizeof(rx_buf));
     if(len > 0) {
         uint8_t msg_type = rx_buf[0];
+        size_t min_len = hmi_request_min_len(msg_type);
+        if(min_len > 0 && len < min_len) {
+            // Too short for its type (the handlers ignore it): NACK it if it's
+            // to us
+            if(len >= 2 && rx_buf[1] == device_address) {
+                hmi_send_nack(msg_type, HMI_NACK_MALFORMED);
+            }
+            return;
+        }
         switch (msg_type) {
             case HMI_MSG_SET_DEVICE_ADDRESS:
                 hmi_handle_set_device_address(rx_buf, len);
@@ -456,14 +465,8 @@ void hmi_serial_tick(bms_model_t *model) {
             case HMI_MSG_WRITE_REGISTERS:
                 hmi_handle_write_registers(rx_buf, len, model);
                 break;
-            case HMI_MSG_READ_CELL_VOLTAGES:
-                hmi_handle_read_cell_voltages(rx_buf, len, model);
-                break;
             case HMI_MSG_READ_EVENTS:
                 hmi_handle_read_events(rx_buf, len, model);
-                break;
-            case HMI_MSG_READ_BALANCING_TIMES:
-                hmi_handle_read_balancing_times(rx_buf, len, model);
                 break;
             case HMI_MSG_READ_LOG:
                 hmi_handle_read_log(rx_buf, len);
@@ -481,8 +484,19 @@ void hmi_serial_tick(bms_model_t *model) {
                     next_announce_timestep = timestep() + announce_period;
                 }
                 break;
+            case HMI_MSG_LIST_REGISTERS:
+                hmi_handle_list_registers(rx_buf, len);
+                break;
             default:
-                // Ignore other messages (responses or unknown)
+                // Ignore responses (from other devices), and requests for
+                // other devices at our address. NACK other requests to us.
+                // (That includes the removed READ_CELL_VOLTAGES and
+                // READ_BALANCING_TIMES, so an older HMI hears why.)
+                if(!(msg_type & 0x80)
+                   && !(msg_type >= HMI_MSG_OTHER_DEVICE_FIRST && msg_type <= HMI_MSG_OTHER_DEVICE_LAST)
+                   && len >= 2 && rx_buf[1] == device_address) {
+                    hmi_send_nack(msg_type, HMI_NACK_UNKNOWN_MESSAGE);
+                }
                 break;
         }
     }

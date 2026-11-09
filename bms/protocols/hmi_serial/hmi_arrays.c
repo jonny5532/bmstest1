@@ -219,33 +219,6 @@ static inline uint64_t get_uint64(const uint8_t *buf) {
     return (uint64_t)get_uint32(buf) | ((uint64_t)get_uint32(&buf[4]) << 32);
 }
 
-size_t hmi_encode_int16_delta_array(uint8_t *buf, size_t capacity, const int16_t *values,
-                                    size_t count, size_t *encoded) {
-    // Absolute values are sent as two bytes, big-endian, with the MSB set (so
-    // only the low 15 bits of the value are kept). Deltas from the previous
-    // value in -64 to +63 are sent as one byte with the MSB clear. The
-    // previous value starts at zero.
-
-    int16_t last_value = 0;
-    size_t idx = 0;
-    size_t i;
-    for (i = 0; i < count; i++) {
-        int16_t value = values[i];
-        int32_t delta = (int32_t)value - last_value;
-        if (delta >= -64 && delta <= 63) {
-            if (idx + 1 > capacity) break;
-            buf[idx++] = delta & 0x7F;
-        } else {
-            if (idx + 2 > capacity) break;
-            buf[idx++] = ((value >> 8) & 0xFF) | 0x80;
-            buf[idx++] = value & 0xFF;
-        }
-        last_value = value;
-    }
-    if (encoded) *encoded = i;
-    return idx;
-}
-
 static size_t hmi_encode_fixed_array(uint8_t *buf, size_t capacity, bms_model_t *model,
                                      const hmi_array_t *array, uint16_t start, size_t count, size_t *encoded) {
     size_t size = array->encoding & 0x0F;

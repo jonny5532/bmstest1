@@ -9,6 +9,145 @@
 
 #include "pico/unique_id.h"
 
+#define W HMI_REG_FLAG_WRITABLE
+#define WS (HMI_REG_FLAG_WRITABLE | HMI_REG_FLAG_SAVED)
+
+// Every register, in increasing ID order (the tests check it against
+// hmi_append_register_value)
+static const hmi_register_info_t registers[] = {
+    { HMI_REG_SERIAL,                 HMI_TYPE_UINT64, 0 },
+    { HMI_REG_PROTOCOL_VERSION,       HMI_TYPE_UINT16, 0 },
+
+    { HMI_REG_MILLIS,                 HMI_TYPE_UINT64, 0 },
+    { HMI_REG_BUILD_HASH,             HMI_TYPE_UINT32, 0 },
+    { HMI_REG_BUILD_TIME,             HMI_TYPE_UINT32, 0 },
+    { HMI_REG_BOARD_REVISION,         HMI_TYPE_UINT16, 0 },
+    { HMI_REG_BOARD_STRAP_COUNTS,     HMI_TYPE_UINT16, 0 },
+    { HMI_REG_MCU_TEMPERATURE,        HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_SYSTEM_STATE,           HMI_TYPE_UINT8,  0 },
+    { HMI_REG_CONTACTORS_STATE,       HMI_TYPE_UINT8,  0 },
+
+    { HMI_REG_BATTERY_VOLTAGE,        HMI_TYPE_INT32,  0 },
+    { HMI_REG_OUTPUT_VOLTAGE,         HMI_TYPE_INT32,  0 },
+    { HMI_REG_POS_CONTACTOR_VOLTAGE,  HMI_TYPE_INT32,  0 },
+    { HMI_REG_NEG_CONTACTOR_VOLTAGE,  HMI_TYPE_INT32,  0 },
+    { HMI_REG_LINK_VOLTAGE,           HMI_TYPE_INT32,  0 },
+    { HMI_REG_CURRENT,                HMI_TYPE_INT32,  0 },
+    { HMI_REG_CHARGE,                 HMI_TYPE_INT64,  0 },
+    { HMI_REG_CELL_VOLTAGE_MIN,       HMI_TYPE_INT16,  0 },
+    { HMI_REG_CELL_VOLTAGE_MAX,       HMI_TYPE_INT16,  0 },
+    { HMI_REG_TEMPERATURE_MIN,        HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_TEMPERATURE_MAX,        HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_SHUNT_DIE_TEMP,         HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_SHUNT_NTC_TEMP,         HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_SHUNT_NTC_RESISTANCE,   HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_SUPPLY_VOLTAGE_3V3,     HMI_TYPE_UINT16, 0 },
+    { HMI_REG_SUPPLY_VOLTAGE_5V,      HMI_TYPE_UINT16, 0 },
+    { HMI_REG_SUPPLY_VOLTAGE_12V,     HMI_TYPE_UINT16, 0 },
+    { HMI_REG_SUPPLY_VOLTAGE_CTR,     HMI_TYPE_UINT16, 0 },
+    { HMI_REG_ISOLATION_OPEN_RESISTANCE, HMI_TYPE_FLOAT, 0 },
+    { HMI_REG_PACK_POS_TO_CHASSIS,    HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_PACK_NEG_TO_CHASSIS,    HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_ISOLATION_OPEN_AGE,     HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_ISOLATION_ZEROED,       HMI_TYPE_UINT8,  0 },
+
+    { HMI_REG_SOC,                    HMI_TYPE_UINT16, W },
+    { HMI_REG_SOC_VOLTAGE_BASED,      HMI_TYPE_UINT16, 0 },
+    { HMI_REG_SOC_BASIC_COUNT,        HMI_TYPE_UINT16, 0 },
+    { HMI_REG_NAMEPLATE_CAPACITY,     HMI_TYPE_UINT32, 0 },
+#ifdef OCV_LEARN
+    { HMI_REG_OCV_LEARN_S_FULL,       HMI_TYPE_FLOAT,  WS },
+    { HMI_REG_OCV_LEARN_CAPACITY_REF, HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_OCV_LEARN_CAPACITY,     HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_OCV_LEARN_CAPACITY_SD,  HMI_TYPE_FLOAT,  0 },
+    { HMI_REG_OCV_LEARN_CAPACITY_STATE, HMI_TYPE_UINT8, 0 },
+    { HMI_REG_OCV_LEARN_CAPACITY_DEPTH, HMI_TYPE_FLOAT, 0 },
+    { HMI_REG_OCV_LEARN_CAPACITY_DEPTH_V, HMI_TYPE_FLOAT, 0 },
+    { HMI_REG_OCV_LEARN_CAPACITY_DEPTH_CYCLES, HMI_TYPE_FLOAT, 0 },
+#endif
+    { HMI_REG_LIFETIME_CHARGED_MAH,    HMI_TYPE_UINT32, 0 },
+    { HMI_REG_LIFETIME_DISCHARGED_MAH, HMI_TYPE_UINT32, 0 },
+    { HMI_REG_LIFETIME_CHARGED_WH,     HMI_TYPE_UINT32, 0 },
+    { HMI_REG_LIFETIME_DISCHARGED_WH,  HMI_TYPE_UINT32, 0 },
+
+    { HMI_REG_CHARGE_CURRENT_LIMIT_DA,                 HMI_TYPE_UINT16, 0 },
+    { HMI_REG_DISCHARGE_CURRENT_LIMIT_DA,              HMI_TYPE_UINT16, 0 },
+    { HMI_REG_TEMP_CHARGE_CURRENT_LIMIT_DA,            HMI_TYPE_UINT16, 0 },
+    { HMI_REG_TEMP_DISCHARGE_CURRENT_LIMIT_DA,         HMI_TYPE_UINT16, 0 },
+    { HMI_REG_CELL_VOLTAGE_CHARGE_CURRENT_LIMIT_DA,    HMI_TYPE_UINT16, 0 },
+    { HMI_REG_CELL_VOLTAGE_DISCHARGE_CURRENT_LIMIT_DA, HMI_TYPE_UINT16, 0 },
+    { HMI_REG_WORKING_CHARGE_CURRENT_LIMIT_DA,         HMI_TYPE_UINT16, 0 },
+    { HMI_REG_WORKING_DISCHARGE_CURRENT_LIMIT_DA,      HMI_TYPE_UINT16, 0 },
+    { HMI_REG_DELTA_CHARGE_CURRENT_LIMIT_DA,           HMI_TYPE_UINT16, 0 },
+    { HMI_REG_HARD_CHARGE_CURRENT_LIMIT_DA,            HMI_TYPE_UINT16, 0 },
+    { HMI_REG_HARD_DISCHARGE_CURRENT_LIMIT_DA,         HMI_TYPE_UINT16, 0 },
+
+    { HMI_REG_INVERTER_SOC,                    HMI_TYPE_INT16, 0 },
+    { HMI_REG_INVERTER_FULL_CAPACITY_DAH,      HMI_TYPE_INT16, 0 },
+    { HMI_REG_INVERTER_REMAINING_CAPACITY_DAH, HMI_TYPE_INT16, 0 },
+    { HMI_REG_INVERTER_MIN_VOLTAGE_LIMIT_DV,   HMI_TYPE_INT16, 0 },
+    { HMI_REG_INVERTER_MAX_VOLTAGE_LIMIT_DV,   HMI_TYPE_INT16, 0 },
+
+    { HMI_REG_CELL_VOLTAGE_WORKING_MIN,   HMI_TYPE_UINT16, WS },
+    { HMI_REG_CELL_VOLTAGE_WORKING_MAX,   HMI_TYPE_UINT16, WS },
+    { HMI_REG_CELL_VOLTAGE_SOFT_MIN,      HMI_TYPE_UINT16, WS },
+    { HMI_REG_CELL_VOLTAGE_SOFT_MAX,      HMI_TYPE_UINT16, WS },
+    { HMI_REG_SOC_SCALING_MIN,            HMI_TYPE_INT16,  WS },
+    { HMI_REG_SOC_SCALING_MAX,            HMI_TYPE_INT16,  WS },
+    { HMI_REG_VOLTAGE_LIMIT_OFFSET_LOWER, HMI_TYPE_INT16,  WS },
+    { HMI_REG_VOLTAGE_LIMIT_OFFSET_UPPER, HMI_TYPE_INT16,  WS },
+    { HMI_REG_AUTO_BALANCING_PERIOD_MS,   HMI_TYPE_UINT32, WS },
+    { HMI_REG_BALANCING_PERIODS_PER_MV,   HMI_TYPE_UINT16, WS },
+    { HMI_REG_BALANCE_MIN_OFFSET_MV,      HMI_TYPE_UINT16, WS },
+    { HMI_REG_MINIMUM_BALANCING_VOLTAGE_MV, HMI_TYPE_UINT16, WS },
+    { HMI_REG_BALANCING_START_VOLTAGE_MV, HMI_TYPE_UINT16, WS },
+    { HMI_REG_USER_CHARGE_CURRENT_LIMIT_DA,    HMI_TYPE_UINT16, WS },
+    { HMI_REG_USER_DISCHARGE_CURRENT_LIMIT_DA, HMI_TYPE_UINT16, WS },
+    { HMI_REG_CAPACITY,                   HMI_TYPE_UINT32, WS },
+
+    { HMI_REG_SYSTEM_REQUEST,             HMI_TYPE_UINT8,  W },
+};
+
+#undef W
+#undef WS
+
+size_t hmi_register_count(void) {
+    return sizeof(registers) / sizeof(registers[0]);
+}
+
+const hmi_register_info_t *hmi_register_info(size_t index) {
+    return index < hmi_register_count() ? &registers[index] : NULL;
+}
+
+const hmi_register_info_t *hmi_find_register(uint16_t reg_id) {
+    for (size_t i = 0; i < hmi_register_count(); i++) {
+        if (registers[i].id == reg_id) return &registers[i];
+    }
+    return NULL;
+}
+
+size_t hmi_build_list_registers_response(uint8_t *buf, size_t capacity, uint8_t device_address,
+                                         uint16_t start) {
+    if (capacity < HMI_LIST_REGISTERS_HEADER_LEN) return 0;
+    size_t total = hmi_register_count();
+    size_t idx = 0;
+    buf[idx++] = HMI_MSG_LIST_REGISTERS_RESPONSE;
+    buf[idx++] = device_address;
+    idx += hmi_buf_append_uint16(&buf[idx], start);
+    idx += hmi_buf_append_uint16(&buf[idx], (uint16_t)total);
+    size_t count_idx = idx++;
+
+    uint8_t count = 0;
+    for (size_t i = start; i < total && idx + HMI_LIST_REGISTERS_ENTRY_LEN <= capacity && count < 255; i++) {
+        idx += hmi_buf_append_uint16(&buf[idx], registers[i].id);
+        buf[idx++] = registers[i].type;
+        buf[idx++] = registers[i].flags;
+        count++;
+    }
+    buf[count_idx] = count;
+    return idx;
+}
+
 bool hmi_register_is_available(uint16_t reg_id, bms_model_t *model) {
     // Currently only checks for initial data availability on power-on, not
     // staleness
@@ -400,37 +539,8 @@ uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_model_t *mo
 #endif
 
         default:
-            if (reg_id >= HMI_REG_CELL_VOLTAGES_START && reg_id <= HMI_REG_CELL_VOLTAGES_END) {
-                uint16_t cell_idx = reg_id - HMI_REG_CELL_VOLTAGES_START;
-                if (cell_idx < 120) {
-                    buf[idx++] = HMI_TYPE_INT16;
-                    idx += hmi_buf_append_uint16(&buf[idx], model->cell_voltages_mV[cell_idx]);
-                } else {
-                    // Unknown cell
-                    idx -= 2; // rollback reg_id
-                }
-            } else if (reg_id >= HMI_REG_MODULE_TEMPS_START && reg_id <= HMI_REG_MODULE_TEMPS_END) {
-                uint16_t temp_idx = reg_id - HMI_REG_MODULE_TEMPS_START;
-                if (temp_idx < 8) {
-                    buf[idx++] = HMI_TYPE_FLOAT;
-                    idx += hmi_buf_append_float(&buf[idx], model->module_temperatures[temp_idx]);
-                } else {
-                    // Unknown temp
-                    idx -= 2; // rollback reg_id
-                }
-            } else if (reg_id >= HMI_REG_RAW_TEMPS_START && reg_id <= HMI_REG_RAW_TEMPS_END) {
-                uint16_t temp_idx = reg_id - HMI_REG_RAW_TEMPS_START;
-                if (temp_idx < (16+24+8)) {
-                    buf[idx++] = HMI_TYPE_UINT16;
-                    idx += hmi_buf_append_uint16(&buf[idx], model->raw_temperatures[temp_idx]);
-                } else {
-                    // Unknown temp
-                    idx -= 2; // rollback reg_id
-                }
-            } else {
-                // Unknown register
-                idx -= 2; // rollback reg_id
-            }
+            // Unknown register
+            idx -= 2; // rollback reg_id
             break;
     }
     return idx;

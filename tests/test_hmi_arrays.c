@@ -51,27 +51,6 @@ static void decode_int16(const uint8_t *buf, size_t count, int16_t *out) {
     }
 }
 
-// Decode count values in the older delta coding, returning the bytes consumed
-static size_t decode_legacy_delta(const uint8_t *buf, size_t count, int16_t *out) {
-    int16_t last = 0;
-    size_t idx = 0;
-    for (size_t i = 0; i < count; i++) {
-        if (buf[idx] & 0x80) {
-            // Absolute, 15 bits, sign extended from bit 14
-            uint16_t v = (uint16_t)((buf[idx] & 0x7F) << 8) | buf[idx + 1];
-            if (v & 0x4000) v |= 0x8000;
-            last = (int16_t)v;
-            idx += 2;
-        } else {
-            int d = buf[idx] & 0x7F;
-            if (d & 0x40) d -= 128;
-            last = (int16_t)(last + d);
-            idx += 1;
-        }
-        out[i] = last;
-    }
-    return idx;
-}
 
 typedef struct {
     uint8_t type;
@@ -126,88 +105,6 @@ static int read_int16_array(uint8_t array_id, int16_t *out, uint16_t expected_to
     return pages;
 }
 
-// The encoder as it was in hmi_serial.c, for checking the legacy messages
-// are unchanged
-static size_t legacy_encode(uint8_t *buf, const int16_t *values, size_t count) {
-    int16_t last_value = 0;
-    size_t idx = 0;
-    for (size_t i = 0; i < count; i++) {
-        int16_t value = values[i];
-        int16_t delta = value - last_value;
-        if (delta >= -64 && delta <= 63) {
-            buf[idx++] = (delta & 0x7F);
-        } else {
-            buf[idx++] = ((value >> 8) & 0xFF) | 0x80;
-            buf[idx++] = (value >> 0) & 0xFF;
-        }
-        last_value = value;
-    }
-    return idx;
-}
-
-// ============================================================================
-// Older delta coding (READ_CELL_VOLTAGES / READ_BALANCING_TIMES)
-// ============================================================================
-
-static void test_delta_round_trip(void **state) {
-    (void) state;
-    const int16_t values[] = { 3300, 3301, 3299, 3363, 3236, 3300, -1, -1, 0, 1, 16383, -16384, 63, -64, 64 };
-    const size_t n = sizeof(values) / sizeof(values[0]);
-
-    uint8_t buf[64];
-    size_t encoded;
-    size_t len = hmi_encode_int16_delta_array(buf, sizeof(buf), values, n, &encoded);
-    assert_int_equal(encoded, n);
-
-    int16_t out[sizeof(values) / sizeof(values[0])];
-    assert_int_equal(decode_legacy_delta(buf, n, out), len);
-    assert_memory_equal(out, values, sizeof(values));
-}
-
-static void test_delta_matches_legacy_encoder(void **state) {
-    (void) state;
-    int16_t values[120];
-    for (int i = 0; i < 120; i++) {
-        values[i] = (int16_t)(3300 + (i * 37) % 200 - 100);
-    }
-    values[17] = -1; // an absent channel
-
-    uint8_t expected[243], actual[243];
-    size_t expected_len = legacy_encode(expected, values, 120);
-    size_t actual_len = hmi_encode_int16_delta_array(actual, sizeof(actual), values, 120, NULL);
-
-    assert_int_equal(actual_len, expected_len);
-    assert_memory_equal(actual, expected, expected_len);
-}
-
-static void test_delta_stops_at_capacity(void **state) {
-    (void) state;
-    // Each value is an absolute (two bytes); 5 bytes of room fits two of them
-    const int16_t values[] = { 1000, 2000, 3000, 4000 };
-    uint8_t buf[8];
-    memset(buf, 0xAA, sizeof(buf));
-
-    size_t encoded;
-    size_t len = hmi_encode_int16_delta_array(buf, 5, values, 4, &encoded);
-
-    assert_int_equal(encoded, 2);
-    assert_int_equal(len, 4);
-    // Nothing written past the values that fit
-    assert_int_equal(buf[4], 0xAA);
-}
-
-static void test_delta_large_jump_not_wrapped(void **state) {
-    (void) state;
-    // The difference overflows int16, so must not be sent as a small delta
-    const int16_t values[] = { -16384, 16383 };
-    uint8_t buf[8];
-    size_t len = hmi_encode_int16_delta_array(buf, sizeof(buf), values, 2, NULL);
-    assert_int_equal(len, 4);
-
-    int16_t out[2];
-    decode_legacy_delta(buf, 2, out);
-    assert_memory_equal(out, values, sizeof(values));
-}
 
 // ============================================================================
 // Responses
@@ -329,7 +226,7 @@ static void test_unknown_array(void **state) {
 static void test_balancing_times_untimestamped(void **state) {
     (void) state;
     // Balancing times have no sample time, so are sent straight away. They
-    // run up to INT16_MAX, beyond what the older delta coding can carry.
+    // run up to INT16_MAX, beyond the 15 bits the old READ_BALANCING_TIMES carried.
     for (int i = 0; i < 120; i++) model.balancing_sm.balance_time_remaining[i] = (int16_t)(i * 3);
     model.balancing_sm.balance_time_remaining[10] = INT16_MAX;
     model.balancing_sm.balance_time_remaining[11] = 0;
@@ -808,11 +705,6 @@ static void test_ocv_learn_cycles_write(void **state) {
 
 int main(void) {
     const struct CMUnitTest tests[] = {
-        // Older delta coding
-        cmocka_unit_test_setup(test_delta_round_trip, setup),
-        cmocka_unit_test_setup(test_delta_matches_legacy_encoder, setup),
-        cmocka_unit_test_setup(test_delta_stops_at_capacity, setup),
-        cmocka_unit_test_setup(test_delta_large_jump_not_wrapped, setup),
 
         // Responses
         cmocka_unit_test_setup(test_cell_voltages_header, setup),

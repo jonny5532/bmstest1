@@ -71,14 +71,6 @@ typedef struct bms_model bms_model_t;
 // Bytes before the elements in a WRITE_ARRAY
 #define HMI_ARRAY_WRITE_HEADER_LEN 7
 
-// Delta code up to count values into buf in the older coding of
-// READ_CELL_VOLTAGES_RESPONSE and READ_BALANCING_TIMES_RESPONSE, which keeps
-// only 15 bits of each value. Stops before the first value that wouldn't fit
-// in capacity bytes. Returns the bytes written; *encoded (if not NULL) is set
-// to the values written.
-size_t hmi_encode_int16_delta_array(uint8_t *buf, size_t capacity, const int16_t *values,
-                                    size_t count, size_t *encoded);
-
 // Build a READ_ARRAY_RESPONSE in buf holding as many elements from start
 // onwards as fit in capacity bytes. Returns the response length.
 size_t hmi_build_read_array_response(uint8_t *buf, size_t capacity, uint8_t device_address,

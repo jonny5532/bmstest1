@@ -2,6 +2,9 @@
 
 #include <stdint.h>
 
+// Message types. A response is its request's type with the top bit set.
+// 0x00 is never a message type (a NACK is 0x80).
+
 #define HMI_MSG_ANNOUNCE_DEVICE      0x81
 #define HMI_MSG_SET_DEVICE_ADDRESS   0x01
 
@@ -10,14 +13,11 @@
 #define HMI_MSG_READ_REGISTERS       0x04
 #define HMI_MSG_READ_REGISTERS_RESPONSE 0x84
 
-#define HMI_MSG_READ_CELL_VOLTAGES   0x05
-#define HMI_MSG_READ_CELL_VOLTAGES_RESPONSE 0x85
+// 0x05 / 0x85 and 0x07 / 0x87 were READ_CELL_VOLTAGES and READ_BALANCING_TIMES,
+// removed in protocol version 7 (READ_ARRAY replaces them). Never reuse them.
 
 #define HMI_MSG_READ_EVENTS          0x06
 #define HMI_MSG_READ_EVENTS_RESPONSE 0x86
-
-#define HMI_MSG_READ_BALANCING_TIMES 0x07
-#define HMI_MSG_READ_BALANCING_TIMES_RESPONSE 0x87
 
 #define HMI_MSG_READ_LOG             0x08
 #define HMI_MSG_READ_LOG_RESPONSE    0x88
@@ -31,6 +31,21 @@
 #define HMI_MSG_READ_SUPERVISOR      0x0B
 #define HMI_MSG_READ_SUPERVISOR_RESPONSE 0x8B
 
+#define HMI_MSG_LIST_REGISTERS       0x0C
+#define HMI_MSG_LIST_REGISTERS_RESPONSE 0x8C
+
+// The BMS's answer to a request at its address that it can't handle (2.14)
+#define HMI_MSG_NACK                 0x80
+
+// Requests 0x40-0x5F are for other devices at the BMS's address (like the
+// supervisor's READ_SUPERVISOR): the BMS never NACKs them.
+#define HMI_MSG_OTHER_DEVICE_FIRST   0x40
+#define HMI_MSG_OTHER_DEVICE_LAST    0x5F
+
+// Reasons in a NACK
+#define HMI_NACK_UNKNOWN_MESSAGE 1 // a message type this firmware doesn't know
+#define HMI_NACK_MALFORMED       2 // too short for its type
+
 // Version of this protocol, in HMI_REG_PROTOCOL_VERSION:
 //   1 = READ_ARRAY
 //   2 = WRITE_ARRAY, the EKF and OCV learner arrays, HMI_REG_OCV_LEARN_*
@@ -40,10 +55,14 @@
 //       over its response
 //   5 = the lifetime throughput totals, HMI_REG_LIFETIME_*
 //   6 = HMI_ARRAY_MODULE_IDS
-#define HMI_PROTOCOL_VERSION 6
+//   7 = registers renumbered into groups (only SERIAL and PROTOCOL_VERSION
+//       kept their IDs); READ_CELL_VOLTAGES, READ_BALANCING_TIMES and the
+//       per-cell / per-module register ranges removed; LIST_REGISTERS and NACK
+#define HMI_PROTOCOL_VERSION 7
 
 #define HMI_ANNOUNCE_DEVICE_TYPE_BMS 0x01
 
+// Type bytes: the low nibble is the size in bytes
 #define HMI_TYPE_UINT8  0x11
 #define HMI_TYPE_INT8   0x21
 #define HMI_TYPE_UINT16 0x12
@@ -56,121 +75,156 @@
 #define HMI_TYPE_FLOAT  0x34
 #define HMI_TYPE_DOUBLE 0x38
 
-#define HMI_REG_SERIAL                  1 // uint64
-#define HMI_REG_MILLIS                  2 // uint64
-#define HMI_REG_SOC                     3 // uint16
-#define HMI_REG_CURRENT                 4 // int32 (mA)
-#define HMI_REG_CHARGE                  5 // int64 (mC)
-#define HMI_REG_BATTERY_VOLTAGE         6 // int32 (mV)
-#define HMI_REG_OUTPUT_VOLTAGE          7 // int32 (mV)
-#define HMI_REG_POS_CONTACTOR_VOLTAGE   8 // int32 (mV)
-#define HMI_REG_NEG_CONTACTOR_VOLTAGE   9 // int32 (mV)
-#define HMI_REG_TEMPERATURE_MIN        10 // float (C)
-#define HMI_REG_TEMPERATURE_MAX        11 // float (C)
-#define HMI_REG_CELL_VOLTAGE_MIN       12 // int16 (mV)
-#define HMI_REG_CELL_VOLTAGE_MAX       13 // int16 (mV)
-#define HMI_REG_SYSTEM_REQUEST         14 // uint8, system_requests_t (6 = zero the isolation monitor)
-#define HMI_REG_SYSTEM_STATE           15 // uint8
-#define HMI_REG_CONTACTORS_STATE       16 // uint8
-#define HMI_REG_SOC_VOLTAGE_BASED      17 // uint16
-#define HMI_REG_SOC_BASIC_COUNT        18 // uint16
+// Register flags, in LIST_REGISTERS_RESPONSE
+#define HMI_REG_FLAG_WRITABLE 0x01 // WRITE_REGISTERS changes it
+#define HMI_REG_FLAG_SAVED    0x02 // writes are saved to NVM (a setting to back up and restore)
 
-#define HMI_REG_CAPACITY               20 // uint32 (mC), actual capacity the SOC estimator uses. Writes are
-                                          // saved to NVM; 0 goes back to the profile's ACTUAL_CAPACITY_AH
-#define HMI_REG_SUPPLY_VOLTAGE_3V3     21 // uint16 (mV)
-#define HMI_REG_SUPPLY_VOLTAGE_5V      22 // uint16 (mV)
-#define HMI_REG_SUPPLY_VOLTAGE_12V     23 // uint16 (mV)
-#define HMI_REG_SUPPLY_VOLTAGE_CTR     24 // uint16 (mV)
-#define HMI_REG_CELL_VOLTAGE_WORKING_MIN 25 // uint16 (mV)
-#define HMI_REG_CELL_VOLTAGE_WORKING_MAX 26 // uint16 (mV)
-#define HMI_REG_SOC_SCALING_MIN        27 // int16 (0.01%)
-#define HMI_REG_SOC_SCALING_MAX        28 // int16 (0.01%)
-#define HMI_REG_VOLTAGE_LIMIT_OFFSET_LOWER 29 // int16 (0.1V)
-#define HMI_REG_VOLTAGE_LIMIT_OFFSET_UPPER 30 // int16 (0.1V)
-#define HMI_REG_CELL_VOLTAGE_SOFT_MIN 31 // uint16 (mV)
-#define HMI_REG_CELL_VOLTAGE_SOFT_MAX 32 // uint16 (mV)
-#define HMI_REG_AUTO_BALANCING_PERIOD_MS     33 // uint32
-#define HMI_REG_BALANCING_PERIODS_PER_MV     34 // uint16
-#define HMI_REG_BALANCE_MIN_OFFSET_MV        35 // uint16
-#define HMI_REG_MINIMUM_BALANCING_VOLTAGE_MV 36 // uint16
-#define HMI_REG_INVERTER_SOC                  37 // int16 (0.01%)
-#define HMI_REG_INVERTER_FULL_CAPACITY_DAH    38 // int16 (0.1Ah)
-#define HMI_REG_INVERTER_REMAINING_CAPACITY_DAH 39 // int16 (0.1Ah)
-#define HMI_REG_INVERTER_MIN_VOLTAGE_LIMIT_DV 40 // int16 (0.1V)
-#define HMI_REG_INVERTER_MAX_VOLTAGE_LIMIT_DV 41 // int16 (0.1V)
-#define HMI_REG_BALANCING_START_VOLTAGE_MV    42 // uint16
+/*
+Register IDs (protocol version 7 onwards)
 
-#define HMI_REG_USER_CHARGE_CURRENT_LIMIT_DA            43 // uint16 (0.1A)
-#define HMI_REG_USER_DISCHARGE_CURRENT_LIMIT_DA         44 // uint16 (0.1A)
-#define HMI_REG_CHARGE_CURRENT_LIMIT_DA                 45 // uint16 (0.1A)
-#define HMI_REG_DISCHARGE_CURRENT_LIMIT_DA              46 // uint16 (0.1A)
-#define HMI_REG_TEMP_CHARGE_CURRENT_LIMIT_DA            47 // uint16 (0.1A)
-#define HMI_REG_TEMP_DISCHARGE_CURRENT_LIMIT_DA         48 // uint16 (0.1A)
-#define HMI_REG_CELL_VOLTAGE_CHARGE_CURRENT_LIMIT_DA    49 // uint16 (0.1A)
-#define HMI_REG_CELL_VOLTAGE_DISCHARGE_CURRENT_LIMIT_DA 50 // uint16 (0.1A)
-#define HMI_REG_WORKING_CHARGE_CURRENT_LIMIT_DA         51 // uint16 (0.1A)
-#define HMI_REG_WORKING_DISCHARGE_CURRENT_LIMIT_DA      52 // uint16 (0.1A)
-#define HMI_REG_DELTA_CHARGE_CURRENT_LIMIT_DA           53 // uint16 (0.1A)
-#define HMI_REG_HARD_CHARGE_CURRENT_LIMIT_DA            54 // uint16 (0.1A)
-#define HMI_REG_HARD_DISCHARGE_CURRENT_LIMIT_DA         55 // uint16 (0.1A)
+The ID's top byte is its group, and each group is split into sub-groups of 16
+with room to grow. New registers go in the gap of their sub-group; an ID is
+never moved, reused or given a different type or unit. LIST_REGISTERS gives
+the registers a firmware has, with their types and flags.
 
-#define HMI_REG_LINK_VOLTAGE           56 // int32 (mV), rev1 boards only
+  0x0001, 0x0047  SERIAL and PROTOCOL_VERSION, at the IDs they had before
+                  version 7, so any HMI can tell which map the firmware uses
+  0x10xx          system: identity, build, board, states
+  0x11xx          measurements
+  0x12xx          SOC and estimators
+  0x13xx          current limits the BMS works out (charge even, discharge odd)
+  0x14xx          the values sent to the inverter
+  0x20xx          settings: writable and saved to NVM
+  0x30xx          commands: write only (never read back)
+  0xF0xx-0xFFxx   debug and experimental, with no promise of staying put
 
-#define HMI_REG_SHUNT_DIE_TEMP         57 // float (C), INA228 internal temperature
-#define HMI_REG_SHUNT_NTC_TEMP         58 // float (C), external shunt NTC temperature
-#define HMI_REG_SHUNT_NTC_RESISTANCE   59 // float (ohms), for NTC calibration
-#define HMI_REG_BOARD_REVISION         60 // uint16, PCB revision from the strap: major*10+minor (Rev1.3 = 13), 0 = Rev0
-#define HMI_REG_BOARD_STRAP_COUNTS     61 // uint16 (12-bit ADC counts), revision strap reading with no pulls
+No ID used before version 7 (1-84, 0x100-0x238) is used again, other than the
+two above: an older HMI reading a newer BMS gets only those two, rather than
+another register's value.
+*/
+
+#define HMI_REG_SERIAL                 0x0001 // uint64
+#define HMI_REG_PROTOCOL_VERSION       0x0047 // uint16, HMI_PROTOCOL_VERSION; absent before READ_ARRAY
+
+// 0x10xx: system
+#define HMI_REG_MILLIS                 0x1000 // uint64
+#define HMI_REG_BUILD_HASH             0x1001 // uint32, firmware commit's first 7 hex digits; bit 31 = uncommitted changes; 0 = unknown
+#define HMI_REG_BUILD_TIME             0x1002 // uint32, firmware build time (Unix seconds, UTC)
+#define HMI_REG_BOARD_REVISION         0x1003 // uint16, PCB revision from the strap: major*10+minor (Rev1.3 = 13), 0 = Rev0
+#define HMI_REG_BOARD_STRAP_COUNTS     0x1004 // uint16 (12-bit ADC counts), revision strap reading with no pulls
+#define HMI_REG_MCU_TEMPERATURE        0x1005 // float (C), the controller chip's own sensor (a few C accurate)
+
+#define HMI_REG_SYSTEM_STATE           0x1010 // uint8
+#define HMI_REG_CONTACTORS_STATE       0x1011 // uint8
+
+// 0x11xx: measurements
+#define HMI_REG_BATTERY_VOLTAGE        0x1100 // int32 (mV)
+#define HMI_REG_OUTPUT_VOLTAGE         0x1101 // int32 (mV)
+#define HMI_REG_POS_CONTACTOR_VOLTAGE  0x1102 // int32 (mV)
+#define HMI_REG_NEG_CONTACTOR_VOLTAGE  0x1103 // int32 (mV)
+#define HMI_REG_LINK_VOLTAGE           0x1104 // int32 (mV), rev1 boards only
+
+#define HMI_REG_CURRENT                0x1110 // int32 (mA)
+#define HMI_REG_CHARGE                 0x1111 // int64 (mC)
+
+#define HMI_REG_CELL_VOLTAGE_MIN       0x1120 // int16 (mV)
+#define HMI_REG_CELL_VOLTAGE_MAX       0x1121 // int16 (mV)
+
+#define HMI_REG_TEMPERATURE_MIN        0x1130 // float (C)
+#define HMI_REG_TEMPERATURE_MAX        0x1131 // float (C)
+#define HMI_REG_SHUNT_DIE_TEMP         0x1132 // float (C), INA228 internal temperature
+#define HMI_REG_SHUNT_NTC_TEMP         0x1133 // float (C), external shunt NTC temperature
+#define HMI_REG_SHUNT_NTC_RESISTANCE   0x1134 // float (ohms), for NTC calibration
+
+#define HMI_REG_SUPPLY_VOLTAGE_3V3     0x1140 // uint16 (mV)
+#define HMI_REG_SUPPLY_VOLTAGE_5V      0x1141 // uint16 (mV)
+#define HMI_REG_SUPPLY_VOLTAGE_12V     0x1142 // uint16 (mV)
+#define HMI_REG_SUPPLY_VOLTAGE_CTR     0x1143 // uint16 (mV)
+
 // Isolation monitor (see app/isolation.h). The open_ values are the last reading
 // with the contactors open, held while they are closed. The terminal voltages
 // are live in any contactor state (closed, the inverter sets the chassis voltage).
-#define HMI_REG_ISOLATION_OPEN_RESISTANCE 62 // float (ohms), capped at 100 Mohm; NaN until measured this boot
-#define HMI_REG_PACK_POS_TO_CHASSIS       63 // float (V), pack+ to chassis; NaN if unusable
-#define HMI_REG_PACK_NEG_TO_CHASSIS       64 // float (V), pack- to chassis (normally negative); NaN if unusable
-#define HMI_REG_ISOLATION_OPEN_AGE        65 // float (s) since the open reading; 0 = live, NaN = none this boot
-#define HMI_REG_ISOLATION_ZEROED          66 // uint8, 1 once calibrated (system request 6); events need it
+#define HMI_REG_ISOLATION_OPEN_RESISTANCE 0x1150 // float (ohms), capped at 100 Mohm; NaN until measured this boot
+#define HMI_REG_PACK_POS_TO_CHASSIS       0x1151 // float (V), pack+ to chassis; NaN if unusable
+#define HMI_REG_PACK_NEG_TO_CHASSIS       0x1152 // float (V), pack- to chassis (normally negative); NaN if unusable
+#define HMI_REG_ISOLATION_OPEN_AGE        0x1153 // float (s) since the open reading; 0 = live, NaN = none this boot
+#define HMI_REG_ISOLATION_ZEROED          0x1154 // uint8, 1 once calibrated (system request 6); events need it
 
-#define HMI_REG_BUILD_HASH             68 // uint32, firmware commit's first 7 hex digits; bit 31 = uncommitted changes; 0 = unknown
-#define HMI_REG_BUILD_TIME             69 // uint32, firmware build time (Unix seconds, UTC)
-#define HMI_REG_MCU_TEMPERATURE        70 // float (C), the controller chip's own sensor (a few C accurate)
-#define HMI_REG_PROTOCOL_VERSION       71 // uint16, HMI_PROTOCOL_VERSION; absent before READ_ARRAY
+// 0x12xx: SOC and estimators
+#define HMI_REG_SOC                    0x1200 // uint16; writable (sets the EKF's SOC, not saved)
+#define HMI_REG_SOC_VOLTAGE_BASED      0x1201 // uint16
+#define HMI_REG_SOC_BASIC_COUNT        0x1202 // uint16
+
+#define HMI_REG_NAMEPLATE_CAPACITY     0x1210 // uint32 (mC), the profile's NAMEPLATE_CAPACITY_AH (the label's)
 
 // The OCV learner (bms/app/estimators/ocv_learn.h), when the profile has OCV_LEARN
-#define HMI_REG_OCV_LEARN_S_FULL       72 // float, factory-curve SOC (0-1] of full charge; absent until learning
-                                          // starts. Writing it starts learning (to restore a saved learner).
-                                          // More than 1% from the charge voltage's, it's re-anchored there.
-#define HMI_REG_OCV_LEARN_CAPACITY_REF 73 // float (Ah), from full to OCV_LEARN_V_REF; NaN until trusted
-
-#define HMI_REG_NAMEPLATE_CAPACITY     74 // uint32 (mC), the profile's NAMEPLATE_CAPACITY_AH (the label's); read only
-
-// Whole-pack capacity learned from every trusted learner bin (see ocv_learn_t), when the
-// profile has OCV_LEARN. Read only. The floats are NaN while the state is below PRELIMINARY.
-#define HMI_REG_OCV_LEARN_CAPACITY        75 // float (Ah)
-#define HMI_REG_OCV_LEARN_CAPACITY_SD     76 // float (Ah), 1-sigma uncertainty
-#define HMI_REG_OCV_LEARN_CAPACITY_STATE  77 // uint8, OCV_LEARN_CAPACITY_* (not learning, no data,
-                                             // preliminary, good)
-#define HMI_REG_OCV_LEARN_CAPACITY_DEPTH  78 // float (0-1), SOC below full of the deepest trusted bin
-#define HMI_REG_OCV_LEARN_CAPACITY_DEPTH_V 79 // float (V/cell), learned OCV at that bin
-#define HMI_REG_OCV_LEARN_CAPACITY_DEPTH_CYCLES 80 // float, that bin's decaying count of full charge cycles
+#define HMI_REG_OCV_LEARN_S_FULL       0x1220 // float, factory-curve SOC (0-1] of full charge; absent until learning
+                                              // starts. Writing it starts learning (to restore a saved learner).
+                                              // More than 1% from the charge voltage's, it's re-anchored there.
+#define HMI_REG_OCV_LEARN_CAPACITY_REF 0x1221 // float (Ah), from full to OCV_LEARN_V_REF; NaN until trusted
+// Whole-pack capacity learned from every trusted learner bin (see ocv_learn_t).
+// Read only. The floats are NaN while the state is below PRELIMINARY.
+#define HMI_REG_OCV_LEARN_CAPACITY        0x1222 // float (Ah)
+#define HMI_REG_OCV_LEARN_CAPACITY_SD     0x1223 // float (Ah), 1-sigma uncertainty
+#define HMI_REG_OCV_LEARN_CAPACITY_STATE  0x1224 // uint8, OCV_LEARN_CAPACITY_* (not learning, no data,
+                                                 // preliminary, good)
+#define HMI_REG_OCV_LEARN_CAPACITY_DEPTH  0x1225 // float (0-1), SOC below full of the deepest trusted bin
+#define HMI_REG_OCV_LEARN_CAPACITY_DEPTH_V 0x1226 // float (V/cell), learned OCV at that bin
+#define HMI_REG_OCV_LEARN_CAPACITY_DEPTH_CYCLES 0x1227 // float, that bin's decaying count of full charge cycles
 
 // Lifetime throughput into and out of the pack, bias-corrected, saved to NVM
 // (app/estimators/lifetime.h). They wrap at 2^32: take differences mod 2^32.
-#define HMI_REG_LIFETIME_CHARGED_MAH    81 // uint32 (mAh)
-#define HMI_REG_LIFETIME_DISCHARGED_MAH 82 // uint32 (mAh)
-#define HMI_REG_LIFETIME_CHARGED_WH     83 // uint32 (Wh)
-#define HMI_REG_LIFETIME_DISCHARGED_WH  84 // uint32 (Wh)
+#define HMI_REG_LIFETIME_CHARGED_MAH    0x1230 // uint32 (mAh)
+#define HMI_REG_LIFETIME_DISCHARGED_MAH 0x1231 // uint32 (mAh)
+#define HMI_REG_LIFETIME_CHARGED_WH     0x1232 // uint32 (Wh)
+#define HMI_REG_LIFETIME_DISCHARGED_WH  0x1233 // uint32 (Wh)
 
-// Deprecated: these ranges and READ_CELL_VOLTAGES / READ_BALANCING_TIMES stay
-// for older HMIs, and are fixed at the first 120 cells and 8 modules. Use
-// READ_ARRAY instead.
+// 0x13xx: current limits (all uint16, 0.1A), charge on even IDs, discharge on odd
+#define HMI_REG_CHARGE_CURRENT_LIMIT_DA                 0x1300 // the one in force
+#define HMI_REG_DISCHARGE_CURRENT_LIMIT_DA              0x1301
+#define HMI_REG_TEMP_CHARGE_CURRENT_LIMIT_DA            0x1302
+#define HMI_REG_TEMP_DISCHARGE_CURRENT_LIMIT_DA         0x1303
+#define HMI_REG_CELL_VOLTAGE_CHARGE_CURRENT_LIMIT_DA    0x1304
+#define HMI_REG_CELL_VOLTAGE_DISCHARGE_CURRENT_LIMIT_DA 0x1305
+#define HMI_REG_WORKING_CHARGE_CURRENT_LIMIT_DA         0x1306
+#define HMI_REG_WORKING_DISCHARGE_CURRENT_LIMIT_DA      0x1307
+#define HMI_REG_DELTA_CHARGE_CURRENT_LIMIT_DA           0x1308
+                                                     // 0x1309 reserved (a delta discharge limit)
+#define HMI_REG_HARD_CHARGE_CURRENT_LIMIT_DA            0x130A
+#define HMI_REG_HARD_DISCHARGE_CURRENT_LIMIT_DA         0x130B
 
-#define HMI_REG_CELL_VOLTAGES_START 0x100
-#define HMI_REG_CELL_VOLTAGES_END   0x1FF
+// 0x14xx: the values sent to the inverter
+#define HMI_REG_INVERTER_SOC                    0x1400 // int16 (0.01%)
+#define HMI_REG_INVERTER_FULL_CAPACITY_DAH      0x1401 // int16 (0.1Ah)
+#define HMI_REG_INVERTER_REMAINING_CAPACITY_DAH 0x1402 // int16 (0.1Ah)
+#define HMI_REG_INVERTER_MIN_VOLTAGE_LIMIT_DV   0x1403 // int16 (0.1V)
+#define HMI_REG_INVERTER_MAX_VOLTAGE_LIMIT_DV   0x1404 // int16 (0.1V)
 
-#define HMI_REG_MODULE_TEMPS_START    0x200
-#define HMI_REG_MODULE_TEMPS_END      0x207
-#define HMI_REG_RAW_TEMPS_START       0x208
-#define HMI_REG_RAW_TEMPS_END         0x238
+// 0x20xx: settings, writable and saved to NVM
+#define HMI_REG_CELL_VOLTAGE_WORKING_MIN   0x2000 // uint16 (mV)
+#define HMI_REG_CELL_VOLTAGE_WORKING_MAX   0x2001 // uint16 (mV)
+#define HMI_REG_CELL_VOLTAGE_SOFT_MIN      0x2002 // uint16 (mV)
+#define HMI_REG_CELL_VOLTAGE_SOFT_MAX      0x2003 // uint16 (mV)
+
+#define HMI_REG_SOC_SCALING_MIN            0x2010 // int16 (0.01%)
+#define HMI_REG_SOC_SCALING_MAX            0x2011 // int16 (0.01%)
+#define HMI_REG_VOLTAGE_LIMIT_OFFSET_LOWER 0x2012 // int16 (0.1V)
+#define HMI_REG_VOLTAGE_LIMIT_OFFSET_UPPER 0x2013 // int16 (0.1V)
+
+#define HMI_REG_AUTO_BALANCING_PERIOD_MS     0x2020 // uint32
+#define HMI_REG_BALANCING_PERIODS_PER_MV     0x2021 // uint16
+#define HMI_REG_BALANCE_MIN_OFFSET_MV        0x2022 // uint16
+#define HMI_REG_MINIMUM_BALANCING_VOLTAGE_MV 0x2023 // uint16
+#define HMI_REG_BALANCING_START_VOLTAGE_MV   0x2024 // uint16
+
+#define HMI_REG_USER_CHARGE_CURRENT_LIMIT_DA    0x2030 // uint16 (0.1A)
+#define HMI_REG_USER_DISCHARGE_CURRENT_LIMIT_DA 0x2031 // uint16 (0.1A)
+
+#define HMI_REG_CAPACITY                   0x2040 // uint32 (mC), actual capacity the SOC estimator uses;
+                                                  // 0 goes back to the profile's ACTUAL_CAPACITY_AH
+
+// 0x30xx: commands
+#define HMI_REG_SYSTEM_REQUEST             0x3000 // uint8, system_requests_t (6 = zero the isolation monitor)
 
 /* 
 
@@ -191,12 +245,12 @@ The payload of each packet consists of one or more HMI messages concatenated
 together. Each message starts with a message type byte, followed by message-specific
 data.
 
-2.1. Amnounce device message (from BMS to HMI)
+2.1. Announce device message (from BMS to HMI)
 
 The announce device message is used by a BMS to announce its presence to the HMI.
 The format is:
 
-<message type byte = HMI_MSG_ANNOUNCE_DEVICE (0x01)>
+<message type byte = HMI_MSG_ANNOUNCE_DEVICE (0x81)>
 <device type byte> (0x01 = BMS)
 <device address (1 byte)> (initially 0 for all devices, to be assigned by HMI later)
 <unique serial number (8 bytes)>
@@ -231,6 +285,9 @@ on the BMS. The format is:
 
 Following a successfully processed message, the BMS will respond with a
 READ_REGISTERS_RESPONSE containing the new values of the written registers.
+A write with a type other than the register's, or to a register that isn't
+writable (see LIST_REGISTERS), changes nothing; the response shows the value
+as it is.
 
 2.4. Read registers (from HMI to BMS)
 
@@ -260,6 +317,9 @@ request from the HMI. The format is:
 <register 2 type (1 byte)>
 <register 2 value (N bytes)>
 ...
+
+A register the firmware doesn't have, or that has no reading yet since power
+on, is left out of the response.
 
 2.6. Read events (from HMI to BMS)
 
@@ -325,12 +385,6 @@ usual little-endian value. The top bit (0x80) is reserved for a packed (for
 example delta coded) form of the type in future; an HMI should treat an
 encoding it doesn't know as an error rather than guess its size.
 
-READ_CELL_VOLTAGES_RESPONSE and READ_BALANCING_TIMES_RESPONSE use an older
-delta coding: absolute values are two bytes, big-endian, with the MSB set
-(keeping only the low 15 bits of the value); deltas from the previous value in
--64 to +63 are one byte with the MSB clear. Balancing times of 16384 or more
-don't survive it.
-
 2.10. Write array (from HMI to BMS)
 
 The write array message is used by the HMI to write part of one of the BMS's
@@ -388,6 +442,46 @@ supervisor, or one that predates this message.
 
 The supervisor is a separate device: its cell min/max come from its own reading
 of the BMB traffic, not from the BMS.
+
+2.13. List registers (from HMI to BMS)
+
+Lists the registers this firmware has (from protocol version 7), so an HMI
+can find them rather than going by the version number. The format is:
+
+<message type byte = HMI_MSG_LIST_REGISTERS (0x0C)>
+<device address (1 byte)>
+<start index (2 bytes)> (0 for the first page)
+
+The response holds as many entries from the start index as fit in a packet,
+in increasing ID order. The HMI reads the rest by asking again from the next
+index, until it reaches the total:
+
+<message type byte = HMI_MSG_LIST_REGISTERS_RESPONSE (0x8C)>
+<device address (1 byte)>
+<start index (2 bytes)>
+<total registers (2 bytes)>
+<entry count in packet (1 byte)>
+<entry 1 register id (2 bytes)>
+<entry 1 type (1 byte)> (HMI_TYPE_*)
+<entry 1 flags (1 byte)> (HMI_REG_FLAG_*)
+...
+
+A listed register can still be left out of a READ_REGISTERS_RESPONSE while it
+has no reading.
+
+2.14. NACK (from BMS to HMI)
+
+Sent (from protocol version 7) in answer to a request at the BMS's address
+that it can't handle, so the HMI needn't wait out a timeout. The format is:
+
+<message type byte = HMI_MSG_NACK (0x80)>
+<device address (1 byte)>
+<request message type (1 byte)>
+<reason (1 byte)> (HMI_NACK_*)
+
+Requests in HMI_MSG_OTHER_DEVICE_FIRST..LAST (0x40-0x5F), and READ_SUPERVISOR,
+are for other devices at the BMS's address, and are never NACKed. A request
+too short to hold an address isn't either.
 
 */
 
