@@ -201,7 +201,7 @@ static void init_hmi_serial(void) {
 
 static void hmi_send(const uint8_t *payload, size_t len) {
     uint8_t frame[SUP_HMI_RESPONSE_LEN + 4];
-    size_t frame_len = sup_frame_encode(payload, len, frame, sizeof(frame));
+    size_t frame_len = duart_frame_encode(payload, len, frame, sizeof(frame));
 
     // The frame fits the empty 32-byte FIFO, so this never waits. If the last
     // one is somehow still going out, skip this: the HMI will ask again.
@@ -232,15 +232,15 @@ static void poll_hmi_serial(uint32_t now) {
         uint8_t c = hmi_rx_ring[hmi_rx_tail];
         hmi_rx_tail = (hmi_rx_tail + 1) % sizeof(hmi_rx_ring);
 
+        sup_frame_feed(&hmi_parser, c);
         const uint8_t *payload;
-        size_t len = sup_frame_feed(&hmi_parser, c, &payload);
-        if(len == 0) {
-            continue;
-        }
-        uint8_t response[SUP_HMI_RESPONSE_LEN];
-        size_t response_len = sup_hmi_handle(&logic, payload, len, now, response, sizeof(response));
-        if(response_len > 0) {
-            hmi_send(response, response_len);
+        size_t len;
+        while((len = sup_frame_next(&hmi_parser, &payload)) > 0) {
+            uint8_t response[SUP_HMI_RESPONSE_LEN];
+            size_t response_len = sup_hmi_handle(&logic, payload, len, now, response, sizeof(response));
+            if(response_len > 0) {
+                hmi_send(response, response_len);
+            }
         }
     }
 }
@@ -403,7 +403,7 @@ static void send_reply(void) {
     uint8_t payload[SUP_REPLY_LEN];
     size_t len = sup_pack_reply(&reply, payload, sizeof(payload));
     uint8_t frame[SUP_REPLY_LEN + 4];
-    size_t frame_len = sup_frame_encode(payload, len, frame, sizeof(frame));
+    size_t frame_len = duart_frame_encode(payload, len, frame, sizeof(frame));
 
     // The whole frame fits the empty 32-byte FIFO, so this never waits. If
     // the last reply is somehow still going out, skip this one: the BMS only
@@ -426,12 +426,15 @@ static bool poll_internal_serial(uint32_t now) {
         uint8_t c = rx_ring[rx_tail];
         rx_tail = rx_tail + 1;
 
+        sup_frame_feed(&frame_parser, c);
         const uint8_t *payload;
-        size_t len = sup_frame_feed(&frame_parser, c, &payload);
-        sup_bms_status_t status;
-        if(len > 0 && sup_unpack_bms_status(payload, len, &status)) {
-            sup_logic_on_status(&logic, &status, now);
-            got_status = true;
+        size_t len;
+        while((len = sup_frame_next(&frame_parser, &payload)) > 0) {
+            sup_bms_status_t status;
+            if(sup_unpack_bms_status(payload, len, &status)) {
+                sup_logic_on_status(&logic, &status, now);
+                got_status = true;
+            }
         }
     }
     return got_status;

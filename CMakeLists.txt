@@ -84,6 +84,7 @@ add_executable(bms
     bms/config/config_check.c
     bms/shared/cell_map.c
     bms/shared/supervisor_protocol.c
+    bms/shared/duart_frame.c
     vendor/can2040/src/can2040.c
     vendor/littlefs/lfs.c
     vendor/littlefs/lfs_util.c

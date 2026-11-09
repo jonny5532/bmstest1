@@ -465,6 +465,7 @@ foreach(chemistry IN ITEMS lfp nmc)
         test_supervisor.c
         ../bms/shared/cell_map.c
         ../bms/shared/supervisor_protocol.c
+        ../bms/shared/duart_frame.c
         ../bms/drivers/bmb3y/crc.c
         ../supervisor/cell_snoop.c
         ../supervisor/supervisor_logic.c
@@ -500,3 +501,15 @@ foreach(profile_file IN LISTS BUILTIN_PROFILES)
     )
     add_test(NAME test_profile_map_${profile} COMMAND ${MEMORY_CHECK} test_profile_map_${profile})
 endforeach()
+
+# DUART framing (shared by the BMS and the supervisor)
+add_executable(test_duart_frame
+    test_duart_frame.c
+    ../bms/shared/duart_frame.c
+)
+target_link_libraries(test_duart_frame PRIVATE cmocka)
+target_include_directories(test_duart_frame PRIVATE
+    ${cmocka_SOURCE_DIR}/include
+    ../bms
+)
+add_test(NAME test_duart_frame COMMAND ${MEMORY_CHECK} test_duart_frame)

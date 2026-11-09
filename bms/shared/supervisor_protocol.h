@@ -4,11 +4,7 @@
 //
 // The BMS sends a status message every 100ms, the supervisor then answers each
 // one with a reply saying whether it is enabling the contactor drivers (CTR_EN)
-// and, if not, why. Frames use the DUART packet format (see duart_send_packet):
-//
-//   0xFF, <payload length - 1>, <payload>, <CRC16 lo>, <CRC16 hi>
-//
-// with the CRC16 (Modbus) taken over the two header bytes and the payload.
+// and, if not, why. Frames use the DUART packet format (shared/duart_frame.h).
 // Multi-byte fields are little-endian.
 
 #include <stdbool.h>
@@ -16,6 +12,7 @@
 #include <stdint.h>
 
 #include "shared/cell_map.h"
+#include "shared/duart_frame.h"
 
 #define SUP_PROTOCOL_VERSION 3
 
@@ -85,29 +82,29 @@ typedef struct {
 #define SUP_BMS_STATUS_LEN (19 + CELL_MAP_MASK_BYTES)
 #define SUP_REPLY_LEN 21
 // Largest frame on the link
-#define SUP_MAX_FRAME_LEN (SUP_BMS_STATUS_LEN + 4)
+#define SUP_MAX_FRAME_LEN (SUP_BMS_STATUS_LEN + DUART_FRAME_OVERHEAD)
 
 size_t sup_pack_bms_status(const sup_bms_status_t *status, uint8_t *buf, size_t buf_size);
 bool sup_unpack_bms_status(const uint8_t *payload, size_t len, sup_bms_status_t *status);
 size_t sup_pack_reply(const sup_reply_t *reply, uint8_t *buf, size_t buf_size);
 bool sup_unpack_reply(const uint8_t *payload, size_t len, sup_reply_t *reply);
 
-// CRC16 (Modbus: reflected 0x8005, init 0xFFFF), as used by DUART
-uint16_t sup_crc16(const uint8_t *data, size_t len, uint16_t crc);
-
-// Wrap a payload in a frame. Returns the frame length, or 0 if it doesn't fit.
-size_t sup_frame_encode(const uint8_t *payload, size_t payload_len, uint8_t *out, size_t out_size);
-
-// Byte-at-a-time frame receiver, for the supervisor (the BMS uses DUART)
+// Frame receiver for the supervisor, fed a byte at a time (the BMS uses DUART).
+// Both use duart_frame_parse(), so they recover from false syncs the same way.
 typedef struct {
-    uint8_t buf[256 + 4];
-    size_t pos;
+    uint8_t buf[512]; // received bytes not yet parsed (a power of two)
+    size_t len;
     size_t max_payload_len;
+    uint8_t payload[DUART_FRAME_MAX_PAYLOAD_LEN];
     uint32_t crc_errors;
 } sup_frame_parser_t;
 
-// Reset the frame parser to its initial state.
+// Reset the frame parser to its initial state. Frames with a payload longer
+// than max_payload_len are taken as false syncs.
 void sup_frame_parser_init(sup_frame_parser_t *parser, size_t max_payload_len);
-// Feed one received byte. When it completes a valid frame, returns the payload
-// length and points *payload at it (valid until the next call), else 0.
-size_t sup_frame_feed(sup_frame_parser_t *parser, uint8_t byte, const uint8_t **payload);
+// Add one received byte
+void sup_frame_feed(sup_frame_parser_t *parser, uint8_t byte);
+// Attempt to grab the next complete frame from the parser. Returns the payload
+// length and sets *payload to point to it, or 0 if no complete frame is
+// available.
+size_t sup_frame_next(sup_frame_parser_t *parser, const uint8_t **payload);

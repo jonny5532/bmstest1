@@ -121,71 +121,30 @@ bool sup_unpack_reply(const uint8_t *payload, size_t len, sup_reply_t *reply) {
     return true;
 }
 
-uint16_t sup_crc16(const uint8_t *data, size_t len, uint16_t crc) {
-    for(size_t i=0; i<len; i++) {
-        crc ^= data[i];
-        for(int j=0; j<8; j++) {
-            if(crc & 1) {
-                crc = (crc >> 1) ^ 0xA001;
-            } else {
-                crc >>= 1;
-            }
-        }
-    }
-    return crc;
-}
-
-size_t sup_frame_encode(const uint8_t *payload, size_t payload_len, uint8_t *out, size_t out_size) {
-    if(payload_len == 0 || payload_len > 256 || out_size < payload_len + 4) {
-        return 0;
-    }
-    out[0] = 0xFF;
-    out[1] = (uint8_t)(payload_len - 1);
-    memcpy(&out[2], payload, payload_len);
-    uint16_t crc = sup_crc16(out, payload_len + 2, 0xFFFF);
-    out[2 + payload_len] = crc & 0xFF;
-    out[3 + payload_len] = crc >> 8;
-    return payload_len + 4;
-}
-
 void sup_frame_parser_init(sup_frame_parser_t *parser, size_t max_payload_len) {
     memset(parser, 0, sizeof(*parser));
-    parser->max_payload_len = max_payload_len;
+    parser->max_payload_len = max_payload_len < DUART_FRAME_MAX_PAYLOAD_LEN ? max_payload_len : DUART_FRAME_MAX_PAYLOAD_LEN;
 }
 
-size_t sup_frame_feed(sup_frame_parser_t *parser, uint8_t byte, const uint8_t **payload) {
-    if(parser->pos == 0 && byte != 0xFF) {
-        // Hunting for the sync byte
-        return 0;
-    }
+static void drop(sup_frame_parser_t *parser, size_t n) {
+    memmove(parser->buf, &parser->buf[n], parser->len - n);
+    parser->len -= n;
+}
 
-    parser->buf[parser->pos++] = byte;
-    if(parser->pos < 2) {
-        return 0;
+void sup_frame_feed(sup_frame_parser_t *parser, uint8_t byte) {
+    if(parser->len == sizeof(parser->buf)) {
+        // Only if the caller never takes the frames (sup_frame_next() keeps
+        // it under one frame otherwise)
+        drop(parser, 1);
     }
+    parser->buf[parser->len++] = byte;
+}
 
-    size_t payload_len = (size_t)parser->buf[1] + 1;
-    if(parser->pos == 2 && payload_len > parser->max_payload_len) {
-        // Longer than any message on this link, so that wasn't a sync byte.
-        // Start again, from this byte if it could be one.
-        parser->pos = 0;
-        if(byte == 0xFF) {
-            parser->buf[parser->pos++] = byte;
-        }
-        return 0;
-    }
-    if(parser->pos < payload_len + 4) {
-        return 0;
-    }
-
-    // Full frame received
-    parser->pos = 0;
-    uint16_t crc = sup_crc16(parser->buf, payload_len + 2, 0xFFFF);
-    uint16_t msg_crc = (uint16_t)(parser->buf[2 + payload_len] | (parser->buf[3 + payload_len] << 8));
-    if(crc != msg_crc) {
-        parser->crc_errors++;
-        return 0;
-    }
-    *payload = &parser->buf[2];
-    return payload_len;
+size_t sup_frame_next(sup_frame_parser_t *parser, const uint8_t **payload) {
+    duart_frame_parse_t r = duart_frame_parse(parser->buf, sizeof(parser->buf), 0, parser->len,
+        parser->payload, parser->max_payload_len);
+    drop(parser, r.consumed);
+    parser->crc_errors += r.crc_errors;
+    *payload = parser->payload;
+    return r.payload_len;
 }

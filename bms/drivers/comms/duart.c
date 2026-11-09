@@ -1,5 +1,6 @@
 #include "duart.h"
 #include "app/monitoring/counters.h"
+#include "shared/duart_frame.h"
 #include "sys/logging/logging.h"
 
 #include "hardware/gpio.h"
@@ -14,8 +15,6 @@
 
 #define UART0_DMA_IRQ_PRIORITY PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY
 #define UART1_DMA_IRQ_PRIORITY PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY
-
-#define CRC16_INIT                  ((uint16_t)-1l)
 
 duart duart0;
 duart duart1;
@@ -190,274 +189,55 @@ bool duart_send_blocking(duart *u, const uint8_t *data, size_t len) {
     }
 }
 
-size_t duart_peek(duart *u, uint8_t **buf, size_t *all_available) {
-    // Updates buf to point to the next available data in the receive buffer,
-    // and returns the number of bytes available contiguously from that point.
-
-    // Also updates all_available to the total number of bytes available (which
-    // may be more than the contiguous amount, if the data wraps around the end
-    // of the buffer).
-
+static size_t duart_rx_available(duart *u) {
+    // The DMA write address, relative to the (aligned) ring buffer
     dma_channel_hw_t *dma_chan = dma_channel_hw_addr(u->rx_dma_channel);
-    size_t available = (dma_chan->write_addr - u->rx_pointer) & ((1<<DUART_RX_BUFFER_BITS)-1);
-
-    *all_available = available;
-    size_t remaining_to_end = (1<<DUART_RX_BUFFER_BITS) - u->rx_pointer;
-
-    if(available>0) {
-        if(available > remaining_to_end) {
-            available = remaining_to_end;
-        }
-        
-        *buf = &u->rx_buffer[u->rx_pointer];
-        return available;
-    }
-
-    return 0;
+    return (dma_chan->write_addr - u->rx_pointer) & ((1<<DUART_RX_BUFFER_BITS)-1);
 }
 
-void duart_flush(duart *u, size_t len) {
+static void duart_flush(duart *u, size_t len) {
     u->rx_pointer = (u->rx_pointer + len) & ((1<<DUART_RX_BUFFER_BITS)-1);
 }
 
-void memcpy_with_crc16_slow(uint8_t *dest, const uint8_t *src, size_t len, uint16_t *crc16) {
-    // Copies data from src to dest, updating the CRC16 value as we go.
-
-    for(size_t i=0; i<len; i++) {
-        uint8_t b = src[i];
-        dest[i] = b;
-
-        *crc16 ^= b;
-        for(int j=0; j<8; j++) {
-            if(*crc16 & 1) {
-                *crc16 = (*crc16 >> 1) ^ 0xA001;
-            } else {
-                *crc16 >>= 1;
-            }
-        }
-    }
-}
-
-static void memcpy_with_crc16(uint8_t *dest, const uint8_t *src, size_t len, uint16_t *crc16) {
-    static const uint16_t crc_table[] = {
-        0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
-        0xC601, 0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440,
-        0xCC01, 0x0CC0, 0x0D80, 0xCD41, 0x0F00, 0xCFC1, 0xCE81, 0x0E40,
-        0x0A00, 0xCAC1, 0xCB81, 0x0B40, 0xC901, 0x09C0, 0x0880, 0xC841,
-        0xD801, 0x18C0, 0x1980, 0xD941, 0x1B00, 0xDBC1, 0xDA81, 0x1A40,
-        0x1E00, 0xDEC1, 0xDF81, 0x1F40, 0xDD01, 0x1DC0, 0x1C80, 0xDC41,
-        0x1400, 0xD4C1, 0xD581, 0x1540, 0xD701, 0x17C0, 0x1680, 0xD641,
-        0xD201, 0x12C0, 0x1380, 0xD341, 0x1100, 0xD1C1, 0xD081, 0x1040,
-        0xF001, 0x30C0, 0x3180, 0xF141, 0x3300, 0xF3C1, 0xF281, 0x3240,
-        0x3600, 0xF6C1, 0xF781, 0x3740, 0xF501, 0x35C0, 0x3480, 0xF441,
-        0x3C00, 0xFCC1, 0xFD81, 0x3D40, 0xFF01, 0x3FC0, 0x3E80, 0xFE41,
-        0xFA01, 0x3AC0, 0x3B80, 0xFB41, 0x3900, 0xF9C1, 0xF881, 0x3840,
-        0x2800, 0xE8C1, 0xE981, 0x2940, 0xEB01, 0x2BC0, 0x2A80, 0xEA41,
-        0xEE01, 0x2EC0, 0x2F80, 0xEF41, 0x2D00, 0xEDC1, 0xEC81, 0x2C40,
-        0xE401, 0x24C0, 0x2580, 0xE541, 0x2700, 0xE7C1, 0xE681, 0x2640,
-        0x2200, 0xE2C1, 0xE381, 0x2340, 0xE101, 0x21C0, 0x2080, 0xE041,
-        0xA001, 0x60C0, 0x6180, 0xA141, 0x6300, 0xA3C1, 0xA281, 0x6240,
-        0x6600, 0xA6C1, 0xA781, 0x6740, 0xA501, 0x65C0, 0x6480, 0xA441,
-        0x6C00, 0xACC1, 0xAD81, 0x6D40, 0xAF01, 0x6FC0, 0x6E80, 0xAE41,
-        0xAA01, 0x6AC0, 0x6B80, 0xAB41, 0x6900, 0xA9C1, 0xA881, 0x6840,
-        0x7800, 0xB8C1, 0xB981, 0x7940, 0xBB01, 0x7BC0, 0x7A80, 0xBA41,
-        0xBE01, 0x7EC0, 0x7F80, 0xBF41, 0x7D00, 0xBDC1, 0xBC81, 0x7C40,
-        0xB401, 0x74C0, 0x7580, 0xB541, 0x7700, 0xB7C1, 0xB681, 0x7640,
-        0x7200, 0xB2C1, 0xB381, 0x7340, 0xB101, 0x71C0, 0x7080, 0xB041,
-        0x5000, 0x90C1, 0x9181, 0x5140, 0x9301, 0x53C0, 0x5280, 0x9241,
-        0x9601, 0x56C0, 0x5780, 0x9741, 0x5500, 0x95C1, 0x9481, 0x5440,
-        0x9C01, 0x5CC0, 0x5D80, 0x9D41, 0x5F00, 0x9FC1, 0x9E81, 0x5E40,
-        0x5A00, 0x9AC1, 0x9B81, 0x5B40, 0x9901, 0x59C0, 0x5880, 0x9841,
-        0x8801, 0x48C0, 0x4980, 0x8941, 0x4B00, 0x8BC1, 0x8A81, 0x4A40,
-        0x4E00, 0x8EC1, 0x8F81, 0x4F40, 0x8D01, 0x4DC0, 0x4C80, 0x8C41,
-        0x4400, 0x84C1, 0x8581, 0x4540, 0x8701, 0x47C0, 0x4680, 0x8641,
-        0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040 
-    };
-
-    for(size_t i=0; i<len; i++) {
-        uint8_t b = src[i];
-        dest[i] = b;
-
-        uint16_t tbl_idx = (*crc16 ^ b) & 0xFF;
-        *crc16 = (uint16_t)((*crc16 >> 8) ^ crc_table[tbl_idx]);
-    }
-}
-
-static uint8_t duart_roll_buffer_byte(uint8_t **data) {
-    // Given a pointer into the receive buffer, rolls it forward by one byte,
-    // wrapping if necessary, and returns the byte at the new position.
-
-    *data = (uint8_t*)(((uintptr_t)(*data) & ~((1<<DUART_RX_BUFFER_BITS)-1)) + ((uintptr_t)((*data)+1) % (1<<DUART_RX_BUFFER_BITS)));
-    return **data;
-}
-
 size_t duart_read_packet(duart *u, uint8_t *buf, size_t buf_size) {
-    // Reads a full packet from the receive buffer. Returns the number of bytes
-    // read, or 0 if no full packet is available.
+    // Reads a full packet (shared/duart_frame.h) from the receive buffer. Returns the
+    // payload length, or 0 if no full packet is available. Packets longer than
+    // buf_size are skipped.
+    duart_frame_parse_t r = duart_frame_parse(u->rx_buffer, 1<<DUART_RX_BUFFER_BITS, u->rx_pointer,
+        duart_rx_available(u), buf, buf_size);
+    duart_flush(u, r.consumed);
 
-    // Packet format:
-    // 0xff (sync byte)
-    // <length-1 byte> (not including sync, CRC bytes or length byte itself)
-    // <payload bytes> (min 1 byte)
-    // <crc16 bytes>
-
-    // The initial sync allows quicker recovery from transmission errors, both
-    // if byte synchronisation is lost (in which case the receiver will search
-    // for the next 0xff byte before continuing), and if bit synchronisation is
-    // lost (since 0xFF is sent as a series of high levels on the line, so the
-    // receiver can re-lock its bit timing on the next start bit).
-
-    while(true) {
-        size_t available;
-        uint8_t *data;
-
-        // Grab a pointer to the start of the received data, and how much is in
-        // the buffer in total (available) and how much is contiguous from the
-        // pointer (len).
-        size_t len = duart_peek(u, &data, &available);
-
-        // A full packet is at least 5 bytes.
-        if(available < 5) {
-            return 0;
-        }
-        if(data[0] != 0xff) {
-            // Invalid start byte, flush one byte
-            duart_flush(u, 1);
-            continue;
-        }
-
-        // We now read the payload length and determine whether we have enough
-        // available for a full packet read. If not we can bail, as we haven't
-        // consumed anything from the buffer yet.
-        size_t payload_len = duart_roll_buffer_byte(&data) + 1;
-        if((payload_len + 4) > available) {
-            // Message not fully available yet
-            return 0;
-        }
-        if(payload_len > buf_size) {
-            // Payload too big for buffer, flush the entire packet
-            duart_flush(u, payload_len + 4);
-            continue;
-        }
-
-        // Consume the length byte, so that data now points to the start of the
-        // payload.
-        duart_roll_buffer_byte(&data);
-
-        if(len <= 2) {
-            // Only two contiguous bytes were available, but we've now popped
-            // them both, so act like we had the full packet available.
-            len = available;
-        }
-
-        uint16_t crc16 = CRC16_INIT;
-
-        // Recreate the first two bytes (sync and length) to prime the CRC.
-        uint8_t first_two_bytes[2];
-        first_two_bytes[0] = 0xff;
-        first_two_bytes[1] = payload_len - 1;
-        memcpy_with_crc16(&buf[0], &first_two_bytes[0], 2, &crc16);
-
-        if((payload_len + 4) <= len) {
-            // The full payload and the CRCs are available contiguously so we can
-            // read in one go.
-            memcpy_with_crc16(&buf[0], &data[0], payload_len, &crc16);
-
-            // Read CRC16 from message
-            uint16_t msg_crc16 = data[payload_len] | (data[payload_len + 1] << 8);
-            duart_flush(u, payload_len + 4);
-            if(crc16 != msg_crc16) {
-                // CRC mismatch
-                error_printf("DUART crc err1: %d calc %04x msg %04x\n", payload_len, crc16, msg_crc16);
-                if(u==&duart0) {
-                    debug_counters.uart0_crc_errors++;
-                } else {
-                    debug_counters.uart1_crc_errors++;
-                }
-                continue;
-            }
+    if(r.crc_errors) {
+        // Corrupted frames, or false syncs (0xff in a payload) after losing our
+        // place in the stream
+        debug_printf("DUART: %lu bad CRC\n", (unsigned long)r.crc_errors);
+        if(u==&duart0) {
+            debug_counters.uart0_crc_errors += r.crc_errors;
         } else {
-            // The message wraps around the end of the buffer, either during the
-            // payload or the CRC.
-
-            // Work out how much of the payload is in the first chunk (the
-            // contiguous length minus the two header bytes we've already
-            // popped).
-            size_t first_part = len - 2;
-
-            if(first_part > payload_len) {
-                // We actually have the entire payload in the first part, must
-                // be the CRC that wraps.
-                first_part = payload_len;
-            }
-
-            // Copy the first part of the payload, calculating the CRC as we go.
-            memcpy_with_crc16(&buf[0], &data[0], first_part, &crc16);
-            // Flush the first part of the payload (and the two header bytes).
-            duart_flush(u, first_part + 2);
-
-            // And do the second part (which may be nothing if it's just the CRC
-            // that wraps).
-            size_t second_part = payload_len - first_part;
-            if(second_part > 0) {
-                duart_peek(u, &data, &available);
-                memcpy_with_crc16(&buf[first_part], &data[0], second_part, &crc16);
-                duart_flush(u, second_part);
-            }
-
-            uint16_t msg_crc16;
-            // Peek so that data points to the first byte of the CRC16
-            duart_peek(u, &data, &available);
-            // Read the first byte
-            msg_crc16 = data[0];
-            // Read the second byte
-            msg_crc16 |= (duart_roll_buffer_byte(&data) << 8);
-            // And flush both CRC bytes
-            duart_flush(u, 2);
-
-            if(crc16 != msg_crc16) {
-                // CRC mismatch
-                error_printf("DUART crc err2: %d calc %04x msg %04x sp %d\n", payload_len, crc16, msg_crc16, second_part);
-                if(u==&duart0) {
-                    debug_counters.uart0_crc_errors++;
-                } else {
-                    debug_counters.uart1_crc_errors++;
-                }
-                continue;
-            }
+            debug_counters.uart1_crc_errors += r.crc_errors;
         }
+    }
+    if(r.payload_len) {
         if(u==&duart0) {
             debug_counters.uart0_packets_received++;
         } else {
             debug_counters.uart1_packets_received++;
         }
-        return payload_len;
     }
+    return r.payload_len;
 }
 
 bool duart_send_packet(duart *u, const uint8_t *payload, size_t payload_len) {
     // Sends a full packet with the given payload. Returns true on success.
 
-    if(payload_len == 0 || payload_len > 256) {
+    uint8_t buf[DUART_FRAME_MAX_PAYLOAD_LEN + DUART_FRAME_OVERHEAD];
+    size_t len = duart_frame_encode(payload, payload_len, buf, sizeof(buf));
+    if(len == 0) {
         // The length byte encodes len-1, so 0 can't be sent (and > 256 won't fit)
         return false;
     }
 
-    uint8_t buf[256 + 4];
-    buf[0] = 0xff; // sync byte
-    buf[1] = payload_len - 1; // length byte
-
-
-    // TODO: adapt the ringbuf to perform the CRC16 calculation, avoiding the
-    // extra copy
-
-    uint16_t crc16 = CRC16_INIT;
-    memcpy_with_crc16(&buf[0], &buf[0], 2, &crc16);
-    memcpy_with_crc16(&buf[2], payload, payload_len, &crc16);
-    buf[2 + payload_len] = crc16 & 0xff;
-    buf[2 + payload_len + 1] = (crc16 >> 8);
-
-    bool ret = duart_send(u, buf, payload_len + 4);
+    bool ret = duart_send(u, buf, len);
     if(ret) {
         if(u==&duart0) {
             debug_counters.uart0_packets_sent++;

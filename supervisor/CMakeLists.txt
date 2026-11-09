@@ -48,6 +48,7 @@ add_executable(supervisor
     supervisor.c
     ${BMS_DIR}/shared/cell_map.c
     ${BMS_DIR}/shared/supervisor_protocol.c
+    ${BMS_DIR}/shared/duart_frame.c
     ${BMS_DIR}/drivers/bmb3y/crc.c
     )
 

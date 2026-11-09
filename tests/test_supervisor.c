@@ -197,7 +197,7 @@ static void test_frame_matches_duart_keepalive(void **state) {
     const uint8_t payload[] = { 'K', 'e', 'e', 'p', 'A', 'l', 'i', 'v' };
     const uint8_t expected[] = { 0xff, 0x07, 'K', 'e', 'e', 'p', 'A', 'l', 'i', 'v', 0x20, 0xe8 };
     uint8_t frame[16];
-    assert_int_equal(sup_frame_encode(payload, sizeof(payload), frame, sizeof(frame)), sizeof(expected));
+    assert_int_equal(duart_frame_encode(payload, sizeof(payload), frame, sizeof(frame)), sizeof(expected));
     assert_memory_equal(frame, expected, sizeof(expected));
 }
 
@@ -303,9 +303,10 @@ static void test_other_version_is_reported(void **state) {
 static size_t feed_all(sup_frame_parser_t *parser, const uint8_t *data, size_t len, int *frames) {
     size_t last_len = 0;
     for(size_t i=0; i<len; i++) {
+        sup_frame_feed(parser, data[i]);
         const uint8_t *payload;
-        size_t n = sup_frame_feed(parser, data[i], &payload);
-        if(n) {
+        size_t n;
+        while((n = sup_frame_next(parser, &payload)) > 0) {
             (*frames)++;
             last_len = n;
         }
@@ -323,7 +324,7 @@ static void test_parser_resyncs(void **state) {
     uint8_t payload[SUP_BMS_STATUS_LEN];
     sup_pack_bms_status(&status, payload, sizeof(payload));
     uint8_t frame[SUP_MAX_FRAME_LEN];
-    size_t frame_len = sup_frame_encode(payload, sizeof(payload), frame, sizeof(frame));
+    size_t frame_len = duart_frame_encode(payload, sizeof(payload), frame, sizeof(frame));
     assert_int_equal(frame_len, SUP_MAX_FRAME_LEN);
 
     int frames = 0;
@@ -344,6 +345,35 @@ static void test_parser_resyncs(void **state) {
     assert_int_equal(parser.crc_errors, 1);
     feed_all(&parser, frame, frame_len, &frames);
     assert_int_equal(frames, 2);
+}
+
+// Fed a byte at a time: a frame inside a false sync's claimed bytes is still
+// delivered, and one byte can complete several frames
+static void test_parser_finds_frame_inside_false_sync(void **state) {
+    (void) state;
+    sup_frame_parser_t parser;
+    sup_frame_parser_init(&parser, SUP_BMS_STATUS_LEN);
+
+    uint8_t payload[3] = { 0x01, 0x02, 0x03 };
+    uint8_t frame[16];
+    size_t frame_len = duart_frame_encode(payload, sizeof(payload), frame, sizeof(frame));
+
+    // A false sync claiming 20 bytes of payload, with two real frames inside
+    uint8_t stream[20 + DUART_FRAME_OVERHEAD];
+    memset(stream, 0x00, sizeof(stream));
+    stream[0] = DUART_FRAME_SYNC;
+    stream[1] = 19;
+    memcpy(&stream[2], frame, frame_len);
+    memcpy(&stream[2 + frame_len], frame, frame_len);
+
+    int frames = 0;
+    // Both frames are complete well before the false one, but wait for it
+    feed_all(&parser, stream, sizeof(stream) - 1, &frames);
+    assert_int_equal(frames, 0);
+    // Its last byte fails its CRC, and both real frames come out at once
+    assert_int_equal(feed_all(&parser, &stream[sizeof(stream) - 1], 1, &frames), sizeof(payload));
+    assert_int_equal(frames, 2);
+    assert_int_equal(parser.crc_errors, 1);
 }
 
 /* Cell map */
@@ -1365,6 +1395,7 @@ int main(void) {
         cmocka_unit_test(test_reply_round_trip),
         cmocka_unit_test(test_other_version_is_reported),
         cmocka_unit_test(test_parser_resyncs),
+        cmocka_unit_test(test_parser_finds_frame_inside_false_sync),
         cmocka_unit_test(test_cell_map_check_accepts_good_maps),
         cmocka_unit_test(test_cell_map_check_rejects_bad_maps),
         cmocka_unit_test(test_cell_map_hash_covers_every_field),
