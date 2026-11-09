@@ -1,6 +1,7 @@
 #include "bmb3y.h"
 #include "crc.h"
 #include "bmb3y_cells.h"
+#include "bmb3y_power.h"
 
 #include "config/limits.h"
 #include "app/model.h"
@@ -567,40 +568,6 @@ static void bmb3y_read_cell_voltages_blocking(bms_model_t *model) {
     }
 }
 
-static bool should_stop(bms_model_t *model) {
-    // Determine whether we should stop communicating with the BMBs to save power.
-    (void)model;
-
-    if((get_event_level(ERR_BATTERY_VOLTAGE_LOW) == LEVEL_FATAL) ||
-       (get_event_level(ERR_CELL_VOLTAGE_VERY_LOW) == LEVEL_FATAL)) {
-        // Have locked out due to low battery/cell voltage
-        // (after stopping we will soon gain a cell-voltages-stale error also)
-        return true;
-    }
-
-    return false;
-}
-
-static bool should_use_slow_mode(bms_model_t *model) {
-    // Determine whether we should enter slow mode to reduce battery self-discharge.
-
-    if(model->system_sm.state == SYSTEM_STATE_INACTIVE && 
-       state_time((sm_t*)&model->system_sm) > 60000 && 
-       (model->cell_voltages_millis > 0 && model->cell_voltage_min_mV < get_minimum_balancing_voltage_mV(model))) {
-        // Inactive (contactors open) for a minute, and too low to balance, enter slow mode
-        return true;
-    }
-
-    if(get_event_level(ERR_BATTERY_VOLTAGE_LOW) != LEVEL_NONE ||
-       get_event_level(ERR_CELL_VOLTAGE_LOW) != LEVEL_NONE) {
-        // Low battery/cell voltage - use slow mode
-        return true;
-    }
-
-    return false;
-}
-
-
 int bmb3y_timestep_offset = 0;
 // Use a shorter period when we're in a balancing pause cycle, to get back to balancing sooner.
 const int PAUSE_CYCLE_LENGTH = 10; // (min 10)
@@ -612,10 +579,10 @@ void bmb3y_tick(bms_model_t *model) {
 
     const int slow_mode_period_mask = 0x7ff;
 
-    if(should_stop(model)) {
+    if(bmb3y_should_stop(model)) {
         // Stop talking to the BMBs to save power
         return;
-    } else if(should_use_slow_mode(model)) {
+    } else if(bmb3y_should_use_slow_mode(model)) {
         // In slow mode, sample less frequently
         if(!model->cell_voltage_slow_mode) {
             info_printf("BMB3Y entering slow mode\n");
@@ -675,7 +642,7 @@ void bmb3y_tick(bms_model_t *model) {
         bmb3y_send_super_wakeup();
         bmb3y_read_more_temps_blocking(model);
 
-        if(!crc_failed && !model->balancing_active && model->cell_voltage_slow_mode && !should_use_slow_mode(model)) {
+        if(!crc_failed && !model->balancing_active && model->cell_voltage_slow_mode && !bmb3y_should_use_slow_mode(model)) {
             // Exit slow mode now that we have fresh readings (both voltage and temp)
             model->cell_voltage_slow_mode = false;
             info_printf("BMB3Y exiting slow mode\n");

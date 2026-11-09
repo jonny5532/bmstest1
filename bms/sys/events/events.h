@@ -100,13 +100,14 @@ typedef enum {
     X(SUPPLY_VOLTAGE_CONTACTOR_HIGH, LEVEL_WARNING, 0)          \
     X(BATTERY_VOLTAGE_HIGH, LEVEL_WARNING, 0)                   \
     X(BATTERY_VOLTAGE_VERY_HIGH, LEVEL_CRITICAL, 1000)          \
-    /* Low voltage escalates after an hour, to stop a tiny  */  \
-    /* discharge eventually depleting the pack.             */  \
-    X(BATTERY_VOLTAGE_LOW, LEVEL_CRITICAL, 3600000)             \
+    /* TODO: remove reserved events                         */  \
+    X(RESERVED_BATTERY_VOLTAGE_LOW, LEVEL_INFO, 0)              \
     X(BATTERY_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, 1000)           \
     X(CELL_VOLTAGE_HIGH, LEVEL_WARNING, 0)                      \
     X(CELL_VOLTAGE_VERY_HIGH, LEVEL_CRITICAL, 1000)             \
-    X(CELL_VOLTAGE_LOW, LEVEL_WARNING, 0)                       \
+    /* A cell below the soft minimum eventually escalates, */   \
+    /* to stop a tiny discharge from depleting the pack.   */   \
+    X(CELL_VOLTAGE_LOW, LEVEL_CRITICAL, CELL_VOLTAGE_LOW_ESCALATION_MS) \
     X(CELL_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, 1000)              \
     X(SOFT_CHARGE_BUFFER_EXCEEDED, LEVEL_CRITICAL, 1000)        \
     X(OVERCURRENT_CHARGING, LEVEL_WARNING, 0 /*LEVEL_CRITICAL, 1000*/ )               \

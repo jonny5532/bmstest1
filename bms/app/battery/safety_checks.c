@@ -25,11 +25,6 @@ void confirm_battery_safety(const bms_model_t *model) {
             ERR_BATTERY_VOLTAGE_VERY_HIGH,
             (int32_t)(model->high_voltages.battery * 1000)
         );
-        // confirm(
-        //     model->battery_voltage >= (BATTERY_VOLTAGE_SOFT_MIN_mV * 0.001f),
-        //     ERR_BATTERY_VOLTAGE_LOW,
-        //     (int32_t)(model->battery_voltage * 1000)
-        // );
         confirm(
             model->high_voltages.battery >= (BATTERY_VOLTAGE_HARD_MIN_mV * 0.001f),
             ERR_BATTERY_VOLTAGE_VERY_LOW,

@@ -125,6 +125,14 @@
 #define CELL_TEMPERATURE_STALE_THRESHOLD_MS 5000
 #define CELL_TEMPERATURE_STALE_THRESHOLD_SLOW_MS 270000
 
+// How long a cell may stay below the soft minimum before the BMS faults and
+// opens the contactors. Long enough for a manual recovery charge, short enough
+// that a forgotten flat pack stops discharging (BMB drain then falls to slow
+// mode) before its cells get too low to recover.
+#define CELL_VOLTAGE_LOW_ESCALATION_MS 3600000
+// Event leeways are counted in 16-bit deciseconds
+_Static_assert(CELL_VOLTAGE_LOW_ESCALATION_MS / 100 <= 0xFFFF, "CELL_VOLTAGE_LOW_ESCALATION_MS too long");
+
 // Threshold for detecting a cell voltage glitch (sudden jump in one cycle)
 #define CELL_VOLTAGE_GLITCH_THRESHOLD_mV 100
 

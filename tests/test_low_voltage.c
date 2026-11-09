@@ -137,8 +137,8 @@ static void test_low_voltage_protection(void **state) {
     discharge(&bat, &model, get_cell_voltage_soft_min_mV(&model) - 1);
     // Check that discharge limit has been zeroed           
     assert_int_equal(model.cell_voltage_discharge_current_limit_dA, 0);
-    // Highest level should still be NONE or WARNING (if LOW is warning)
-    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_WARNING);
+    // Below the soft minimum: critical, escalating only after an hour
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_CRITICAL);
 
     // 3. Sudden discharge to below HARD_MIN
     tick(&bat, &model, -10000.0f, 100);

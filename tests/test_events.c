@@ -121,7 +121,7 @@ static void test_safety_voltage_events(void **state) {
     model.cell_voltage_min_mV = get_cell_voltage_soft_min_mV(&model) - 1;
     model.cell_voltage_millis = stored_millis;
     confirm_battery_safety(&model);
-    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_WARNING);
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_CRITICAL);
 
     // Cell Voltage Very Low
     model.cell_voltage_min_mV = CELL_VOLTAGE_HARD_MIN_mV - 1;
@@ -410,6 +410,65 @@ static void test_event_escalation(void **state) {
     assert_int_equal(get_event_level(ERR_BATTERY_VOLTAGE_VERY_HIGH), LEVEL_FATAL);
 }
 
+// Hold the lowest cell at cell_mV for duration_ms, running the safety checks
+// and event escalation once a minute with every other reading kept fresh.
+static void hold_cell_min(bms_model_t *model, uint16_t cell_mV, uint32_t duration_ms) {
+    for(uint32_t t = 0; t < duration_ms; t += 60000) {
+        stored_millis += 60000;
+        stored_millis64 += 60000;
+        model->high_voltages.battery_millis = stored_millis;
+        model->cell_voltage_millis = stored_millis;
+        model->temperature_millis = stored_millis;
+        model->current_millis = stored_millis;
+        model->cell_voltage_min_mV = cell_mV;
+        confirm_battery_safety(model);
+        events_tick();
+    }
+}
+
+static void test_cell_voltage_low_escalates_after_an_hour(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    setup_model(&model);
+    events_tick(); // bring the escalation clock up to date
+
+    uint16_t low_mV = get_cell_voltage_soft_min_mV(&model) - 1;
+
+    // Below the soft minimum: critical, but leaves time for a manual recovery
+    hold_cell_min(&model, low_mV, CELL_VOLTAGE_LOW_ESCALATION_MS - 120000);
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_CRITICAL);
+
+    // After an hour it escalates, faulting the BMS and opening the contactors
+    hold_cell_min(&model, low_mV, 180000);
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_FATAL);
+    assert_int_equal(get_highest_event_level(), LEVEL_FATAL);
+
+    // and stays latched even if the cells recover
+    hold_cell_min(&model, 3500, 60000);
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_FATAL);
+}
+
+static void test_cell_voltage_low_recovery_resets_escalation(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    setup_model(&model);
+    events_tick();
+
+    uint16_t low_mV = get_cell_voltage_soft_min_mV(&model) - 1;
+
+    // Most of the hour below the soft minimum
+    hold_cell_min(&model, low_mV, CELL_VOLTAGE_LOW_ESCALATION_MS - 600000);
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_CRITICAL);
+
+    // Recharged above it for as long: the event clears and the clock winds back
+    hold_cell_min(&model, 3500, CELL_VOLTAGE_LOW_ESCALATION_MS - 600000);
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_NONE);
+
+    // so dipping below again gets most of a fresh hour
+    hold_cell_min(&model, low_mV, CELL_VOLTAGE_LOW_ESCALATION_MS - 600000);
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_CRITICAL);
+}
+
 static void test_overcurrent_accumulation(void **state) {
     (void) state;
     bms_model_t model = {0};
@@ -481,6 +540,8 @@ int main(void) {
         cmocka_unit_test_setup(test_hardware_checks_ignored_before_first_supply_read, setup),
         cmocka_unit_test_setup(test_hardware_stale_event_when_all_rails_stale, setup),
         cmocka_unit_test_setup(test_event_escalation, setup),
+        cmocka_unit_test_setup(test_cell_voltage_low_escalates_after_an_hour, setup),
+        cmocka_unit_test_setup(test_cell_voltage_low_recovery_resets_escalation, setup),
         cmocka_unit_test_setup(test_overcurrent_accumulation, setup),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
