@@ -454,3 +454,22 @@ foreach(t IN LISTS test_targets)
         bms_use_board(${t} rev0)
     endif()
 endforeach()
+
+# Every built-in pack profile's cell map passes the supervisor's checks
+file(GLOB BUILTIN_PROFILES RELATIVE ${CMAKE_CURRENT_LIST_DIR}/../profiles/builtin
+    ${CMAKE_CURRENT_LIST_DIR}/../profiles/builtin/*.h)
+foreach(profile_file IN LISTS BUILTIN_PROFILES)
+    get_filename_component(profile ${profile_file} NAME_WE)
+    add_executable(test_profile_map_${profile}
+        test_profile_map.c
+        ../bms/shared/cell_map.c
+    )
+    target_compile_definitions(test_profile_map_${profile} PRIVATE
+        TEST_PROFILE_HEADER="builtin/${profile_file}" TEST_PROFILE_NAME="${profile}")
+    target_link_libraries(test_profile_map_${profile} PRIVATE cmocka)
+    target_include_directories(test_profile_map_${profile} PRIVATE
+        ${cmocka_SOURCE_DIR}/include
+        ../bms
+    )
+    add_test(NAME test_profile_map_${profile} COMMAND ${MEMORY_CHECK} test_profile_map_${profile})
+endforeach()
