@@ -71,6 +71,16 @@ typedef struct {
     bool present;
 } ads1115_t;
 
+// Scan diagnostics (for the CLI)
+typedef struct {
+    uint32_t cycles;          // completed scan cycles
+    uint32_t errors;          // cycles abandoned after an I2C error
+    uint32_t last_cycle_us;   // duration of the last completed cycle
+    uint32_t max_cycle_us;    // longest completed cycle
+    uint32_t samples[ADS1115_CHANNEL_COUNT];
+} ads1115_stats_t;
+extern volatile ads1115_stats_t ads1115_stats;
+
 // Device handles owned by the driver
 extern ads1115_t ads1115_dev;   // ADC A (0x48)
 #if HAS_ADS1115_SECONDARY()
@@ -83,6 +93,8 @@ millis_t ads1115_get_sample_millis(int channel);
 void ads1115_start_calibration(uint16_t num_samples);
 bool ads1115_calibration_finished(void);
 int32_t ads1115_get_calibration(int channel);
+const char *ads1115_channel_name(int channel);
+bool ads1115_channel_single_ended(int channel);
 
 static inline int64_t div_round_closest(const int64_t n, const int64_t d)
 {

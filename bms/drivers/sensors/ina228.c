@@ -85,6 +85,8 @@ static void ina228_start_async_timer(ina228_t *dev);
 // When the last current sample was seen, or conversions started
 static uint32_t last_sample_us;
 
+ina228_stats_t ina228_stats;
+
 // Helper function to write a 16-bit register
 static bool ina228_write_reg16(ina228_t *dev, uint8_t reg, uint16_t value) {
     uint8_t buf[2];
@@ -271,6 +273,8 @@ static void on_read_complete(i2c_inst_t *i2c, bool success, void *user_data) {
             latest_async_current_us = time_us_32();
             async_new_reading_available = true;
         }
+    } else {
+        ina228_stats.i2c_errors++;
     }
 }
 
@@ -279,6 +283,7 @@ static void on_config_write_complete(i2c_inst_t *i2c, bool success, void *user_d
     (void)user_data;
 
     if (!success) {
+        ina228_stats.i2c_errors++;
         return; // Stay in the current state; the timer will retry
     }
 
@@ -295,6 +300,7 @@ static void on_temp_read_complete(i2c_inst_t *i2c, bool success, void *user_data
     (void)user_data;
 
     if (!success) {
+        ina228_stats.i2c_errors++;
         return; // Stay in MEAS_STATE_CONVERTING; the timer will retry
     }
 
@@ -390,10 +396,13 @@ static void store_temp_result(bool is_ntc, int32_t raw) {
         model.shunt_ntc_resistance_ohms = r_ntc;
         model.shunt_ntc_temperature = temp_c;
         model.shunt_ntc_millis = millis();
+        ina228_stats.ntc_volts = v;
+        ina228_stats.ntc_measurements++;
     } else {
         // DIETEMP: 7.8125 m degrees C per LSB
         model.shunt_die_temperature = (float)raw * 0.0078125f;
         model.shunt_die_temperature_millis = millis();
+        ina228_stats.die_measurements++;
     }
 }
 
@@ -521,6 +530,12 @@ bool ina228_read_current_async(ina228_t *dev) {
         // We're having to guess the current for a long gap
         info_printf("INA228: %lu ms since the last current sample\n", (unsigned long)(elapsed_us / 1000));
     }
+    if (elapsed_us > ina228_stats.max_gap_us) {
+        ina228_stats.max_gap_us = elapsed_us;
+    }
+    ina228_stats.samples++;
+    ina228_stats.last_raw = current_raw;
+    ina228_stats.last_vos_counts = vos_whole;
     model.charge_raw += (int64_t)current_corrected * elapsed_us;
     last_sample_us = sample_us;
     model.charge_millis = model.current_millis;

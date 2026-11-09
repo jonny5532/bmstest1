@@ -51,6 +51,8 @@ sampler_t samples[ADS1115_CHANNEL_COUNT] = {0};
 float filtered_samples[ADS1115_CHANNEL_COUNT] = { [0 ... (ADS1115_CHANNEL_COUNT-1)] = NAN };
 float sample_deviations[ADS1115_CHANNEL_COUNT] = { [0 ... (ADS1115_CHANNEL_COUNT-1)] = NAN };
 
+volatile ads1115_stats_t ads1115_stats = {0};
+
 ads1115_t ads1115_dev = {0};   // ADC A (0x48)
 #if HAS_ADS1115_SECONDARY()
 ads1115_t ads1115_dev_b = {0}; // ADC B (0x49)
@@ -59,23 +61,24 @@ ads1115_t ads1115_dev_b = {0}; // ADC B (0x49)
 typedef struct {
     ads1115_t *dev;
     uint16_t config; // mux | pga bits
+    const char *name;
 } ads1115_channel_cfg_t;
 
 // Logical channel table (see ads1115.h for the meaning of each channel)
 static const ads1115_channel_cfg_t channel_table[ADS1115_CHANNEL_COUNT] = {
     // ADC A
-    [0] = { &ads1115_dev, ADS1115_CONFIG_MUX_DIFF_0_1 | ADS1115_CONFIG_PGA_1_024V }, // battery voltage
-    [1] = { &ads1115_dev, ADS1115_CONFIG_MUX_DIFF_2_3 | ADS1115_CONFIG_PGA_1_024V }, // output voltage
-    [2] = { &ads1115_dev, ADS1115_CONFIG_MUX_DIFF_1_3 | ADS1115_CONFIG_PGA_1_024V }, // across negative path
-    [3] = { &ads1115_dev, ADS1115_CONFIG_MUX_DIFF_0_3 | ADS1115_CONFIG_PGA_1_024V }, // battery pos to output neg
-    [4] = { &ads1115_dev, ADS1115_CONFIG_MUX_SINGLE_0 | ADS1115_CONFIG_PGA_4_096V }, // battery pos (isolation)
-    [5] = { &ads1115_dev, ADS1115_CONFIG_MUX_SINGLE_1 | ADS1115_CONFIG_PGA_4_096V }, // battery neg (isolation)
+    [0] = { &ads1115_dev, ADS1115_CONFIG_MUX_DIFF_0_1 | ADS1115_CONFIG_PGA_1_024V, "battery" }, // battery voltage
+    [1] = { &ads1115_dev, ADS1115_CONFIG_MUX_DIFF_2_3 | ADS1115_CONFIG_PGA_1_024V, "output" }, // output voltage
+    [2] = { &ads1115_dev, ADS1115_CONFIG_MUX_DIFF_1_3 | ADS1115_CONFIG_PGA_1_024V, "neg_ctr" }, // across negative path
+    [3] = { &ads1115_dev, ADS1115_CONFIG_MUX_DIFF_0_3 | ADS1115_CONFIG_PGA_1_024V, "bat_pos_out_neg" }, // battery pos to output neg
+    [4] = { &ads1115_dev, ADS1115_CONFIG_MUX_SINGLE_0 | ADS1115_CONFIG_PGA_4_096V, "iso_bat_pos" }, // battery pos (isolation)
+    [5] = { &ads1115_dev, ADS1115_CONFIG_MUX_SINGLE_1 | ADS1115_CONFIG_PGA_4_096V, "iso_bat_neg" }, // battery neg (isolation)
 #if HAS_ADS1115_SECONDARY()
     // ADC B
-    [6] = { &ads1115_dev_b, ADS1115_CONFIG_MUX_DIFF_2_3 | ADS1115_CONFIG_PGA_1_024V }, // across pos (Link Positive) contactor
-    [7] = { &ads1115_dev_b, ADS1115_CONFIG_MUX_DIFF_0_3 | ADS1115_CONFIG_PGA_1_024V }, // negated link voltage
-    [8] = { &ads1115_dev_b, ADS1115_CONFIG_MUX_DIFF_1_3 | ADS1115_CONFIG_PGA_1_024V }, // fuse/jumper drop
-    [9] = { &ads1115_dev_b, ADS1115_CONFIG_MUX_SINGLE_1 | ADS1115_CONFIG_PGA_4_096V }, // out pos (diagnostics)
+    [6] = { &ads1115_dev_b, ADS1115_CONFIG_MUX_DIFF_2_3 | ADS1115_CONFIG_PGA_1_024V, "pos_ctr" }, // across pos (Link Positive) contactor
+    [7] = { &ads1115_dev_b, ADS1115_CONFIG_MUX_DIFF_0_3 | ADS1115_CONFIG_PGA_1_024V, "neg_link" }, // negated link voltage
+    [8] = { &ads1115_dev_b, ADS1115_CONFIG_MUX_DIFF_1_3 | ADS1115_CONFIG_PGA_1_024V, "fuse_drop" }, // fuse/jumper drop
+    [9] = { &ads1115_dev_b, ADS1115_CONFIG_MUX_SINGLE_1 | ADS1115_CONFIG_PGA_4_096V, "out_pos" }, // out pos (diagnostics)
 #endif
 };
 
@@ -98,6 +101,7 @@ static struct {
         SCAN_STATE_READING_CONVERSION,
     } state;
     bool busy;
+    uint32_t cycle_start_us;
     int round;
     // Channels being converted this round (one per present device)
     int round_channels[ADS1115_MAX_PER_ROUND];
@@ -143,6 +147,7 @@ bool ads1115_init(ads1115_t *dev, uint8_t addr) {
 
 // Abandon the current cycle; the watchdog timer will start a fresh one
 static void ads1115_abandon_scan(void) {
+    ads1115_stats.errors++;
     scan.busy = false;
     scan.state = SCAN_STATE_IDLE;
 }
@@ -204,6 +209,12 @@ static void ads1115_start_round(void) {
     }
 
     // Cycle complete
+    uint32_t cycle_us = time_us_32() - scan.cycle_start_us;
+    ads1115_stats.cycles++;
+    ads1115_stats.last_cycle_us = cycle_us;
+    if (cycle_us > ads1115_stats.max_cycle_us) {
+        ads1115_stats.max_cycle_us = cycle_us;
+    }
     scan.busy = false;
     scan.state = SCAN_STATE_IDLE;
 
@@ -221,12 +232,14 @@ static void ads1115_start_round(void) {
 static void ads1115_start_sampling(void) {
     if (scan.busy) return;
     scan.busy = true;
+    scan.cycle_start_us = time_us_32();
     scan.round = 0;
     ads1115_start_round();
 }
 
 static void ads1115_store_sample(int channel, int16_t sample) {
     sampler_add(&samples[channel], (int32_t)sample, ADS1115_OVERSAMPLING, 0);
+    ads1115_stats.samples[channel]++;
 
     // Publish freshness per sample rather than per accumulator rollover: the
     // values the application consumes (filtered_samples) update every cycle,
@@ -338,6 +351,15 @@ int32_t ads1115_get_calibration(int channel) {
     return cal_accumulator[channel];
 }
 
+
+const char *ads1115_channel_name(int channel) {
+    return channel_table[channel].name;
+}
+
+bool ads1115_channel_single_ended(int channel) {
+    // MUX[2] selects AINx vs GND
+    return channel_table[channel].config & (0x4 << 12);
+}
 
 int16_t ads1115_get_sample_range(int channel) {
     return (int16_t)(samples[channel].max_value - samples[channel].min_value);

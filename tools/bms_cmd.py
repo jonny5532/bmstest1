@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Send CLI command(s) to the BMS over USB serial and print the response.
 
-Usage: bms_cmd.py [-t SECONDS] [-p PORT] CMD [CMD ...]
+Usage: bms_cmd.py [-t SECONDS] [-p PORT] [-n COUNT] [-i SECONDS] CMD [CMD ...]
 
 For each command: drains any stale buffered output, sends the command, then
 prints from the firmware's "Received command: '<cmd>'" echo up to the final
 "OK" / "ERR <reason>" line (log lines from elsewhere may be interleaved).
 The tty settings are restored on exit so a plain `cat` (ser.sh) still works.
+
+With -n COUNT the command list is run COUNT times (0 = until Ctrl-C), starting
+every -i SECONDS, e.g. `bms_cmd.py -n 10 -i 30 ina` to watch a value drift.
 
 Exit codes: 0 ok, 1 command returned ERR, 2 port in use by another process,
 3 command not acknowledged, 4 no OK/ERR within SECONDS.
@@ -132,15 +135,28 @@ def main():
     ap.add_argument("-p", "--port", default=None)
     ap.add_argument("-t", "--timeout", type=float, default=10.0,
                     help="max seconds to wait for OK/ERR after each ack")
+    ap.add_argument("-n", "--count", type=int, default=1,
+                    help="run the command list this many times (0 = forever)")
+    ap.add_argument("-i", "--interval", type=float, default=10.0,
+                    help="seconds between the starts of repeated runs")
     ap.add_argument("cmds", nargs="+")
     args = ap.parse_args()
 
     s, saved = open_port(args.port or find_port())
     try:
-        for cmd in args.cmds:
-            rc = run(s, cmd, args.timeout)
-            if rc:
-                sys.exit(rc)
+        n = 0
+        while True:
+            start = time.monotonic()
+            for cmd in args.cmds:
+                rc = run(s, cmd, args.timeout)
+                if rc:
+                    sys.exit(rc)
+            n += 1
+            if n == args.count:
+                break
+            time.sleep(max(0.0, start + args.interval - time.monotonic()))
+    except KeyboardInterrupt:
+        pass
     finally:
         close_port(s, saved)
 

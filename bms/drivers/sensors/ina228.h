@@ -70,6 +70,19 @@ typedef struct {
     volatile uint8_t async_bytes_received;
 } ina228_t;
 
+// Sampling diagnostics (for the CLI)
+typedef struct {
+    uint32_t samples;          // accepted current samples
+    uint32_t max_gap_us;       // longest interval between current samples
+    uint32_t i2c_errors;       // failed I2C transactions
+    uint32_t die_measurements; // completed die temperature measurements
+    uint32_t ntc_measurements; // completed NTC (VBUS) measurements
+    int32_t last_raw;          // last CURRENT register value (0.25mA counts)
+    int32_t last_vos_counts;   // offset voltage correction applied to it
+    float ntc_volts;           // last NTC divider voltage
+} ina228_stats_t;
+extern ina228_stats_t ina228_stats;
+
 bool ina228_init(ina228_t *dev, uint8_t i2c_addr, float shunt_resistor_ohms, float max_current_a);
 void ina228_configure(ina228_t *dev);
 
