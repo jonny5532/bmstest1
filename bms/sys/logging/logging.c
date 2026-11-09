@@ -2,6 +2,7 @@
 #include "../time/time.h"
 
 #include "tusb.h"
+#include "hardware/sync.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -212,7 +213,11 @@ void logging_printf(log_level_t level, const char *format, ...) {
         log_at_line_start = (buffer[total_len - 1] == '\n');
     }
 
+    // Logging happens from ISRs as well as the main loop, and rb_write's
+    // head/write_count updates aren't atomic.
+    uint32_t irq_state = save_and_disable_interrupts();
     rb_write(&log_ringbuffer, (const uint8_t *)buffer, total_len);
+    restore_interrupts(irq_state);
 }
 
 void logging_flush_to_stdout() {
