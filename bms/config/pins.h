@@ -2,6 +2,9 @@
 #define PIN_5V_SENSE 41
 #define PIN_12V_SENSE 42
 #define PIN_CONTACTOR_SENSE 43
+// PCB revision strap (see app/board_id.h): Rev0 floating, Rev1.0 to GND,
+// Rev1.1+ 10k to 3V3 plus a per-revision resistor to GND
+#define PIN_BOARD_REV 47
 
 #define PIN_CONTACTOR_POS 18
 #define PIN_CONTACTOR_NEG 17

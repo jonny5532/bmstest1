@@ -134,6 +134,18 @@ typedef enum {
                                                                 \
     X(LINK_VOLTAGE_MISMATCH, LEVEL_WARNING, 0)                  \
     X(FUSE_VOLTAGE_DROP_HIGH, LEVEL_CRITICAL, FUSE_DROP_FAULT_DELAY_MS) \
+    /* Reserved: never raised. They keep the numbers of the  */ \
+    /* events around them fixed for the HMI.                 */ \
+    X(RESERVED_53, LEVEL_INFO, 0)                               \
+    X(RESERVED_54, LEVEL_INFO, 0)                               \
+    /* PCB revision strap doesn't match the BMS_BOARD build. */ \
+    /* Data: (detected code << 16) | BMS_BOARD               */ \
+    X(BOARD_MISMATCH, LEVEL_FATAL, 0)                           \
+    X(RESERVED_56, LEVEL_INFO, 0)                               \
+    X(RESERVED_57, LEVEL_INFO, 0)                               \
+    X(RESERVED_58, LEVEL_INFO, 0)                               \
+    X(RESERVED_59, LEVEL_INFO, 0)                               \
+    X(RESERVED_60, LEVEL_INFO, 0)                               \
     X(BMB_PACK_MISMATCH, LEVEL_WARNING, 0)                      \
     /* Data: up to 8 missing cell indices, lowest first, one */ \
     /* per byte from the LSB; unused bytes are 0xFF.          */ \

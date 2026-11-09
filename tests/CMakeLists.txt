@@ -254,6 +254,21 @@ foreach(variant IN ITEMS "" "_rev1")
 endforeach()
 target_compile_definitions(test_ads1115_rev1 PRIVATE BMS_BOARD=2)
 
+foreach(variant IN ITEMS "" "_rev1")
+    add_executable(test_board_id${variant}
+        test_board_id.c
+        ../bms/app/board_id.c
+    )
+    target_link_libraries(test_board_id${variant} PRIVATE cmocka)
+    target_include_directories(test_board_id${variant} PRIVATE
+        ${cmocka_SOURCE_DIR}/include
+        include
+        ../bms
+    )
+    add_test(NAME test_board_id${variant} COMMAND ${MEMORY_CHECK} test_board_id${variant})
+endforeach()
+target_compile_definitions(test_board_id_rev1 PRIVATE BMS_BOARD=2)
+
 add_executable(test_sampler
     test_sampler.c
     ../bms/lib/sampler.c

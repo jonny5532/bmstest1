@@ -207,6 +207,14 @@ static uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_mode
             buf[idx++] = HMI_TYPE_FLOAT;
             idx += hmi_buf_append_float(&buf[idx], model->shunt_ntc_resistance_ohms);
             break;
+        case HMI_REG_BOARD_REVISION:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->board_id);
+            break;
+        case HMI_REG_BOARD_STRAP_COUNTS:
+            buf[idx++] = HMI_TYPE_UINT16;
+            idx += hmi_buf_append_uint16(&buf[idx], model->board_id_counts);
+            break;
         case HMI_REG_TEMPERATURE_MIN:
             buf[idx++] = HMI_TYPE_FLOAT;
             idx += hmi_buf_append_float(&buf[idx], (uint16_t)model->temperature_min);

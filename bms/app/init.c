@@ -13,6 +13,8 @@
 #include "../protocols/inverter/inverter.h"
 #include "../drivers/isospi/isosnoop.h"
 #include "../drivers/isospi/isospi_master.h"
+#include "board_id.h"
+#include "sys/events/events.h"
 #include "state_machines/contactors.h"
 #include "model.h"
 #include "bms.h"
@@ -140,11 +142,29 @@ static void init_model() {
     }
 }
 
+static void check_board_id() {
+    uint16_t pull_up, pull_down, open;
+    internal_adc_board_strap(&pull_up, &pull_down, &open);
+    model.board_id = board_id_classify(pull_up, pull_down, open);
+    model.board_id_counts = open;
+
+    info_printf("Board strap: up %u down %u open %u -> code %u\n",
+        (unsigned)pull_up, (unsigned)pull_down, (unsigned)open, (unsigned)model.board_id);
+    if (!board_id_matches_build(model.board_id)) {
+        // Firmware for the wrong PCB: channel scaling and contactor sensing
+        // differ between revisions, so never operate
+        error_printf("Board revision code %u does not match this build (BMS_BOARD %d)\n",
+            (unsigned)model.board_id, BMS_BOARD);
+        raise_bms_event(ERR_BOARD_MISMATCH, ((uint64_t)model.board_id << 16) | BMS_BOARD);
+    }
+}
+
 void bms_init() {
     printf("Initializing BMS...\n");
     init_hw();
     init_comms();
     init_model();
+    check_board_id();
 
     // This will advance the time to a non-zero value
     update_millis();

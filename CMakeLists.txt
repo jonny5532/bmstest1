@@ -30,6 +30,7 @@ include(profiles/profiles.cmake)
 
 add_executable(bms
     bms/app/bms.c
+    bms/app/board_id.c
     bms/app/hardware_checks.c
     bms/app/init.c
     bms/app/model.c

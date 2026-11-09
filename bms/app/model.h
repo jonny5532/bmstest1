@@ -312,8 +312,10 @@ typedef struct bms_model {
     // Whether we should ignore a potential loop overrun at the end of this tick
     // (eg, due to a slow flash write). This is reset each tick.
     bool ignore_missed_deadline;
-    
-  
+
+    // PCB revision detected from the strap at boot (app/board_id.h)
+    uint16_t board_id;
+    uint16_t board_id_counts;
 } bms_model_t;
 
 extern bms_model_t model;

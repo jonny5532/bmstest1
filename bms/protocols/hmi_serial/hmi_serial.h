@@ -109,6 +109,8 @@
 #define HMI_REG_SHUNT_DIE_TEMP         57 // float (C), INA228 internal temperature
 #define HMI_REG_SHUNT_NTC_TEMP         58 // float (C), external shunt NTC temperature
 #define HMI_REG_SHUNT_NTC_RESISTANCE   59 // float (ohms), for NTC calibration
+#define HMI_REG_BOARD_REVISION         60 // uint16, PCB revision from the strap: major*10+minor (Rev1.3 = 13), 0 = Rev0
+#define HMI_REG_BOARD_STRAP_COUNTS     61 // uint16 (12-bit ADC counts), revision strap reading with no pulls
 
 #define HMI_REG_PROTOCOL_VERSION       71 // uint16, HMI_PROTOCOL_VERSION; absent before READ_ARRAY
 
