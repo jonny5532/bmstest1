@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "lib/persist.h"
+
 // Learns a correction to the OCV table from near-rest voltages, against Ah below
 // settled full charge, and reads off the Ah from full down to OCV_LEARN_V_REF.
 // Readings are held until the next full charge, so their Ah below full can be
@@ -28,15 +30,24 @@ typedef struct {
 } ocv_reading_t;
 
 // Saved to NVM
+// Reserved bytes will need adding to keep the members aligned (the compiler
+// will warn if needed).
+PERSIST_BEGIN
 typedef struct {
     bool valid;
+    uint8_t reserved_1[3];
     float s_full;   // factory-curve SOC of the charge voltage, fixed when learning starts
     double corr[OCV_LEARN_BINS];   // learned OCV correction (V)
     double P[OCV_LEARN_BINS][OCV_LEARN_BINS];
     // Full-charge cycles that gave each bin at least one reading's worth of data;
     // decays daily, so old data stops counting as confirmation
     float cycles[OCV_LEARN_BINS];
+    uint8_t reserved_1516[4];
 } ocv_learn_persistent_t;
+PERSIST_END
+
+// Ensure the number of bins hasn't changed (update OCV_LEARN_VERSION if it does)
+_Static_assert(OCV_LEARN_BINS == 13, "OCV_LEARN_BINS changes the saved layout");
 
 typedef struct {
     ocv_learn_persistent_t persistent;

@@ -10,13 +10,17 @@
 #include "app/estimators/ocv_learn.h"
 #include "config/limits.h"
 #include "lib/math.h"
+#include "lib/persist.h"
 
 #include <stdint.h>
 #include <stdio.h>
 
-// Persistent data (saved to NVM)
-// Do not reorder the fields without updating the version number. New fields can
-// be added to the end (they will default to zero);
+// Persistent data (saved to NVM as raw bytes) 
+// These are naturally aligned but unpadded, so you will need to manually add
+// any necessary padding as reserved fields to maintain the layout (the compiler
+// will enforce this via the PERSIST_BEGIN and PERSIST_END macros).
+
+PERSIST_BEGIN
 
 // 'Fast' persistent data (saved frequently)
 
@@ -25,6 +29,7 @@ typedef struct {
                                  // boot; now actual_capacity_mC in the slow data. Kept for the layout.
     float charge_used_Ah; // charge used in Ah
     bool operating; // Whether BMS should resume operating if restarted
+    uint8_t reserved_9[3]; // compiler padding in older firmware, saved as whatever was there: don't reuse
     float current_bias_A; // current sensor bias learned by the SoC EKF
 } bms_model_persistent_fast_t;
 
@@ -86,6 +91,9 @@ typedef struct {
     float isolation_zero_counts;
 
 } bms_model_persistent_slow_t;
+
+PERSIST_END
+
 
 static const uint32_t BMS_MODEL_PERSISTENT_SLOW_VERSION = 2;
 

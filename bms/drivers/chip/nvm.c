@@ -7,6 +7,7 @@
 #include "pico/flash.h"
 #include "pico/stdlib.h"
 #include "../vendor/littlefs/lfs.h"
+#include <stddef.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -115,7 +116,8 @@ int update_boot_count(void) {
     return (int)boot_count;
 }
 
-bool nvm_save(const char *name, const void *data, size_t size) {
+// A 4 byte version is stored first, immediately followed by the data.
+static bool nvm_save(const char *name, uint32_t version, const void *data, size_t size) {
     int err = lfs_mount(&lfs, &cfg);
     if (err) {
         error_printf("NVM: mount failed saving '%s' (%d)\n", name, err);
@@ -123,21 +125,28 @@ bool nvm_save(const char *name, const void *data, size_t size) {
     }
 
     lfs_file_t file;
-    err = lfs_file_open(&lfs, &file, name, LFS_O_WRONLY | LFS_O_CREAT);
+    // Truncate so that downgraded firmware will remove stale fields.
+    err = lfs_file_open(&lfs, &file, name, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
     if (err) {
         error_printf("NVM: open failed saving '%s' (%d)\n", name, err);
         lfs_unmount(&lfs);
         return false;
     }
 
-    lfs_file_write(&lfs, &file, data, size);
-    lfs_file_close(&lfs, &file);
+    bool ok = lfs_file_write(&lfs, &file, &version, sizeof(version)) == (lfs_ssize_t)sizeof(version)
+        && lfs_file_write(&lfs, &file, data, size) == (lfs_ssize_t)size;
+    // Closing flushes, so it can fail too
+    ok = (lfs_file_close(&lfs, &file) == 0) && ok;
+    if (!ok) error_printf("NVM: write failed saving '%s'\n", name);
 
     lfs_unmount(&lfs);
-    return true;
+    return ok;
 }
 
-bool nvm_load(const char *name, void *data, size_t size) {
+// Loads the data if the file's version matches, leaving it untouched otherwise.
+// An older, shorter save leaves the fields it didn't have zero. If the read
+// fails partway, the data is zeroed (every saved struct takes zero as "unset").
+static bool nvm_load(const char *name, uint32_t version, void *data, size_t size) {
     int err = lfs_mount(&lfs, &cfg);
     if (err) {
         error_printf("NVM: mount failed loading '%s' (%d)\n", name, err);
@@ -152,11 +161,21 @@ bool nvm_load(const char *name, void *data, size_t size) {
         return false;
     }
 
-    lfs_file_read(&lfs, &file, data, size);
+    bool ok = false;
+    uint32_t stored_version = 0;
+    if (lfs_file_read(&lfs, &file, &stored_version, sizeof(stored_version)) == (lfs_ssize_t)sizeof(stored_version)
+        && stored_version == version) {
+        memset(data, 0, size);
+        ok = lfs_file_read(&lfs, &file, data, size) >= 0;
+        if (!ok) {
+            memset(data, 0, size);
+            error_printf("NVM: read failed loading '%s'\n", name);
+        }
+    }
     lfs_file_close(&lfs, &file);
 
     lfs_unmount(&lfs);
-    return true;
+    return ok;
 }
 
 // typedef struct __attribute__((packed)) {
@@ -173,98 +192,39 @@ bool nvm_load(const char *name, void *data, size_t size) {
 //     int32_t current_offset;
 // } calibration_data_t;
 
-typedef struct {
-    uint32_t version;
-    bms_model_persistent_fast_t data;
-} stored_persistent_fast_t;
-
 bool nvm_save_persistent_fast(bms_model_t *model) {
-    stored_persistent_fast_t data = {
-        .version = BMS_MODEL_PERSISTENT_FAST_VERSION,
-        .data = model->persistent_fast,
-    };
-
     // Allow missing a deadline due to NVM write slowness
     model->ignore_missed_deadline = true;
 
-    return nvm_save("fast", &data, sizeof(data));
+    return nvm_save("fast", BMS_MODEL_PERSISTENT_FAST_VERSION, &model->persistent_fast, sizeof(model->persistent_fast));
 }
 
 bool nvm_load_persistent_fast(bms_model_t *model) {
-    stored_persistent_fast_t data = {0};
-    if(!nvm_load("fast", &data, sizeof(data))) {
-        return false;
-    }
-
-    if (data.version != BMS_MODEL_PERSISTENT_FAST_VERSION) {
-        return false;
-    }
-    
-    model->persistent_fast = data.data;
-
-    return true;
+    return nvm_load("fast", BMS_MODEL_PERSISTENT_FAST_VERSION, &model->persistent_fast, sizeof(model->persistent_fast));
 }
 
-typedef struct {
-    uint32_t version;
-    bms_model_persistent_slow_t data;
-} stored_persistent_slow_t;
-
 bool nvm_save_persistent_slow(bms_model_t *model) {
-    stored_persistent_slow_t data = {
-        .version = BMS_MODEL_PERSISTENT_SLOW_VERSION,
-        .data = model->persistent_slow,
-    };
-
     // Allow missing a deadline due to NVM write slowness
     model->ignore_missed_deadline = true;
 
-    return nvm_save("slow", &data, sizeof(data));
+    return nvm_save("slow", BMS_MODEL_PERSISTENT_SLOW_VERSION, &model->persistent_slow, sizeof(model->persistent_slow));
 }
 
 bool nvm_load_persistent_slow(bms_model_t *model) {
-    stored_persistent_slow_t data = {0};
-    if(!nvm_load("slow", &data, sizeof(data))) {
-        return false;
-    }
-
-    if (data.version != BMS_MODEL_PERSISTENT_SLOW_VERSION) {
-        return false;
-    }
-
-    model->persistent_slow = data.data;
-
-    return true;
+    return nvm_load("slow", BMS_MODEL_PERSISTENT_SLOW_VERSION, &model->persistent_slow, sizeof(model->persistent_slow));
 }
-
-typedef struct {
-    uint32_t version;
-    ocv_learn_persistent_t data;
-} stored_ocv_learn_t;
 
 static const uint32_t OCV_LEARN_VERSION = 1;
 
 static bool nvm_save_ocv_learn(bms_model_t *model) {
-    stored_ocv_learn_t data = {
-        .version = OCV_LEARN_VERSION,
-        .data = model->ocv_learn.persistent,
-    };
-
     // Allow missing a deadline due to NVM write slowness
     model->ignore_missed_deadline = true;
 
-    return nvm_save("ocv_learn", &data, sizeof(data));
+    return nvm_save("ocv_learn", OCV_LEARN_VERSION, &model->ocv_learn.persistent, sizeof(model->ocv_learn.persistent));
 }
 
 bool nvm_load_ocv_learn(bms_model_t *model) {
-    stored_ocv_learn_t data = {0};
-    if(!nvm_load("ocv_learn", &data, sizeof(data)) || data.version != OCV_LEARN_VERSION) {
-        return false;
-    }
-
-    model->ocv_learn.persistent = data.data;
-
-    return true;
+    return nvm_load("ocv_learn", OCV_LEARN_VERSION, &model->ocv_learn.persistent, sizeof(model->ocv_learn.persistent));
 }
 
 void nvm_schedule_save_persistent_fast(bms_model_t *model) {
