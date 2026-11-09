@@ -401,21 +401,21 @@ static void test_module_ids(void **state) {
     size_t len = hmi_build_read_array_response(buf, sizeof(buf), DEVICE_ADDRESS, &model, HMI_ARRAY_MODULE_IDS, 0);
     response_t r = parse_response(buf, len);
     assert_int_equal(r.encoding, HMI_TYPE_UINT16);
-    assert_int_equal(r.total, NUM_MODULE_VOLTAGES);
+    assert_int_equal(r.total, NUM_MODULES);
     assert_int_equal(r.count, 0);
 
     // One ID per module, with a failed read as BMB3Y_MODULE_ID_NONE
-    for (int i = 0; i < NUM_MODULE_VOLTAGES; i++) model.bmb_diag.module_ids[i] = (uint16_t)(0x020 + i);
-    model.bmb_diag.module_ids[NUM_MODULE_VOLTAGES - 1] = BMB3Y_MODULE_ID_NONE;
+    for (int i = 0; i < NUM_MODULES; i++) model.bmb_diag.module_ids[i] = (uint16_t)(0x020 + i);
+    model.bmb_diag.module_ids[NUM_MODULES - 1] = BMB3Y_MODULE_ID_NONE;
     model.bmb_diag.module_ids_millis = 1234;
     len = hmi_build_read_array_response(buf, sizeof(buf), DEVICE_ADDRESS, &model, HMI_ARRAY_MODULE_IDS, 0);
     r = parse_response(buf, len);
-    assert_int_equal(r.count, NUM_MODULE_VOLTAGES);
+    assert_int_equal(r.count, NUM_MODULES);
     assert_int_equal(r.sample_millis, 1234);
-    for (int i = 0; i < NUM_MODULE_VOLTAGES - 1; i++) {
+    for (int i = 0; i < NUM_MODULES - 1; i++) {
         assert_int_equal(get_uint16(&r.elements[i * 2]), 0x020 + i);
     }
-    assert_int_equal(get_uint16(&r.elements[(NUM_MODULE_VOLTAGES - 1) * 2]), 0xFFFF);
+    assert_int_equal(get_uint16(&r.elements[(NUM_MODULES - 1) * 2]), 0xFFFF);
 }
 
 // ============================================================================

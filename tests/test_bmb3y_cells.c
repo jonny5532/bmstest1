@@ -11,9 +11,9 @@
 // Synthetic tests of the BMB3Y channel indexing. Deliberately independent of
 // any pack profile: every mask here is made up.
 
-#define NUM_MODULES 8
+#define TEST_MODULES 8
 #define NUM_BANKS 5
-#define NUM_CHANNELS (NUM_MODULES * BMB3Y_CHANNELS_PER_MODULE)
+#define NUM_CHANNELS (TEST_MODULES * BMB3Y_CHANNELS_PER_MODULE)
 #define MAX_PHYSICAL (BMB3Y_PRESENCE_MASK_WORDS * 32)
 #define NUM_RANDOM_MASKS 1000
 
@@ -92,7 +92,7 @@ static void check_bank_reads_cover_every_cell_once(const uint32_t mask[BMB3Y_PRE
     int hits[NUM_CHANNELS];
     memset(hits, 0, sizeof(hits));
 
-    for(int module = 0; module < NUM_MODULES; module++) {
+    for(int module = 0; module < TEST_MODULES; module++) {
         for(int bank = 0; bank < NUM_BANKS; bank++) {
             for(int cell = 0; cell < BMB3Y_CHANNELS_PER_BANK; cell++) {
                 int logical = bmb3y_logical_index(mask, bmb3y_physical_index(module, bank, cell));
@@ -122,7 +122,7 @@ static void check_bank_reads_cover_every_cell_once(const uint32_t mask[BMB3Y_PRE
 static void test_physical_index_layout(void **state) {
     (void) state;
     int expected = 0;
-    for(int module = 0; module < NUM_MODULES; module++) {
+    for(int module = 0; module < TEST_MODULES; module++) {
         for(int bank = 0; bank < NUM_BANKS; bank++) {
             for(int cell = 0; cell < BMB3Y_CHANNELS_PER_BANK; cell++) {
                 int p = bmb3y_physical_index(module, bank, cell);
@@ -230,7 +230,7 @@ static void assert_guards_intact(const records_buf_t *buf) {
 // bytes 2-3. Returns a presence-style mask of the flagged physical channels.
 static void decode_balance_flags(const uint8_t records[BMB3Y_BALANCE_RECORDS_LEN], uint32_t out[BMB3Y_PRESENCE_MASK_WORDS]) {
     memset(out, 0, BMB3Y_PRESENCE_MASK_WORDS * sizeof(uint32_t));
-    for(int r = 0; r < NUM_MODULES; r++) {
+    for(int r = 0; r < TEST_MODULES; r++) {
         const uint8_t *rec = &records[r * 6];
         // Only the flag bytes may ever be written
         assert_int_equal(rec[0], 0);

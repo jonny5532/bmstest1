@@ -7,8 +7,8 @@
 // Cell presence bitmask (1 = present, 0 = not present, 32-bit groups, LSB = cell 0)
 #define CELL_PRESENCE_WORDS 0xc7ff8f7f, 0xf3ffe3ff, 0xfcfff8ff, 0x1ffe3d
 #define NUM_CELLS 96
-#define NUM_MODULE_VOLTAGES 8
-#define NUM_MODULE_TEMPS 8
+#define NUM_MODULES 8 // BMBs in the chain
+#define NUM_MODULE_TEMPS 8 // temperatures read, one per BMB for now
 #define NAMEPLATE_CAPACITY_AH 210 // possibly; unclear what voltage range it's rated over
 // Aged: three full-to-3.4V sweeps in Sep 2026 (kalman/replay) put it at ~173Ah on the G0 midpoint curve
 #define ACTUAL_CAPACITY_AH 173

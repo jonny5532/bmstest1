@@ -96,7 +96,7 @@ static bool hmi_get_array(bms_model_t *model, uint8_t array_id, hmi_array_t *arr
         case HMI_ARRAY_MODULE_IDS:
             *array = (hmi_array_t){
                 .values = model->bmb_diag.module_ids,
-                .total = NUM_MODULE_VOLTAGES,
+                .total = NUM_MODULES,
                 .encoding = HMI_TYPE_UINT16,
                 .sample_millis = model->bmb_diag.module_ids_millis,
                 .timestamped = true,

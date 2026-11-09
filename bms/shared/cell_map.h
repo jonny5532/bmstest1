@@ -34,7 +34,7 @@ _Static_assert(CELL_MAP_MODULES <= 16, "module bitmasks are uint16_t");
 typedef struct {
     uint8_t chemistry;   // CHEMISTRY: LFP or NMC (chemistry/chemistry.h)
     uint8_t num_cells;   // NUM_CELLS
-    uint8_t num_modules; // NUM_MODULE_VOLTAGES: BMBs the BMS reads
+    uint8_t num_modules; // NUM_MODULES: BMBs the BMS reads
     // Bit n (word n / 32, bit n % 32) set if physical channel n has a cell
     uint32_t presence[CELL_MAP_MASK_WORDS];
 } cell_map_t;

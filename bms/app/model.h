@@ -360,7 +360,7 @@ static inline const cell_map_t *bms_cell_map(void) {
     static const cell_map_t map = {
         .chemistry = CHEMISTRY,
         .num_cells = NUM_CELLS,
-        .num_modules = NUM_MODULE_VOLTAGES,
+        .num_modules = NUM_MODULES,
         .presence = CELL_PRESENCE_MASK,
     };
     return &map;

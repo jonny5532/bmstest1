@@ -15,8 +15,8 @@
 #ifndef NUM_CELLS
 #error "Profile must define NUM_CELLS"
 #endif
-#ifndef NUM_MODULE_VOLTAGES
-#error "Profile must define NUM_MODULE_VOLTAGES"
+#ifndef NUM_MODULES
+#error "Profile must define NUM_MODULES"
 #endif
 #ifndef NUM_MODULE_TEMPS
 #error "Profile must define NUM_MODULE_TEMPS"

@@ -24,11 +24,10 @@ const uint8_t MODULE_COUNT = 8;
 // There is future provision in the supervisor protocol for more.
 _Static_assert(BMB3Y_MAX_MODULES * 9 == 72, "bank reads are 72 bytes");
 _Static_assert(BMB3Y_MAX_MODULES <= CELL_MAP_MODULES, "the cell map must cover the chain");
-_Static_assert(NUM_MODULE_VOLTAGES <= BMB3Y_MAX_MODULES, "the BMS reads at most BMB3Y_MAX_MODULES modules");
-// NUM_MODULE_VOLTAGES is the number of BMBs. Only one temperature per BMB is
-// decoded so far (module_temperatures[bmb]), so modules with more sensors need
-// the temperature reads to map them first.
-_Static_assert(NUM_MODULE_TEMPS == NUM_MODULE_VOLTAGES, "one temperature per BMB is all the BMB3Y driver decodes");
+_Static_assert(NUM_MODULES <= BMB3Y_MAX_MODULES, "the BMS reads at most BMB3Y_MAX_MODULES modules");
+// Only one temperature per BMB is decoded so far (module_temperatures[bmb]),
+// so modules with more sensors need the temperature reads to map them first.
+_Static_assert(NUM_MODULE_TEMPS == NUM_MODULES, "one temperature per BMB is all the BMB3Y driver decodes");
 
 // Low level functions
 
@@ -231,7 +230,7 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
     // Clear the absent channel flag for this bank before rechecking
     absent_channel_banks &= (uint8_t)~(1U << bank_index);
 
-    for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
+    for(int module=0; module<NUM_MODULES; module++) {
         uint16_t module_crc = (uint16_t)(rx_buf[module * 9 + 6] << 8) | (uint16_t)(rx_buf[module * 9 + 7]);
         //uint16_t calc_crc = crc14(&rx_buf[module * 9], 6, 0x1000);
         uint16_t calc_crc = crc14(&rx_buf[module * 9], 6, 0x1000, module_crc);
@@ -303,7 +302,7 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
     // Check for absent channels in module slots beyond those this pack
     // supposedly uses (which allows the BMS and supervisor to confirm the exact
     // cell count)
-    for(int module=NUM_MODULE_VOLTAGES; module<BMB3Y_MAX_MODULES; module++) {
+    for(int module=NUM_MODULES; module<BMB3Y_MAX_MODULES; module++) {
         uint16_t module_crc = (uint16_t)(rx_buf[module * 9 + 6] << 8) | (uint16_t)(rx_buf[module * 9 + 7]);
         if((module_crc & 0x3fff) != crc14(&rx_buf[module * 9], 6, 0x1000, module_crc)) {
             continue;
@@ -418,7 +417,7 @@ bool bmb3y_read_more_temps_blocking(bms_model_t *model) {
     }
 
     bool crc_ok = true;
-    for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
+    for(int module=0; module<NUM_MODULES; module++) {
         uint16_t module_crc = (uint16_t)(rx_buf[module * 8 + 6] << 8) | (uint16_t)(rx_buf[module * 8 + 7]);
         //uint16_t calc_crc = crc14(&rx_buf[module * 8], 6, 0x0010);
         uint16_t calc_crc = crc14(&rx_buf[module * 8], 6, 0x0010, module_crc);
@@ -463,7 +462,7 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
     }
 
     bool crc_ok = true;
-    for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
+    for(int module=0; module<NUM_MODULES; module++) {
         // Each module has 8 bytes: 6 bytes data, 2 bytes CRC
         // The temp is in bytes 2 and 3 (little-endian)
         
@@ -564,17 +563,17 @@ bool bmb3y_read_module_ids_blocking(bms_model_t *model) {
     uint16_t *ids = model->bmb_diag.module_ids;
     model->bmb_diag.module_ids_millis = millis();
 
-    if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_MODULE_ID, rx_buf, NUM_MODULE_VOLTAGES * 4)) {
+    if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_MODULE_ID, rx_buf, NUM_MODULES * 4)) {
         error_printf("BMB3Y module ID read failed\n");
         count_bms_event(ERR_BMB_READ_ERROR, 0x0400000000000000);
-        for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
+        for(int module=0; module<NUM_MODULES; module++) {
             ids[module] = BMB3Y_MODULE_ID_NONE;
         }
         return false;
     }
 
     bool all_ok = true;
-    for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
+    for(int module=0; module<NUM_MODULES; module++) {
         const uint8_t *m = &rx_buf[module * 4];
         uint16_t word = (uint16_t)m[0] | ((uint16_t)m[1] << 8);
         uint16_t crc_field = ((uint16_t)m[2] << 8) | m[3];
