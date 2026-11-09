@@ -136,6 +136,19 @@ target_include_directories(test_basic_count PRIVATE
 
 add_test(NAME test_basic_count COMMAND ${MEMORY_CHECK} test_basic_count)
 
+add_executable(test_lifetime
+    test_lifetime.c
+    ../bms/app/estimators/lifetime.c
+)
+target_link_libraries(test_lifetime PRIVATE cmocka m)
+target_include_directories(test_lifetime PRIVATE
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_lifetime COMMAND ${MEMORY_CHECK} test_lifetime)
+
 add_executable(test_byd_can
     test_byd_can.c
     ../bms/protocols/inverter/can.c

@@ -8,6 +8,7 @@
 #include "app/state_machines/system.h"
 #include "app/estimators/ekf.h"
 #include "app/estimators/ocv_learn.h"
+#include "app/estimators/lifetime.h"
 #include "config/limits.h"
 #include "lib/math.h"
 #include "lib/persist.h"
@@ -31,6 +32,12 @@ typedef struct {
     bool operating; // Whether BMS should resume operating if restarted
     uint8_t reserved_9[3]; // compiler padding in older firmware, saved as whatever was there: don't reuse
     float current_bias_A; // current sensor bias learned by the SoC EKF
+
+    // Lifetime throughput, bias-corrected (app/estimators/lifetime.h).
+    uint32_t lifetime_charged_mAh;
+    uint32_t lifetime_discharged_mAh;
+    uint32_t lifetime_charged_Wh;
+    uint32_t lifetime_discharged_Wh;
 } bms_model_persistent_fast_t;
 
 static const uint32_t BMS_MODEL_PERSISTENT_FAST_VERSION = 1;
@@ -249,6 +256,7 @@ typedef struct bms_model {
 
     ekf_t ekf;
     ocv_learn_t ocv_learn;
+    lifetime_accum_t lifetime;
 
     // Aggregated cell voltage data
     int16_t cell_voltage_min_mV;

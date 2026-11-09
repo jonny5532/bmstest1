@@ -463,6 +463,10 @@ static float ekf_stored_bias(const bms_model_t *model) {
     return bias;
 }
 
+double ekf_bias_A(const bms_model_t *model) {
+    return model->ekf.initialized ? model->ekf.x[2] : ekf_stored_bias(model);
+}
+
 static void ekf_init_from_model(bms_model_t *model, float voltage_volts) {
     if (model->ekf.initialized || voltage_volts <= 0.0f) return;
     float capacity_ah = (float)get_actual_capacity_mC(model) / 3600000.0f;

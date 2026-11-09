@@ -60,6 +60,7 @@ add_executable(bms
     bms/app/calibration/calibration.c
     bms/app/estimators/basic_count.c
     bms/app/estimators/ekf.c
+    bms/app/estimators/lifetime.c
     bms/app/estimators/fancy_count.c
     bms/app/estimators/ocv_learn.c
     bms/app/estimators/voltage_based.c

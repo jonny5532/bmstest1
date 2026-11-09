@@ -12,6 +12,7 @@
 #include "config/pins.h"
 #include "estimators/ekf.h"
 #include "estimators/estimators.h"
+#include "estimators/lifetime.h"
 #include "calibration/calibration.h"
 #include "state_machines/contactors.h"
 #include "battery/balancing.h"
@@ -223,6 +224,10 @@ void bms_print_status() {
         model.soc_basic_count / 100.0f,
         model.soc_fancy_count / 100.0f
     );
+    debug_printf("Lifetime: in %lu mAh / %lu Wh | out %lu mAh / %lu Wh\n",
+        (unsigned long)model.lifetime_charged_mAh, (unsigned long)model.lifetime_charged_Wh,
+        (unsigned long)model.lifetime_discharged_mAh, (unsigned long)model.lifetime_discharged_Wh
+    );
     debug_printf("Current filtered: %6f mA (%f)\n",
         model.current_filtered_mA,
         model.current_deviation
@@ -327,11 +332,17 @@ void bms_tick() {
     // Phase 2: Update model
 
     static int64_t last_charge_raw = 0;
+    static millis_t last_charge_millis = 0;
     millis_t now = millis();
     if(now - model.soc_millis >= 1000) {
+        float charge_Ah = raw_charge_to_Ah(model.charge_raw - last_charge_raw);
+        // Before ekf_tick, so with the bias its prediction step takes out
+        lifetime_accumulate(&model, charge_Ah, (now - last_charge_millis) * 0.001,
+                            ekf_bias_A(&model), model.cell_voltage_total_mV * 0.001);
+        last_charge_millis = now;
         uint32_t soc = ekf_tick(
             &model,
-            raw_charge_to_Ah(model.charge_raw - last_charge_raw),
+            charge_Ah,
             model.current_mA,
             model.cell_voltage_total_mV / NUM_CELLS
         );

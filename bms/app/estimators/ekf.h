@@ -66,6 +66,9 @@ void ekf_set_capacity(bms_model_t *model, uint32_t capacity_mC);
 // Forget the learned current bias, e.g. because the sensor offset was just recalibrated
 void ekf_reset_bias(bms_model_t *model);
 
+// The learned current sensor bias (A).
+double ekf_bias_A(const bms_model_t *model);
+
 uint32_t ekf_tick(bms_model_t *model, float charge_Ah, int32_t current_mA, int32_t voltage_mV);
 
 // The chemistry's factory OCV table (101 points, index = SOC in percent)
