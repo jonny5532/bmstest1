@@ -14,6 +14,9 @@ void init_internal_adc();
 void internal_adc_board_strap(uint16_t *pull_up, uint16_t *pull_down, uint16_t *open);
 void internal_adc_check();
 int32_t get_temperature_c_times10();
+// The RP2354B's on-die sensor, only good to a few degrees C
+float internal_adc_read_temperature_c();
+millis_t internal_adc_read_temperature_millis();
 int32_t internal_adc_read_3v3_mv();
 int32_t internal_adc_read_5v_mv();
 int32_t internal_adc_read_12v_mv();

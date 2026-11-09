@@ -37,6 +37,8 @@ bool hmi_register_is_available(uint16_t reg_id, bms_model_t *model) {
         case HMI_REG_TEMPERATURE_MIN:
         case HMI_REG_TEMPERATURE_MAX:
             return model->temperature_millis > 0;
+        case HMI_REG_MCU_TEMPERATURE:
+            return model->mcu_temperature_millis > 0;
         case HMI_REG_CELL_VOLTAGE_MIN:
         case HMI_REG_CELL_VOLTAGE_MAX:
             return model->cell_voltage_millis > 0;
@@ -156,6 +158,10 @@ uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_model_t *mo
         case HMI_REG_TEMPERATURE_MAX:
             buf[idx++] = HMI_TYPE_FLOAT;
             idx += hmi_buf_append_float(&buf[idx], model->temperature_max);
+            break;
+        case HMI_REG_MCU_TEMPERATURE:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], model->mcu_temperature);
             break;
         case HMI_REG_CELL_VOLTAGE_MIN:
             buf[idx++] = HMI_TYPE_INT16;

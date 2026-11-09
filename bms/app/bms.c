@@ -131,6 +131,8 @@ void read_inputs(bms_model_t *model) {
     /* Read supply voltages */
 
     read_supply_voltages(&model->supply_voltages);
+    model->mcu_temperature = internal_adc_read_temperature_c();
+    model->mcu_temperature_millis = internal_adc_read_temperature_millis();
 
     model->estop_pressed = gpio_get(PIN_ESTOP);
 

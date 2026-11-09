@@ -75,6 +75,15 @@ static void test_module_temp_registers_are_floats(void **state) {
     assert_true(read_float_register(HMI_REG_MODULE_TEMPS_START + 7) == 33.3f);
 }
 
+static void test_mcu_temperature_register(void **state) {
+    (void) state;
+    assert_false(hmi_register_is_available(HMI_REG_MCU_TEMPERATURE, &model));
+    model.mcu_temperature = 47.3f;
+    model.mcu_temperature_millis = 1;
+    assert_true(hmi_register_is_available(HMI_REG_MCU_TEMPERATURE, &model));
+    assert_true(read_float_register(HMI_REG_MCU_TEMPERATURE) == 47.3f);
+}
+
 static void test_unknown_register_writes_nothing(void **state) {
     (void) state;
     uint8_t buf[16];
@@ -86,6 +95,7 @@ int main(void) {
         cmocka_unit_test_setup(test_temperature_min_max_are_exact_floats, setup),
         cmocka_unit_test_setup(test_temperature_min_max_available_after_first_reading, setup),
         cmocka_unit_test_setup(test_module_temp_registers_are_floats, setup),
+        cmocka_unit_test_setup(test_mcu_temperature_register, setup),
         cmocka_unit_test_setup(test_unknown_register_writes_nothing, setup),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);

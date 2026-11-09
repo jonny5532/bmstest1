@@ -178,6 +178,10 @@ typedef struct bms_model {
     float shunt_ntc_resistance_ohms;
     millis_t shunt_ntc_millis;
 
+    // The controller chip's own temperature (internal ADC), degrees C
+    float mcu_temperature;
+    millis_t mcu_temperature_millis;
+
     high_voltages_t high_voltages;
     // float battery_voltage;
     // millis_t battery_voltage_millis;

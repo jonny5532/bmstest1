@@ -189,12 +189,19 @@ void internal_adc_check() {
     last_drain_millis64 = now;
 }
 
-int32_t get_temperature_c_times10() {
+float internal_adc_read_temperature_c() {
     // based on pico-examples/adc/onboard_temperature/onboard_temperature.c
     const float conversionFactor = ( 3.3f / (1 << 12) ) / OVERSAMPLING;
     float adc = (float)samples[INTERNAL_ADC_TEMP_INDEX].value * conversionFactor;
-    float tempC = 27.0f - (adc - 0.706f) / 0.001721f;
-    return (int16_t)(tempC*10);
+    return 27.0f - (adc - 0.706f) / 0.001721f;
+}
+
+millis_t internal_adc_read_temperature_millis() {
+    return samples[INTERNAL_ADC_TEMP_INDEX].timestamp;
+}
+
+int32_t get_temperature_c_times10() {
+    return (int16_t)(internal_adc_read_temperature_c() * 10);
 }
 
 int32_t internal_adc_read(uint8_t channel) {

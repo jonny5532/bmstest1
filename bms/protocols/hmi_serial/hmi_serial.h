@@ -120,6 +120,7 @@
 #define HMI_REG_ISOLATION_OPEN_AGE        65 // float (s) since the open reading; 0 = live, NaN = none this boot
 #define HMI_REG_ISOLATION_ZEROED          66 // uint8, 1 once calibrated (system request 6); events need it
 
+#define HMI_REG_MCU_TEMPERATURE        70 // float (C), the controller chip's own sensor (a few C accurate)
 #define HMI_REG_PROTOCOL_VERSION       71 // uint16, HMI_PROTOCOL_VERSION; absent before READ_ARRAY
 
 // The OCV learner (bms/app/estimators/ocv_learn.h), when the profile has OCV_LEARN
