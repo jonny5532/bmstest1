@@ -447,6 +447,40 @@ static void test_voltage_mismatch_triggered_on_large_difference(void **state) {
     assert_int_equal(get_event_level(ERR_VOLTAGE_MISMATCH), LEVEL_CRITICAL);
 }
 
+static void test_voltage_mismatch_checked_when_cells_newer(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    // Battery reading 500 ms older than the cell reading: still close enough
+    // in time to compare
+    m.high_voltages.battery = (3700 * NUM_CELLS + VOLTAGE_MISMATCH_THRESHOLD_mV + 1000) * 0.001f;
+    m.high_voltages.battery_millis = stored_millis;
+    advance_time(500);
+    m.cell_voltages_millis = stored_millis;
+
+    model_tick(&m);
+    confirm_battery_safety(&m);
+
+    assert_int_equal(get_event_level(ERR_VOLTAGE_MISMATCH), LEVEL_CRITICAL);
+}
+
+static void test_voltage_mismatch_skipped_when_readings_far_apart(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    m.high_voltages.battery = (3700 * NUM_CELLS + VOLTAGE_MISMATCH_THRESHOLD_mV + 1000) * 0.001f;
+    m.high_voltages.battery_millis = stored_millis;
+    advance_time(1500);
+    m.cell_voltages_millis = stored_millis;
+
+    model_tick(&m);
+    confirm_battery_safety(&m);
+
+    assert_int_equal(get_event_level(ERR_VOLTAGE_MISMATCH), LEVEL_NONE);
+}
+
 // ============================================================================
 // E-Stop Tests
 // ============================================================================
@@ -569,6 +603,8 @@ int main(void) {
         // Voltage mismatch
         cmocka_unit_test_setup(test_voltage_mismatch_not_triggered_when_matched, setup),
         cmocka_unit_test_setup(test_voltage_mismatch_triggered_on_large_difference, setup),
+        cmocka_unit_test_setup(test_voltage_mismatch_checked_when_cells_newer, setup),
+        cmocka_unit_test_setup(test_voltage_mismatch_skipped_when_readings_far_apart, setup),
         
         // E-Stop
         cmocka_unit_test_setup(test_estop_raises_event, setup),
