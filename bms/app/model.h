@@ -87,13 +87,11 @@ typedef struct {
     uint16_t minimum_balancing_voltage_mV; // Minimum cell voltage to allow balancing
     uint16_t balancing_start_voltage_mV;   // Start balancing when highest cell reaches this voltage
 
-    // Rev1 board calibration (appended at the end to preserve the NVM layout;
-    // these default to zero on older saves and rev0 boards)
+    // Rev1 board calibration
     float pos_contactor_offset_mV; // offset for the direct pos contactor channel
     float link_voltage_mul;
 
-    // Pack capacity the SOC estimator uses (mC), set over the HMI; zero (as on
-    // older saves) for the profile's ACTUAL_CAPACITY_AH. See get_actual_capacity_mC.
+    // Pack capacity used by the SOC estimator (mC)
     uint32_t actual_capacity_mC;
 
     // Isolation monitor zero in ADC counts, as calibrated
@@ -131,7 +129,7 @@ typedef struct high_voltages {
     float neg_contactor_deviation;
     millis_t neg_contactor_millis;
 
-    // Rev1 boards only (second ADS1115): these stay zero/stale on rev0
+    // Rev1 boards only
     // Link rail voltage (Link+ to Link-)
     float link;
     float link_deviation;
@@ -235,8 +233,7 @@ typedef struct bms_model {
 
     uint32_t nvm_fast_saved_timestep;
 
-    uint32_t working_capacity_mC; // actual capacity within working voltage range in mC; an
-                                  // overestimate on packs with a weak cell (see ekf_update_limits)
+    uint32_t working_capacity_mC; // actual capacity within working voltage range in mC
 
     system_sm_t system_sm;
     system_requests_t system_req;

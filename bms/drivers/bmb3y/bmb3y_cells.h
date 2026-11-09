@@ -4,8 +4,7 @@
 
 #include <stdint.h>
 
-// Cell channel indexing for the BMB3Y, kept free of hardware dependencies so
-// it can be unit tested.
+// Cell channel indexing for the BMB3Y.
 //
 // Physical index: the channel number across the BMB chain, 15 per module
 // (module 0 is channels 0-14). Each voltage bank carries 3 channels per
