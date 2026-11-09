@@ -57,7 +57,8 @@
 //   6 = HMI_ARRAY_MODULE_IDS
 //   7 = registers renumbered into groups (only SERIAL and PROTOCOL_VERSION
 //       kept their IDs); READ_CELL_VOLTAGES, READ_BALANCING_TIMES and the
-//       per-cell / per-module register ranges removed; LIST_REGISTERS and NACK
+//       per-cell / per-module register ranges removed; LIST_REGISTERS and NACK;
+//       events reordered by subsystem and the reserved ones removed
 #define HMI_PROTOCOL_VERSION 7
 
 #define HMI_ANNOUNCE_DEVICE_TYPE_BMS 0x01
@@ -339,7 +340,7 @@ The format is:
 <device address (1 byte)>
 <next index (2 bytes)>
 <event count in packet (2 bytes)>
-<event 1 type (2 bytes)>
+<event 1 type (2 bytes)> (its place in EVENT_TYPES, sys/events/events.h)
 <event 1 level (2 bytes)>
 <event 1 count (2 bytes)>
 <event 1 timestamp (8 bytes)>

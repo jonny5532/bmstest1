@@ -72,7 +72,86 @@ typedef enum {
 //      escalating to FATAL (zero means instant). Should be a multiple of 100ms.
 //      Maximum 6553s.
 
+// An event's ID (in the HMI's READ_EVENTS) is its place in this list, so
+// adding, removing or moving one is a change to the HMI protocol: bump
+// HMI_PROTOCOL_VERSION (protocols/hmi_serial/hmi_serial.h). The list is grouped
+// by subsystem; within a group, limit events run from the lowest limit to the
+// highest.
+
 #define EVENT_TYPES(X)                                          \
+    /* System */                                                \
+    X(BOOT_NORMAL, LEVEL_INFO, 0)                               \
+    X(BOOT_WATCHDOG, LEVEL_WARNING, 0)                          \
+    X(LOOP_OVERRUN, LEVEL_WARNING, 0)                           \
+    X(RESTARTING, LEVEL_FATAL, 0)                               \
+    /* PCB revision strap doesn't match the board's revision */ \
+    /* Data: (detected code << 16) | BMS_BOARD_REVISION      */ \
+    X(BOARD_MISMATCH, LEVEL_FATAL, 0)                           \
+    X(ESTOP_PRESSED, LEVEL_CRITICAL, 500)                       \
+                                                                \
+    /* Readings gone stale */                                   \
+    X(SUPPLY_VOLTAGE_STALE, LEVEL_CRITICAL, 2000)               \
+    X(BATTERY_VOLTAGE_STALE, LEVEL_CRITICAL, 2000)              \
+    X(CURRENT_STALE, LEVEL_CRITICAL, 2000)                      \
+    X(CELL_VOLTAGES_STALE, LEVEL_CRITICAL, CELL_VOLTAGES_STALE_ESCALATION_MS) \
+    X(BATTERY_TEMPERATURE_STALE, LEVEL_CRITICAL, 20000)         \
+                                                                \
+    /* Supply voltages */                                       \
+    X(SUPPLY_VOLTAGE_3V3_LOW, LEVEL_WARNING, 0)                 \
+    X(SUPPLY_VOLTAGE_3V3_HIGH, LEVEL_WARNING, 0)                \
+    X(SUPPLY_VOLTAGE_5V_LOW, LEVEL_WARNING, 0)                  \
+    X(SUPPLY_VOLTAGE_5V_HIGH, LEVEL_WARNING, 0)                 \
+    X(SUPPLY_VOLTAGE_12V_LOW, LEVEL_WARNING, 0)                 \
+    X(SUPPLY_VOLTAGE_12V_HIGH, LEVEL_WARNING, 0)                \
+    X(SUPPLY_VOLTAGE_CONTACTOR_VERY_LOW, LEVEL_CRITICAL, 5000)  \
+    X(SUPPLY_VOLTAGE_CONTACTOR_LOW, LEVEL_WARNING, 0)           \
+    X(SUPPLY_VOLTAGE_CONTACTOR_HIGH, LEVEL_WARNING, 0)          \
+                                                                \
+    /* Pack voltage and current */                              \
+    X(BATTERY_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, 1000)           \
+    X(BATTERY_VOLTAGE_HIGH, LEVEL_WARNING, 0)                   \
+    X(BATTERY_VOLTAGE_VERY_HIGH, LEVEL_CRITICAL, 1000)          \
+    X(VOLTAGE_MISMATCH, LEVEL_CRITICAL, 1000)                   \
+    X(LINK_VOLTAGE_MISMATCH, LEVEL_WARNING, 0)                  \
+    X(FUSE_VOLTAGE_DROP_HIGH, LEVEL_CRITICAL, FUSE_DROP_FAULT_DELAY_MS) \
+    X(OVERCURRENT_CHARGING, LEVEL_WARNING, 0)                   \
+    X(OVERCURRENT_DISCHARGING, LEVEL_WARNING, 0)                \
+                                                                \
+    /* Cells */                                                 \
+    X(CELL_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS) \
+    /* A cell below the soft minimum eventually escalates, */   \
+    /* to stop a tiny discharge from depleting the pack.   */   \
+    X(CELL_VOLTAGE_LOW, LEVEL_CRITICAL, CELL_VOLTAGE_LOW_ESCALATION_MS) \
+    X(CELL_VOLTAGE_HIGH, LEVEL_WARNING, 0)                      \
+    X(CELL_VOLTAGE_VERY_HIGH, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS) \
+    X(SOFT_CHARGE_BUFFER_EXCEEDED, LEVEL_CRITICAL, 1000)        \
+    /* Data: up to 8 missing cell indices, lowest first, one */ \
+    /* per byte from the LSB; unused bytes are 0xFF.          */ \
+    X(CELL_MISSING, LEVEL_WARNING, 0)                           \
+    /* A channel the cell map says is unpopulated reads above */ \
+    /* SUPERVISOR_ABSENT_CHANNEL_MAX_mV, so a connected cell  */ \
+    /* would go unchecked. Data: (physical channel << 16) | mV */ \
+    X(ABSENT_CHANNEL_VOLTAGE, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS) \
+                                                                \
+    /* Pack temperature */                                      \
+    X(BATTERY_TEMPERATURE_VERY_LOW, LEVEL_CRITICAL, 1000)       \
+    X(BATTERY_TEMPERATURE_LOW, LEVEL_WARNING, 0)                \
+    X(BATTERY_TEMPERATURE_HIGH, LEVEL_WARNING, 0)               \
+    X(BATTERY_TEMPERATURE_VERY_HIGH, LEVEL_CRITICAL, 1000)      \
+                                                                \
+    /* BMBs */                                                  \
+    X(BMB_READ_ERROR, LEVEL_WARNING, 0)                         \
+    X(BMB_CRC_MISMATCH, LEVEL_WARNING, 0)                       \
+    X(CELL_VOLTAGE_GLITCH, LEVEL_WARNING, 0)                    \
+    X(MODULE_TEMPERATURE_GLITCH, LEVEL_WARNING, 0)              \
+    X(BMB_PACK_MISMATCH, LEVEL_WARNING, 0)                      \
+                                                                \
+    /* Isolation */                                             \
+    /* Open-contactor isolation below ISOLATION_LOW_OHMS_PER_V */ \
+    /* (only once zeroed). Data: resistance in ohms           */ \
+    X(ISOLATION_LOW, LEVEL_WARNING, 0)                          \
+                                                                \
+    /* Contactors */                                            \
     X(CONTACTOR_POS_STUCK_OPEN, LEVEL_WARNING, 20)              \
     X(CONTACTOR_POS_STUCK_CLOSED, LEVEL_CRITICAL, 0)            \
     X(CONTACTOR_NEG_STUCK_OPEN, LEVEL_WARNING, 20)              \
@@ -84,80 +163,16 @@ typedef enum {
     X(CONTACTOR_POS_UNEXPECTED_OPEN, LEVEL_WARNING, 0)          \
     X(CONTACTOR_NEG_UNEXPECTED_OPEN, LEVEL_WARNING, 0)          \
     X(CONTACTOR_CLOSING_FAILED, LEVEL_WARNING, 20)              \
-    X(SUPPLY_VOLTAGE_STALE, LEVEL_CRITICAL, 2000)               \
-    X(BATTERY_VOLTAGE_STALE, LEVEL_CRITICAL, 2000)              \
-    X(BATTERY_TEMPERATURE_STALE, LEVEL_CRITICAL, 20000)         \
-    X(CURRENT_STALE, LEVEL_CRITICAL, 2000)                      \
-    X(CELL_VOLTAGES_STALE, LEVEL_CRITICAL, CELL_VOLTAGES_STALE_ESCALATION_MS) \
-    X(SUPPLY_VOLTAGE_3V3_LOW, LEVEL_WARNING, 0)                 \
-    X(SUPPLY_VOLTAGE_3V3_HIGH, LEVEL_WARNING, 0)                \
-    X(SUPPLY_VOLTAGE_5V_LOW, LEVEL_WARNING, 0)                  \
-    X(SUPPLY_VOLTAGE_5V_HIGH, LEVEL_WARNING, 0)                 \
-    X(SUPPLY_VOLTAGE_12V_LOW, LEVEL_WARNING, 0)                 \
-    X(SUPPLY_VOLTAGE_12V_HIGH, LEVEL_WARNING, 0)                \
-    X(SUPPLY_VOLTAGE_CONTACTOR_LOW, LEVEL_WARNING, 0)           \
-    X(SUPPLY_VOLTAGE_CONTACTOR_VERY_LOW, LEVEL_CRITICAL, 5000)  \
-    X(SUPPLY_VOLTAGE_CONTACTOR_HIGH, LEVEL_WARNING, 0)          \
-    X(BATTERY_VOLTAGE_HIGH, LEVEL_WARNING, 0)                   \
-    X(BATTERY_VOLTAGE_VERY_HIGH, LEVEL_CRITICAL, 1000)          \
-    /* TODO: remove reserved events                         */  \
-    X(RESERVED_BATTERY_VOLTAGE_LOW, LEVEL_INFO, 0)              \
-    X(BATTERY_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, 1000)           \
-    X(CELL_VOLTAGE_HIGH, LEVEL_WARNING, 0)                      \
-    X(CELL_VOLTAGE_VERY_HIGH, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS) \
-    /* A cell below the soft minimum eventually escalates, */   \
-    /* to stop a tiny discharge from depleting the pack.   */   \
-    X(CELL_VOLTAGE_LOW, LEVEL_CRITICAL, CELL_VOLTAGE_LOW_ESCALATION_MS) \
-    X(CELL_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS) \
-    X(SOFT_CHARGE_BUFFER_EXCEEDED, LEVEL_CRITICAL, 1000)        \
-    X(OVERCURRENT_CHARGING, LEVEL_WARNING, 0 )                  \
-    X(OVERCURRENT_DISCHARGING, LEVEL_WARNING, 0  )              \
-    X(BATTERY_TEMPERATURE_HIGH, LEVEL_WARNING, 0)               \
-    X(BATTERY_TEMPERATURE_VERY_HIGH, LEVEL_CRITICAL, 1000)      \
-    X(BATTERY_TEMPERATURE_LOW, LEVEL_WARNING, 0)                \
-    X(BATTERY_TEMPERATURE_VERY_LOW, LEVEL_CRITICAL, 1000)       \
-    X(VOLTAGE_MISMATCH, LEVEL_CRITICAL, 1000)                   \
-                                                                \
-    X(BMB_READ_ERROR, LEVEL_WARNING, 0)                         \
-    X(BMB_CRC_MISMATCH, LEVEL_WARNING, 0)                       \
-    X(CELL_VOLTAGE_GLITCH, LEVEL_WARNING, 0)                    \
-    X(MODULE_TEMPERATURE_GLITCH, LEVEL_WARNING, 0)              \
-                                                                \
-    X(INVERTER_DETECTED, LEVEL_INFO, 0)                         \
-                                                                \
-    X(ESTOP_PRESSED, LEVEL_CRITICAL, 500)                       \
-                                                                \
-    X(BOOT_NORMAL, LEVEL_INFO, 0)                               \
-    X(BOOT_WATCHDOG, LEVEL_WARNING, 0)                          \
-    X(LOOP_OVERRUN, LEVEL_WARNING, 0)                           \
-    X(RESTARTING, LEVEL_FATAL, 0)                               \
-                                                                \
-    X(LINK_VOLTAGE_MISMATCH, LEVEL_WARNING, 0)                  \
-    X(FUSE_VOLTAGE_DROP_HIGH, LEVEL_CRITICAL, FUSE_DROP_FAULT_DELAY_MS) \
-    /* Open-contactor isolation below ISOLATION_LOW_OHMS_PER_V */ \
-    /* (only once zeroed). Data: resistance in ohms           */ \
-    X(ISOLATION_LOW, LEVEL_WARNING, 0)                          \
-    X(RESERVED_54, LEVEL_INFO, 0)                               \
-    /* PCB revision strap doesn't match the board's revision */ \
-    /* Data: (detected code << 16) | BMS_BOARD_REVISION      */ \
-    X(BOARD_MISMATCH, LEVEL_FATAL, 0)                           \
     /* Closing held off: the supervisor isn't enabling the   */ \
     /* contactor drivers. Data: see supervisor_event_data()  */ \
     X(SUPERVISOR_NOT_ENABLED, LEVEL_WARNING, 0)                 \
     /* The supervisor cut the contactor drivers while the    */ \
     /* contactors were being driven                          */ \
     X(SUPERVISOR_DISABLED_CONTACTORS, LEVEL_CRITICAL, 0)        \
-    X(RESERVED_58, LEVEL_INFO, 0)                               \
-    X(RESERVED_59, LEVEL_INFO, 0)                               \
-    X(RESERVED_60, LEVEL_INFO, 0)                               \
-    X(BMB_PACK_MISMATCH, LEVEL_WARNING, 0)                      \
-    /* Data: up to 8 missing cell indices, lowest first, one */ \
-    /* per byte from the LSB; unused bytes are 0xFF.          */ \
-    X(CELL_MISSING, LEVEL_WARNING, 0)                           \
-    /* A channel the cell map says is unpopulated reads above */ \
-    /* SUPERVISOR_ABSENT_CHANNEL_MAX_mV, so a connected cell  */ \
-    /* would go unchecked. Data: (physical channel << 16) | mV */ \
-    X(ABSENT_CHANNEL_VOLTAGE, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS)
+                                                                \
+    /* Inverter */                                              \
+    X(INVERTER_DETECTED, LEVEL_INFO, 0)
+
 
 typedef enum {
 #define X(name, _1, _2) ERR_##name,
