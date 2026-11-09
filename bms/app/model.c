@@ -90,7 +90,7 @@ void store_module_temperature(uint8_t module_index, int16_t raw_temp_dC) {
 
         if(delta >= MODULE_TEMPERATURE_GLITCH_THRESHOLD_dC) {
             uint64_t event_data = ((uint64_t)module_index << 32) |
-                                  ((uint16_t)previous_raw_temp << 16) |
+                                  ((uint32_t)(uint16_t)previous_raw_temp << 16) |
                                   (uint16_t)raw_temp_dC;
             count_bms_event(ERR_MODULE_TEMPERATURE_GLITCH, event_data);
         }
