@@ -4,6 +4,7 @@
 #include "app/firmware_id.h"
 #include "app/model.h"
 #include "app/state_machines/system.h"
+#include "drivers/bmb3y/bmb3y.h"
 #include "drivers/sensors/internal_adc.h"
 #include "drivers/sensors/ads1115.h"
 #include "drivers/sensors/ina228.h"
@@ -230,6 +231,12 @@ static const char *cmd_version(char *args) {
     return NULL;
 }
 
+static const char *cmd_cells_raw(char *args) {
+    (void)args;
+    bmb3y_print_physical_cells();
+    return NULL;
+}
+
 static const char *cmd_adc(char *args) {
     (void)args;
     millis_t now = millis();
@@ -355,6 +362,7 @@ static const cli_command_t commands[] = {
     {"adc", NULL, cmd_adc, "internal ADC readings"},
     {"ads", NULL, cmd_ads, "ADS1115 readings, scan rate and errors"},
     {"ina", NULL, cmd_ina, "INA228 current, charge, temperatures and sampling stats"},
+    {"cells_raw", NULL, cmd_cells_raw, "last reading of every BMB channel (* = in the cell map)"},
 };
 #define NUM_COMMANDS (sizeof(commands) / sizeof(commands[0]))
 

@@ -149,7 +149,11 @@ typedef enum {
     X(BMB_PACK_MISMATCH, LEVEL_WARNING, 0)                      \
     /* Data: up to 8 missing cell indices, lowest first, one */ \
     /* per byte from the LSB; unused bytes are 0xFF.          */ \
-    X(CELL_MISSING, LEVEL_WARNING, 0)
+    X(CELL_MISSING, LEVEL_WARNING, 0)                           \
+    /* A channel the cell map says is unpopulated reads above */ \
+    /* SUPERVISOR_ABSENT_CHANNEL_MAX_mV, so a connected cell  */ \
+    /* would go unchecked. Data: (physical channel << 16) | mV */ \
+    X(ABSENT_CHANNEL_VOLTAGE, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS)
 
 typedef enum {
 #define X(name, _1, _2) ERR_##name,

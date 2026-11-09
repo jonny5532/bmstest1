@@ -9,14 +9,22 @@
 #include "sys/logging/logging.h"
 #include "drivers/isospi/isospi_master.h"
 #include "drivers/isospi/isosnoop.h"
+#include "shared/cell_map.h"
 
 #include "pico/stdlib.h"
 
 #include <stdint.h>
+#include <stdio.h>
 
 const uint8_t CELLS_PER_MODULE = 15;
 const uint8_t CELLS_PER_BANK = 3;
 const uint8_t MODULE_COUNT = 8;
+
+// The BMS reads (and balances) up to BMB3Y_MAX_MODULES, in 72-byte bank reads.
+// There is future provision in the supervisor protocol for more.
+_Static_assert(BMB3Y_MAX_MODULES * 9 == 72, "bank reads are 72 bytes");
+_Static_assert(BMB3Y_MAX_MODULES <= CELL_MAP_MODULES, "the cell map must cover the chain");
+_Static_assert(NUM_MODULE_VOLTAGES <= BMB3Y_MAX_MODULES, "the BMS reads at most BMB3Y_MAX_MODULES modules");
 
 // Low level functions
 
@@ -158,6 +166,42 @@ static const uint16_t SHORT_READ_COMMANDS[] = {
     BMB3Y_CMD_READ_E_SHORT
 };
 
+// Every channel's last reading, populated or not (the cells_raw CLI command)
+static int16_t physical_cell_voltages_mV[CELL_MAP_CHANNELS] = { [0 ... CELL_MAP_CHANNELS - 1] = CELL_MV_NOT_READ };
+
+void bmb3y_print_physical_cells(void) {
+    // Present channels are marked with *, and ---- means no valid reading
+    uint32_t cell_presence_mask[] = CELL_PRESENCE_MASK;
+    for(int module=0; module<BMB3Y_MAX_MODULES; module++) {
+        char line[16 + CELL_MAP_CELLS_PER_MODULE * 6];
+        int len = snprintf(line, sizeof(line), "BMB %d:", module);
+        for(int cell=0; cell<CELL_MAP_CELLS_PER_MODULE; cell++) {
+            int physical_index = module * CELL_MAP_CELLS_PER_MODULE + cell;
+            int16_t mV = physical_cell_voltages_mV[physical_index];
+            char mark = bmb3y_logical_index(cell_presence_mask, physical_index) >= 0 ? '*' : ' ';
+            if(mV == CELL_MV_NOT_READ) {
+                len += snprintf(&line[len], sizeof(line) - len, " %c----", mark);
+            } else {
+                len += snprintf(&line[len], sizeof(line) - len, " %c%4d", mark, mV);
+            }
+        }
+        info_printf("%s\n", line);
+    }
+}
+
+// Store the indices and voltages of absent channels for later reporting.
+static uint8_t absent_channel_banks;
+static uint64_t absent_channel_data;
+
+// Ensure that unpopulated channels are actually reading as empty (which ensures
+// we have the right cell count and presence mask)
+static void check_absent_channel(int bank_index, int physical_index, int16_t mV) {
+    if(mV > SUPERVISOR_ABSENT_CHANNEL_MAX_mV) {
+        absent_channel_banks |= (uint8_t)(1U << bank_index);
+        absent_channel_data = ((uint64_t)physical_index << 16) | (uint16_t)mV;
+    }
+}
+
 bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
     uint8_t rx_buf[72];
     uint32_t cmd = READ_COMMANDS[bank_index];
@@ -180,6 +224,8 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
     uint32_t cell_presence_mask[] = CELL_PRESENCE_MASK;
     bmb3y_diagnostics_t *diag = &model->bmb_diag;
     bool crc_ok = true;
+    // Clear the absent channel flag for this bank before rechecking
+    absent_channel_banks &= (uint8_t)~(1U << bank_index);
 
     for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
         uint16_t module_crc = (uint16_t)(rx_buf[module * 9 + 6] << 8) | (uint16_t)(rx_buf[module * 9 + 7]);
@@ -228,23 +274,17 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
                 diag->observed_presence_mask[word_offset] |= bit;
             }
 
+            // -1 for a non-existent cell, 1 for a zero reading (to tell it
+            // apart from unmeasured)
+            int16_t converted = cell_raw_to_mV(voltage);
+            physical_cell_voltages_mV[physical_index] = converted;
+
             // Map the BMB channel to the cell number (see bmb3y_cells.h),
             // skipping channels the compiled mask says are unpopulated.
             int logical_index = bmb3y_logical_index(cell_presence_mask, physical_index);
             if(logical_index < 0) {
+                check_absent_channel(bank_index, physical_index, converted);
                 continue;
-            }
-
-            int16_t converted = 0;
-
-            if(voltage == 0xFFFF) {
-                // A non-existent cell
-                converted = -1;
-            } else if(voltage == 0) {
-                // Record as 1mV to distinguish from unmeasured
-                converted = 1;
-            } else {
-                converted = (voltage * 2) / 25;
             }
 
             model->raw_cell_voltages_mV[logical_index] = converted;
@@ -255,6 +295,26 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
             }
         }
     }
+
+    // Check for absent channels in module slots beyond those this pack
+    // supposedly uses (which allows the BMS and supervisor to confirm the exact
+    // cell count)
+    for(int module=NUM_MODULE_VOLTAGES; module<BMB3Y_MAX_MODULES; module++) {
+        uint16_t module_crc = (uint16_t)(rx_buf[module * 9 + 6] << 8) | (uint16_t)(rx_buf[module * 9 + 7]);
+        if((module_crc & 0x3fff) != crc14(&rx_buf[module * 9], 6, 0x1000, module_crc)) {
+            continue;
+        }
+        for(int cell=0; cell<3; cell++) {
+            int physical_index = bmb3y_physical_index(module, bank_index, cell);
+            uint16_t voltage =
+                (uint16_t)(rx_buf[module * 9 + cell * 2]) |
+                (uint16_t)(rx_buf[module * 9 + cell * 2 + 1] << 8);
+            int16_t converted = cell_raw_to_mV(voltage);
+            physical_cell_voltages_mV[physical_index] = converted;
+            check_absent_channel(bank_index, physical_index, converted);
+        }
+    }
+    confirm(absent_channel_banks == 0, ERR_ABSENT_CHANNEL_VOLTAGE, absent_channel_data);
 
     if(crc_ok) {
         diag->presence_banks_seen |= (1u << bank_index);
