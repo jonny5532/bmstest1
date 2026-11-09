@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <cmocka.h>
 #include <stdbool.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -182,6 +183,15 @@ static void test_discharge_limit_at_high_cell_voltage(void **state) {
 // Temperature Charge Limit Tests
 // ============================================================================
 
+static void test_temp_limits_zero_when_temperature_nan(void **state) {
+    (void) state;
+
+    assert_int_equal(calculate_temperature_charge_current_limit(NAN, 30.0f), 0);
+    assert_int_equal(calculate_temperature_charge_current_limit(25.0f, NAN), 0);
+    assert_int_equal(calculate_temperature_discharge_current_limit(NAN, 30.0f), 0);
+    assert_int_equal(calculate_temperature_discharge_current_limit(25.0f, NAN), 0);
+}
+
 static void test_temp_charge_limit_normal_temperature(void **state) {
     (void) state;
     
@@ -334,6 +344,7 @@ int main(void) {
         cmocka_unit_test_setup(test_discharge_limit_at_high_cell_voltage, setup),
         
         // Temperature charge limits
+        cmocka_unit_test_setup(test_temp_limits_zero_when_temperature_nan, setup),
         cmocka_unit_test_setup(test_temp_charge_limit_normal_temperature, setup),
         cmocka_unit_test_setup(test_temp_charge_limit_at_max_temp, setup),
         cmocka_unit_test_setup(test_temp_charge_limit_at_min_temp, setup),
