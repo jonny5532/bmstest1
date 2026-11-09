@@ -68,8 +68,8 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
         carry_word = new_carry;
 
         if(i < skip) {
-            // skip receiving this byte
-            rx_buf[i] = 0;
+            // skip receiving this byte (rx_buf may be NULL for write-only
+            // transfers, e.g. the balancing write)
             continue;
         }
 
@@ -91,7 +91,9 @@ bool isospi_write_read_blocking(uint8_t* tx_buf, uint8_t* rx_buf, size_t len, si
                 byte = (byte << 1) | 0x0;
             }
         }
-        rx_buf[i - skip] = byte;
+        if(rx_buf) {
+            rx_buf[i - skip] = byte;
+        }
 
         // an inter-byte delay gives the other end time to process
         //sleep_us(2);
