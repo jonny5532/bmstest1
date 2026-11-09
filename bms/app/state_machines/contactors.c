@@ -389,7 +389,7 @@ static void contactors_close_pre_side_via_precharge(void) {
 
 // Close the non-precharge side only
 static void contactors_close_other_side_only(void) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     contactors_set_pos_pre_neg(true, false, false);
 #else
     contactors_set_pos_pre_neg(false, false, true);
@@ -398,7 +398,7 @@ static void contactors_close_other_side_only(void) {
 
 // Close both the precharge and the other side, to actually precharge
 static void contactors_start_precharge(void) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     contactors_set_pos_pre_neg(true, true, false);
 #else
     contactors_set_pos_pre_neg(false, true, true);
@@ -413,7 +413,7 @@ static void contactors_close(void) {
 // Close the negative contactor, with precharge in-circuit if applicable (on
 // boards with precharge on the negative leg).
 static void contactors_close_neg_only_via_precharge(void) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     contactors_set_pos_pre_neg(false, true, true);
 #else
     contactors_set_pos_pre_neg(false, false, true);
@@ -428,7 +428,7 @@ static void contactors_close_neg_only(void) {
 // Check helpers, mapping the logical role onto the physical contactor reading
 // and its POS/NEG event.
 static bool confirm_pre_side_seems_closed(const bms_model_t *model) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     return confirm_contactor_neg_seems_closed(model);
 #else
     return confirm_contactor_pos_seems_closed(model);
@@ -436,7 +436,7 @@ static bool confirm_pre_side_seems_closed(const bms_model_t *model) {
 }
 
 static bool confirm_other_side_seems_closed(const bms_model_t *model) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     return confirm_contactor_pos_seems_closed(model);
 #else
     return confirm_contactor_neg_seems_closed(model);
@@ -444,7 +444,7 @@ static bool confirm_other_side_seems_closed(const bms_model_t *model) {
 }
 
 static bool confirm_pre_side_seems_open(const bms_model_t *model) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     return confirm_contactor_neg_seems_open(model);
 #else
     return confirm_contactor_pos_seems_open(model);
@@ -452,7 +452,7 @@ static bool confirm_pre_side_seems_open(const bms_model_t *model) {
 }
 
 static bool confirm_other_side_seems_open(const bms_model_t *model) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     return confirm_contactor_pos_seems_open(model);
 #else
     return confirm_contactor_neg_seems_open(model);
@@ -476,7 +476,7 @@ static bool assisted_entry_allowed(const bms_model_t *model) {
 }
 
 static float contactor_voltage_for_side(const bms_model_t *model, bool pre_side) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     return pre_side ? model->high_voltages.neg_contactor : model->high_voltages.pos_contactor;
 #else
     return pre_side ? model->high_voltages.pos_contactor : model->high_voltages.neg_contactor;
@@ -495,7 +495,7 @@ static void remember_pos_open_reference(bms_model_t *model) {
 // Data tag for ERR_CONTACTOR_CLOSING_FAILED, kept aligned with the physical
 // pole (NEG=0x3..., POS=0x5...) as before.
 static uint64_t closed_failed_tag(bool pre_side) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     return pre_side ? 0x3000000000000000ULL : 0x5000000000000000ULL;
 #else
     return pre_side ? 0x5000000000000000ULL : 0x3000000000000000ULL;

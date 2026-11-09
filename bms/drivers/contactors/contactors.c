@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
 #define PIN_CONTACTOR_PRE PIN_CONTACTOR_FC_NEG
 #define INVERT_B false
 #else
@@ -31,7 +31,7 @@ void contactors_init() {
     // synchrony, the contactors actually boost the rail voltage, so we want the
     // settings that give the least boost.
    
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     // They are all on different slices, so just stagger them by 120 degrees
     int slice1 = pwm_gpio_to_slice_num(PIN_CONTACTOR_POS);
     int slice2 = pwm_gpio_to_slice_num(PIN_CONTACTOR_PRE);
@@ -92,7 +92,7 @@ static void set_with_pwm(unsigned int pin, bool enabled, uint32_t *level) {
 }
 
 void contactors_set_pos_pre_neg(bool pos, bool pre, bool neg) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     // Negative needs to be on for precharging
     bool actual_neg = neg || pre;
     // Precharge contactor actually bypasses the precharge resistor, so is off

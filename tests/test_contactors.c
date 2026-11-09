@@ -69,7 +69,7 @@ static void expect_close_pre_side_via_precharge(void) {
 }
 
 static void expect_close_other_side_direct(void) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     expect_value(contactors_set_pos_pre_neg, pos, true);
     expect_value(contactors_set_pos_pre_neg, pre, false);
     expect_value(contactors_set_pos_pre_neg, neg, false);
@@ -172,7 +172,7 @@ static void test_precharge_success(void **state) {
     model.contactor_sm.pre_close_current_mA = 300.0f;
     model.current_millis = stored_millis;
 
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     expect_value(contactors_set_pos_pre_neg, pos, true);
     expect_value(contactors_set_pos_pre_neg, pre, true);
     expect_value(contactors_set_pos_pre_neg, neg, false);
@@ -207,7 +207,7 @@ static void test_precharge_failure_timeout(void **state) {
 #endif
     model.current_millis = stored_millis;
 
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     expect_value(contactors_set_pos_pre_neg, pos, true);
     expect_value(contactors_set_pos_pre_neg, pre, true);
     expect_value(contactors_set_pos_pre_neg, neg, false);
@@ -246,9 +246,15 @@ static void test_precharge_failure_link_voltage(void **state) {
     model.contactor_sm.pre_close_current_mA = 300.0f;
     model.current_millis = stored_millis;
 
+#if IS_PRECHARGE_ON_NEGATIVE()
     expect_value(contactors_set_pos_pre_neg, pos, true);
     expect_value(contactors_set_pos_pre_neg, pre, true);
     expect_value(contactors_set_pos_pre_neg, neg, false);
+#else
+    expect_value(contactors_set_pos_pre_neg, pos, false);
+    expect_value(contactors_set_pos_pre_neg, pre, true);
+    expect_value(contactors_set_pos_pre_neg, neg, true);
+#endif
 
     // Event counts accumulate across tests, so compare against the count
     // before the failing tick
@@ -614,7 +620,7 @@ static void test_testing_failed_recovers_to_open_after_timeout(void **state) {
 // Mode 2 (assisted) helpers: voltages are role-based, since the precharge
 // side is neg on rev1 (PRECHARGE_ON_NEGATIVE) and pos on rev0.
 static void set_assisted_pre_pass_voltages(bms_model_t *model) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     model->high_voltages.neg_contactor = 0.1f; // pre closed (<=2V)
     model->high_voltages.pos_contactor = 15.0f; // other open (>=3V)
 #else
@@ -624,7 +630,7 @@ static void set_assisted_pre_pass_voltages(bms_model_t *model) {
 }
 
 static void set_assisted_other_pass_voltages(bms_model_t *model) {
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     model->high_voltages.pos_contactor = 0.5f; // other closed (<=2V)
     model->high_voltages.neg_contactor = 5.0f; // pre open (>=3V)
 #else
@@ -635,7 +641,7 @@ static void set_assisted_other_pass_voltages(bms_model_t *model) {
 
 static void set_assisted_other_weld_voltages(bms_model_t *model) {
     // Other side welded: stays small after pre-side PTC pull.
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     model->high_voltages.neg_contactor = 0.1f;
     model->high_voltages.pos_contactor = 0.1f;
 #else
@@ -646,7 +652,7 @@ static void set_assisted_other_weld_voltages(bms_model_t *model) {
 
 static void set_assisted_pre_weld_voltages(bms_model_t *model) {
     // Pre side welded: stays small after other-side direct close.
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     model->high_voltages.pos_contactor = 0.5f;
     model->high_voltages.neg_contactor = 0.1f;
 #else
@@ -890,7 +896,7 @@ static void test_calib_neg_init_proceeds_when_current_low(void **state) {
     model.contactor_sm.last_transition_time = stored_millis64;
     model.current_mA = 0;
 
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     expect_value(contactors_set_pos_pre_neg, pos, false);
     expect_value(contactors_set_pos_pre_neg, pre, true);
     expect_value(contactors_set_pos_pre_neg, neg, true);
@@ -914,7 +920,7 @@ static void test_calib_neg_init_aborts_when_bus_live(void **state) {
     model.current_mA = 0;
     model.high_voltages.output = 400.0f;
 
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     expect_value(contactors_set_pos_pre_neg, pos, false);
     expect_value(contactors_set_pos_pre_neg, pre, true);
     expect_value(contactors_set_pos_pre_neg, neg, true);
@@ -937,7 +943,7 @@ static void test_calib_neg_init_aborts_when_current_high(void **state) {
     model.contactor_sm.last_transition_time = stored_millis64;
     model.current_mA = 3000;
 
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     expect_value(contactors_set_pos_pre_neg, pos, false);
     expect_value(contactors_set_pos_pre_neg, pre, true);
     expect_value(contactors_set_pos_pre_neg, neg, true);

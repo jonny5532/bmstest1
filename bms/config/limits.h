@@ -31,10 +31,6 @@
 // Rev1 adds a second ADS1115 (0x49) sensing the Link and Drive Unit rails.
 // Function-like for the same reason as IS_BMS_BOARD.
 #define HAS_ADS1115_SECONDARY() 1
-// Rev1's default contactor arrangement precharges via the FC negative contactor
-#ifndef PRECHARGE_ON_NEGATIVE
-#define PRECHARGE_ON_NEGATIVE 1
-#endif
 // Rev1 uses 501:1 dividers (12M/24k): 501 * 1.024/32768 V per count
 #define ADS1115_DEFAULT_MUL 0.015656f
 // Isolation monitor zero (ADC counts with the pack floating), measured on one
@@ -48,6 +44,23 @@
 #else
     #error "Unsupported BMS_BOARD"
 #endif
+
+// Which pole carries the precharge element. A profile (or -D) can set
+// PRECHARGE_ON_NEGATIVE to 0 or 1; otherwise Rev1 defaults to negative (via
+// the FC negative contactor) and Rev0 to positive. Check it with
+// #if IS_PRECHARGE_ON_NEGATIVE(), which, like IS_BMS_BOARD, fails to compile
+// if this header hasn't been included.
+#ifndef PRECHARGE_ON_NEGATIVE
+#if IS_BMS_BOARD(REV1)
+#define PRECHARGE_ON_NEGATIVE 1
+#else
+#define PRECHARGE_ON_NEGATIVE 0
+#endif
+#endif
+#if PRECHARGE_ON_NEGATIVE != 0 && PRECHARGE_ON_NEGATIVE != 1
+#error "PRECHARGE_ON_NEGATIVE must be 0 or 1"
+#endif
+#define IS_PRECHARGE_ON_NEGATIVE() (PRECHARGE_ON_NEGATIVE)
 
 // Isolation monitor (app/isolation.h)
 #define ISOLATION_DIVIDER_BOTTOM_OHMS 24000.0f // bottom resistor of each HV divider

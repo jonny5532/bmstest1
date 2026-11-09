@@ -134,7 +134,7 @@ void read_inputs(bms_model_t *model) {
 
     model->estop_pressed = gpio_get(PIN_ESTOP);
 
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     model->precharge_closed = gpio_get(PIN_AUX_CONTACTOR_FC_NEG);
 #else
     model->precharge_closed = gpio_get(PIN_AUX_CONTACTOR_FC_POS);

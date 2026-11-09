@@ -56,7 +56,7 @@ static void init_hw() {
     gpio_pull_down(PIN_ESTOP);
 
     // Init precharge sense input
-#ifdef PRECHARGE_ON_NEGATIVE
+#if IS_PRECHARGE_ON_NEGATIVE()
     gpio_init(PIN_AUX_CONTACTOR_FC_NEG);
     gpio_set_dir(PIN_AUX_CONTACTOR_FC_NEG, GPIO_IN);
     gpio_pull_down(PIN_AUX_CONTACTOR_FC_NEG);

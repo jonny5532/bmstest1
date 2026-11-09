@@ -54,6 +54,23 @@ target_include_directories(test_contactors_rev1 PRIVATE
 
 add_test(NAME test_contactors_rev1 COMMAND ${MEMORY_CHECK} test_contactors_rev1)
 
+# Rev1 with the precharge element on the positive side
+add_executable(test_contactors_rev1_pos_pre
+    test_contactors.c
+    ../bms/sys/events/events.c
+    ../bms/app/state_machines/contactors.c
+    ../bms/app/state_machines/base.c
+)
+target_compile_definitions(test_contactors_rev1_pos_pre PRIVATE BMS_BOARD=2 PRECHARGE_ON_NEGATIVE=0)
+target_link_libraries(test_contactors_rev1_pos_pre PRIVATE cmocka)
+target_include_directories(test_contactors_rev1_pos_pre PRIVATE
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_contactors_rev1_pos_pre COMMAND ${MEMORY_CHECK} test_contactors_rev1_pos_pre)
+
 add_executable(test_low_voltage
     test_low_voltage.c
     physical_model.c
