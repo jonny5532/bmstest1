@@ -12,6 +12,8 @@
 #include "config/limits.h"
 #include "lib/math.h"
 #include "lib/persist.h"
+#include "shared/cell_map.h"
+#include "shared/supervisor_protocol.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -347,9 +349,36 @@ typedef struct bms_model {
     // PCB revision detected from the strap at boot (app/board_id.h)
     uint16_t board_id;
     uint16_t board_id_counts;
+
+    // Last reply from the supervisor (protocols/internal_serial)
+    sup_reply_t supervisor;
+    millis_t supervisor_millis; // when it arrived (0 = never)
 } bms_model_t;
 
 extern bms_model_t model;
+
+// The pack cell map, which is populated from the profile and sent to the
+// supervisor.
+static inline const cell_map_t *bms_cell_map(void) {
+    static const cell_map_t map = {
+        .chemistry = CHEMISTRY,
+        .num_cells = NUM_CELLS,
+        .num_modules = NUM_MODULE_VOLTAGES,
+        .presence = CELL_PRESENCE_MASK,
+    };
+    return &map;
+}
+
+// Whether the supervisor is currently enabling the contactor drivers (CTR_EN),
+// enforcing our cell map. Without that the contactors can't close, whatever
+// the BMS drives.
+static inline bool supervisor_contactors_enabled(const bms_model_t *model) {
+    return millis_recent_enough(model->supervisor_millis, SUPERVISOR_REPLY_STALE_MS)
+        && model->supervisor.version == SUP_PROTOCOL_VERSION
+        && model->supervisor.state == SUP_STATE_ON
+        && model->supervisor.chemistry == CHEMISTRY
+        && model->supervisor.map_hash == cell_map_hash(bms_cell_map());
+}
 
 void model_tick(bms_model_t *model);
 void store_cell_voltage(uint8_t logical_index, int16_t voltage_mV);

@@ -141,8 +141,12 @@ typedef enum {
     /* PCB revision strap doesn't match the board's revision */ \
     /* Data: (detected code << 16) | BMS_BOARD_REVISION      */ \
     X(BOARD_MISMATCH, LEVEL_FATAL, 0)                           \
-    X(RESERVED_56, LEVEL_INFO, 0)                               \
-    X(RESERVED_57, LEVEL_INFO, 0)                               \
+    /* Closing held off: the supervisor isn't enabling the   */ \
+    /* contactor drivers. Data: see supervisor_event_data()  */ \
+    X(SUPERVISOR_NOT_ENABLED, LEVEL_WARNING, 0)                 \
+    /* The supervisor cut the contactor drivers while the    */ \
+    /* contactors were being driven                          */ \
+    X(SUPERVISOR_DISABLED_CONTACTORS, LEVEL_CRITICAL, 0)        \
     X(RESERVED_58, LEVEL_INFO, 0)                               \
     X(RESERVED_59, LEVEL_INFO, 0)                               \
     X(RESERVED_60, LEVEL_INFO, 0)                               \

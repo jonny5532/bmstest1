@@ -27,6 +27,7 @@ add_executable(test_contactors
     test_contactors.c 
     ../bms/sys/events/events.c
     ../bms/app/state_machines/contactors.c 
+    ../bms/shared/cell_map.c
     ../bms/app/state_machines/base.c
 )
 target_link_libraries(test_contactors PRIVATE cmocka)
@@ -43,6 +44,7 @@ add_executable(test_contactors_rev1
     test_contactors.c 
     ../bms/sys/events/events.c
     ../bms/app/state_machines/contactors.c 
+    ../bms/shared/cell_map.c
     ../bms/app/state_machines/base.c
 )
 bms_use_board(test_contactors_rev1 rev1)
@@ -60,6 +62,7 @@ add_executable(test_contactors_rev1_pos_pre
     test_contactors.c
     ../bms/sys/events/events.c
     ../bms/app/state_machines/contactors.c
+    ../bms/shared/cell_map.c
     ../bms/app/state_machines/base.c
 )
 bms_use_board(test_contactors_rev1_pos_pre rev1)

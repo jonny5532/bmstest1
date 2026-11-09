@@ -8,6 +8,8 @@
 #include "drivers/sensors/internal_adc.h"
 #include "drivers/sensors/ads1115.h"
 #include "drivers/sensors/ina228.h"
+#include "shared/cell_map.h"
+#include "shared/supervisor_protocol.h"
 #include "sys/events/events.h"
 #include "sys/logging/logging.h"
 
@@ -237,6 +239,22 @@ static const char *cmd_cells_raw(char *args) {
     return NULL;
 }
 
+static const char *cmd_supervisor(char *args) {
+    (void)args;
+    const sup_reply_t *r = &model.supervisor;
+    const cell_map_t *map = bms_cell_map();
+    info_printf("Supervisor: %s | state %u, reasons 0x%04x, latch 0x%04x, protocol v%u (ours v%u), reply age %lu ms\n",
+        supervisor_contactors_enabled(&model) ? "ENABLED" : "disabled",
+        r->state, r->reasons, r->latch_reasons, r->version, SUP_PROTOCOL_VERSION,
+        model.supervisor_millis ? (unsigned long)(millis() - model.supervisor_millis) : 0UL);
+    info_printf("Supervisor: enforcing map %08lx, chemistry %u | ours %08lx, chemistry %u (%u cells on %u modules)\n",
+        (unsigned long)r->map_hash, r->chemistry,
+        (unsigned long)cell_map_hash(map), map->chemistry, map->num_cells, map->num_modules);
+    info_printf("Supervisor: snooped %d-%d mV, %u cells ok, %lu scans\n",
+        r->cell_min_mV, r->cell_max_mV, r->cells_ok, (unsigned long)r->scans);
+    return NULL;
+}
+
 static const char *cmd_adc(char *args) {
     (void)args;
     millis_t now = millis();
@@ -363,6 +381,7 @@ static const cli_command_t commands[] = {
     {"ads", NULL, cmd_ads, "ADS1115 readings, scan rate and errors"},
     {"ina", NULL, cmd_ina, "INA228 current, charge, temperatures and sampling stats"},
     {"cells_raw", NULL, cmd_cells_raw, "last reading of every BMB channel (* = in the cell map)"},
+    {"supervisor", NULL, cmd_supervisor, "supervisor state, reasons and the cell map it enforces"},
 };
 #define NUM_COMMANDS (sizeof(commands) / sizeof(commands[0]))
 

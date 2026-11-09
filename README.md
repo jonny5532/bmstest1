@@ -103,6 +103,60 @@ damage where possible. External safety equipment should be used for more
 time-critical protection against overcurrent (fuses) or leakage (an RCD).
 
 
+### Supervisor
+
+A second MCU, the supervisor (firmware in `supervisor/`), holds the contactor
+gate drivers disabled (`CTR_EN`) unless its own checks pass. It independently
+measures the cell voltages and temperatures by snooping the isoSPI bus.
+
+It is built per chemistry, which sets the hard cell limits it enforces. The
+cell map (cell count, BMB count and presence mask) comes from the BMS, in the
+status it sends every 100ms over the internal serial link
+(`bms/shared/supervisor_protocol.h`). The supervisor takes the first map after
+each BMS boot that is self-consistent (`cell_map_check()`: the mask has the
+stated cell count, no cells past the stated BMBs, no BMB without cells) and is
+for its own chemistry. A different map later in the same boot is a BMS fault,
+and latches.
+
+It enables the drivers once, all at the same time:
+- the BMS is sending status in the same protocol version, with a usable map;
+- three scans in a row have every BMB in the map reading with good CRCs, every
+  populated cell read and within the hard limits, and every channel the map
+  leaves out reading empty (below 500mV), on any BMB that answered, in the map
+  or not. A wrong map therefore can't hide a connected cell;
+- the BMS's cell min/max agree with the snooped ones.
+
+The BMS holds off closing the contactors (`SUPERVISOR_NOT_ENABLED`) until the
+supervisor reports that it is enabled, for this BMS's map and chemistry.
+
+Once enabled, the supervisor cuts the drivers if:
+- the BMS stops sending status for twice its watchdog timeout, or restarts, or
+  the scans stop for twice as long as the BMS takes to fault on stale cells. It
+  re-enables once the checks pass again;
+- a cell problem above lasts twice as long as the BMS takes to open the
+  contactors itself, so the BMS always gets to open them first. The BMS checks
+  unpopulated channels too (`ABSENT_CHANNEL_VOLTAGE`). This latches until the
+  BMS restarts;
+- the BMS's map changes. This latches at once.
+
+If the drivers are cut while the contactors are driven, the BMS faults
+(`SUPERVISOR_DISABLED_CONTACTORS`). The BMS and supervisor speak protocol
+version 2: update both together, or the contactors won't close.
+
+Build the supervisor for the pack's chemistry (the one its profile includes,
+`chemistry/lfp.h` or `chemistry/nmc.h`) and the same `BMS_BOARD` as the BMS (for
+its USB wiring):
+
+```bash
+cmake -S supervisor -B supervisor/build -DSUPERVISOR_CHEMISTRY=lfp -DBMS_BOARD=desk
+cmake --build supervisor/build -j
+```
+
+Over its USB serial, `s` prints the status (including the map in force) and `r`
+the last snooped scan, with `*` on the populated channels. The BMS CLI has
+`supervisor` and `cells_raw`.
+
+
 ## Balancing
 
 There are five settings that control balancing:

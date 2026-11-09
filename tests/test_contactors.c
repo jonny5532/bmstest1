@@ -16,8 +16,9 @@
 // #define CONTACTORS_TEST_WAIT_MS 1000
 
 // Mock globals
-millis64_t stored_millis64 = 0;
-millis_t stored_millis = 0;
+// Time starts non-zero, as on the BMS (a zero timestamp means "no reading yet")
+millis64_t stored_millis64 = 1;
+millis_t stored_millis = 1;
 
 uint32_t time_us_32() { return stored_millis * 1000; }
 
@@ -44,6 +45,15 @@ void contactors_test_pre_bypass(bool pre) {
     check_expected(pre);
 }
 
+// A fresh reply from a supervisor enabling the contactor drivers for our map
+static void supervisor_enabled(bms_model_t *model) {
+    model->supervisor.version = SUP_PROTOCOL_VERSION;
+    model->supervisor.state = SUP_STATE_ON;
+    model->supervisor.chemistry = CHEMISTRY;
+    model->supervisor.map_hash = cell_map_hash(bms_cell_map());
+    model->supervisor_millis = stored_millis;
+}
+
 // Test helper to tick the SM multiple times if needed and advance time
 void tick_sm(bms_model_t *model, uint32_t ms) {
     stored_millis += ms;
@@ -58,8 +68,225 @@ void tick_sm(bms_model_t *model, uint32_t ms) {
     model->high_voltages.fuse_drop_millis = stored_millis;
 #endif
     model->current_millis = stored_millis;
+    supervisor_enabled(model);
 
     contactor_sm_tick(model);
+}
+
+static void expect_all_open(void) {
+    expect_value(contactors_set_pos_pre_neg, pos, false);
+    expect_value(contactors_set_pos_pre_neg, pre, false);
+    expect_value(contactors_set_pos_pre_neg, neg, false);
+}
+
+static void expect_closed(void) {
+    expect_value(contactors_set_pos_pre_neg, pos, true);
+    expect_value(contactors_set_pos_pre_neg, pre, false);
+    expect_value(contactors_set_pos_pre_neg, neg, true);
+}
+
+static void test_close_held_until_supervisor_enables(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    clear_bms_event(ERR_SUPERVISOR_NOT_ENABLED);
+
+    model.contactor_req = CONTACTORS_REQUEST_CLOSE;
+
+    // No supervisor reply yet: stay open, keep the request
+    stored_millis += 100;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_CLOSE);
+    assert_int_equal(get_event_level(ERR_SUPERVISOR_NOT_ENABLED), LEVEL_WARNING);
+
+    // Supervisor replying but not enabled (still settling)
+    supervisor_enabled(&model);
+    model.supervisor.state = SUP_STATE_OFF;
+    model.supervisor.reasons = SUP_REASON_SETTLING;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_CLOSE);
+
+    // Enabled: the self-test starts and the warning clears
+    expect_all_open();
+    tick_sm(&model, 100);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_BYPASS_CLOSED);
+    assert_int_equal(get_event_level(ERR_SUPERVISOR_NOT_ENABLED), LEVEL_NONE);
+}
+
+static void test_calibration_held_until_supervisor_enables(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+
+    model.contactor_req = CONTACTORS_REQUEST_CALIBRATE;
+    stored_millis += 100;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_CALIBRATE);
+
+    model.contactor_req = CONTACTORS_REQUEST_CALIBRATE_ONLY_NEG;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_CALIBRATE_ONLY_NEG);
+}
+
+static void test_open_request_not_held(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    clear_bms_event(ERR_SUPERVISOR_NOT_ENABLED);
+
+    // Opening never waits for the supervisor, and isn't a reason to warn
+    model.contactor_req = CONTACTORS_REQUEST_OPEN;
+    stored_millis += 100;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_NULL);
+    assert_int_equal(get_event_level(ERR_SUPERVISOR_NOT_ENABLED), LEVEL_NONE);
+}
+
+static void test_supervisor_enforcing_another_map_holds_close(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    model.contactor_req = CONTACTORS_REQUEST_CLOSE;
+    stored_millis += 100;
+
+    // ON, but checking the cells against a map that isn't ours
+    supervisor_enabled(&model);
+    model.supervisor.map_hash ^= 1;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+
+    // Or against another chemistry's limits
+    supervisor_enabled(&model);
+    model.supervisor.chemistry = (CHEMISTRY == LFP) ? NMC : LFP;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+
+    // Or in another protocol version
+    supervisor_enabled(&model);
+    model.supervisor.version = SUP_PROTOCOL_VERSION + 1;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_CLOSE);
+}
+
+static void test_stale_supervisor_reply_holds_close(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+
+    model.contactor_req = CONTACTORS_REQUEST_CLOSE;
+    stored_millis += 100;
+    supervisor_enabled(&model);
+    stored_millis += SUPERVISOR_REPLY_STALE_MS + 100;
+
+    expect_all_open();
+    contactor_sm_tick(&model);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_CLOSE);
+}
+
+static void test_supervisor_drop_while_closed_is_fatal(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    clear_bms_event(ERR_SUPERVISOR_DISABLED_CONTACTORS);
+
+    model.contactor_sm.state = CONTACTORS_STATE_CLOSED;
+    model.high_voltages.pos_contactor = 0.1f;
+    model.high_voltages.neg_contactor = 0.1f;
+    expect_closed();
+    tick_sm(&model, 100);
+    assert_int_equal(get_event_level(ERR_SUPERVISOR_DISABLED_CONTACTORS), LEVEL_NONE);
+
+    // The supervisor latches off
+    stored_millis += 100;
+    supervisor_enabled(&model);
+    model.supervisor.state = SUP_STATE_LATCHED;
+    model.supervisor.latch_reasons = SUP_REASON_CELL_HIGH;
+    expect_closed();
+    contactor_sm_tick(&model);
+    events_tick();
+    assert_int_equal(get_event_level(ERR_SUPERVISOR_DISABLED_CONTACTORS), LEVEL_FATAL);
+    // Its state and latch reasons are in the event data
+    assert_int_equal(bms_event_slots[ERR_SUPERVISOR_DISABLED_CONTACTORS].data64,
+        ((uint64_t)SUP_STATE_LATCHED << 32) | ((uint64_t)SUP_REASON_CELL_HIGH << 16));
+}
+
+// A fatal event can't be cleared, so reset its slot directly
+static void reset_supervisor_disabled_event(void) {
+    memset(&bms_event_slots[ERR_SUPERVISOR_DISABLED_CONTACTORS], 0, sizeof(bms_event_slots[0]));
+}
+
+// The failed states hold everything open while they wait, but they're outside
+// OPEN, where the supervisor has no normal reason to drop (no slow mode there)
+static void test_supervisor_drop_in_failed_states_is_fatal(void **state) {
+    (void) state;
+    const int failed_states[] = {CONTACTORS_STATE_TESTING_FAILED, CONTACTORS_STATE_PRECHARGE_FAILED};
+    for (size_t i = 0; i < sizeof(failed_states) / sizeof(failed_states[0]); i++) {
+        bms_model_t model = {0};
+        reset_supervisor_disabled_event();
+        model.contactor_sm.state = failed_states[i];
+        model.contactor_sm.last_transition_time = stored_millis64;
+
+        expect_all_open();
+        tick_sm(&model, 100);
+        events_tick();
+        assert_int_equal(get_event_level(ERR_SUPERVISOR_DISABLED_CONTACTORS), LEVEL_NONE);
+
+        // Partway through the cooldown, the supervisor drops (a cell below its limit)
+        stored_millis += 100;
+        supervisor_enabled(&model);
+        model.supervisor.state = SUP_STATE_OFF;
+        model.supervisor.reasons = SUP_REASON_CELL_LOW;
+        expect_all_open();
+        contactor_sm_tick(&model);
+        events_tick();
+        assert_int_equal(model.contactor_sm.state, failed_states[i]);
+        assert_int_equal(get_event_level(ERR_SUPERVISOR_DISABLED_CONTACTORS), LEVEL_FATAL);
+        assert_int_equal(bms_event_slots[ERR_SUPERVISOR_DISABLED_CONTACTORS].data64,
+            ((uint64_t)SUP_STATE_OFF << 32) | SUP_REASON_CELL_LOW);
+    }
+    reset_supervisor_disabled_event();
+}
+
+// In OPEN the supervisor drops routinely (in slow mode the scans are too far
+// apart for it), so that's never an event; a close just waits for it
+static void test_supervisor_drop_while_open_is_not_fatal(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    reset_supervisor_disabled_event();
+    clear_bms_event(ERR_SUPERVISOR_NOT_ENABLED);
+
+    expect_all_open();
+    tick_sm(&model, 100);
+
+    stored_millis += 100;
+    supervisor_enabled(&model);
+    model.supervisor.state = SUP_STATE_OFF;
+    model.supervisor.reasons = SUP_REASON_NO_SCAN;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    events_tick();
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(get_event_level(ERR_SUPERVISOR_DISABLED_CONTACTORS), LEVEL_NONE);
+    assert_int_equal(get_event_level(ERR_SUPERVISOR_NOT_ENABLED), LEVEL_NONE);
+
+    // A close request while it's off waits for it, and only warns
+    model.contactor_req = CONTACTORS_REQUEST_CLOSE;
+    expect_all_open();
+    contactor_sm_tick(&model);
+    events_tick();
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_CLOSE);
+    assert_int_equal(get_event_level(ERR_SUPERVISOR_NOT_ENABLED), LEVEL_WARNING);
+    assert_int_equal(get_event_level(ERR_SUPERVISOR_DISABLED_CONTACTORS), LEVEL_NONE);
+    clear_bms_event(ERR_SUPERVISOR_NOT_ENABLED);
 }
 
 static void expect_close_pre_side_via_precharge(void) {
@@ -411,6 +638,7 @@ static void test_fuse_drop_frozen_reading_is_not_fatal(void **state) {
         model.high_voltages.link_millis = stored_millis;
         model.high_voltages.fuse_drop_millis = frozen_reading;
         model.current_millis = stored_millis;
+        supervisor_enabled(&model);
         contactor_sm_tick(&model);
         events_tick();
         assert_int_not_equal(get_event_level(ERR_FUSE_VOLTAGE_DROP_HIGH), LEVEL_FATAL);
@@ -1040,6 +1268,14 @@ int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_initial_state),
         cmocka_unit_test(test_close_request_to_testing_sequence),
+        cmocka_unit_test(test_close_held_until_supervisor_enables),
+        cmocka_unit_test(test_calibration_held_until_supervisor_enables),
+        cmocka_unit_test(test_open_request_not_held),
+        cmocka_unit_test(test_supervisor_enforcing_another_map_holds_close),
+        cmocka_unit_test(test_stale_supervisor_reply_holds_close),
+        cmocka_unit_test(test_supervisor_drop_while_closed_is_fatal),
+        cmocka_unit_test(test_supervisor_drop_in_failed_states_is_fatal),
+        cmocka_unit_test(test_supervisor_drop_while_open_is_not_fatal),
         cmocka_unit_test(test_precharge_success),
         cmocka_unit_test(test_precharge_failure_timeout),
 #if IS_BMS_BOARD(REV1)

@@ -384,7 +384,7 @@ void bms_tick() {
 
     nvm_tick(&model);
     inverter_tick(&model.inverter_outputs);
-    internal_serial_tick();
+    internal_serial_tick(&model);
     hmi_serial_tick(&model);
 
     timings[8] = time_us_32();
