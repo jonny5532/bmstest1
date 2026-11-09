@@ -258,8 +258,8 @@ static void model_calculate_inverter_voltage_limits(const bms_model_t *model, in
     uint16_t cell_voltage_working_max_mV = get_cell_voltage_working_max_mV(model);
     uint16_t cell_voltage_working_min_mV = get_cell_voltage_working_min_mV(model);
 
-    uint32_t max_voltage_limit_dV = (cell_voltage_working_max_mV * NUM_CELLS) / 100; // in 0.1V units
-    uint32_t min_voltage_limit_dV = (cell_voltage_working_min_mV * NUM_CELLS) / 100; // in 0.1V units
+    int32_t max_voltage_limit_dV = (cell_voltage_working_max_mV * NUM_CELLS) / 100; // in 0.1V units
+    int32_t min_voltage_limit_dV = (cell_voltage_working_min_mV * NUM_CELLS) / 100; // in 0.1V units
     
     int32_t mean_cell_voltage_mV = model->cell_voltage_total_mV / NUM_CELLS;
 
@@ -284,7 +284,13 @@ static void model_calculate_inverter_voltage_limits(const bms_model_t *model, in
     // Apply user-configured offsets to account for errors in the inverter
     // voltage reading.
     max_voltage_limit_dV += model->pack_voltage_limit_upper_offset_dV;
-    min_voltage_limit_dV += model->pack_voltage_limit_lower_offset_dV;  
+    min_voltage_limit_dV += model->pack_voltage_limit_lower_offset_dV;
+
+    // Guard against a bad cell reading (e.g. one faulty tap skewing the mean)
+    // or offsets driving the limits negative or inverting them.
+    if(max_voltage_limit_dV < 0) max_voltage_limit_dV = 0;
+    if(min_voltage_limit_dV > max_voltage_limit_dV) min_voltage_limit_dV = max_voltage_limit_dV;
+    if(min_voltage_limit_dV < 0) min_voltage_limit_dV = 0;
 
     out->max_voltage_limit_dV = max_voltage_limit_dV;
     out->min_voltage_limit_dV = min_voltage_limit_dV;
