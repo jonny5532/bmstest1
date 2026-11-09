@@ -37,149 +37,182 @@ extern ina228_t ina228_dev;
 // Max characters consumed per tick, so a flood of input can't stall the loop
 #define CLI_MAX_CHARS_PER_TICK 128
 
-// Runtime-tunable parameters for set/get/params. Exactly one of f/d is set.
+// Parameters for params/set. Read-only ones are shown but can't be set (the
+// calibration values are persisted, and a later NVM save would keep a
+// temporary change).
+typedef enum { PARAM_FLOAT, PARAM_DOUBLE, PARAM_INT32 } param_type_t;
+
 typedef struct {
     const char *name;
-    float *f;
-    double *d;
+    param_type_t type;
+    void *ptr;
+    bool writable;
 } cli_param_t;
 
+#define RW(name, type, ptr) {name, type, ptr, true}
+#define RO(name, type, ptr) {name, type, ptr, false}
+
 static const cli_param_t params[] = {
-    {"working_charge_internal_resistance_uR", &working_charge_internal_resistance_uR, NULL},
-    {"working_charge_ceiling_dA", &working_charge_ceiling_dA, NULL},
-    {"working_charge_slow_alpha", &working_charge_slow_alpha, NULL},
-    {"working_charge_fast_alpha", &working_charge_fast_alpha, NULL},
-    {"working_charge_slow_threshold_dA", &working_charge_slow_threshold_dA, NULL},
-    {"working_charge_fast_threshold_dA", &working_charge_fast_threshold_dA, NULL},
-    {"ekf_q0", NULL, &model.ekf.Q[0]},
-    {"ekf_q1", NULL, &model.ekf.Q[1]},
-    {"ekf_q2", NULL, &model.ekf.Q[2]},
-    {"ekf_r", NULL, &model.ekf.R},
-    {"ekf_min_slope", NULL, &model.ekf.min_ocv_slope},
-    {"ekf_knee_slope", NULL, &model.ekf.knee_ocv_slope},
-    {"ekf_r_ohm", NULL, &model.ekf.R_ohm},
-    {"ekf_offset_tau", NULL, &model.ekf.offset_tau_s},
+    RW("working_charge_internal_resistance_uR", PARAM_FLOAT, &working_charge_internal_resistance_uR),
+    RW("working_charge_ceiling_dA", PARAM_FLOAT, &working_charge_ceiling_dA),
+    RW("working_charge_slow_alpha", PARAM_FLOAT, &working_charge_slow_alpha),
+    RW("working_charge_fast_alpha", PARAM_FLOAT, &working_charge_fast_alpha),
+    RW("working_charge_slow_threshold_dA", PARAM_FLOAT, &working_charge_slow_threshold_dA),
+    RW("working_charge_fast_threshold_dA", PARAM_FLOAT, &working_charge_fast_threshold_dA),
+    RW("ekf_q0", PARAM_DOUBLE, &model.ekf.Q[0]),
+    RW("ekf_q1", PARAM_DOUBLE, &model.ekf.Q[1]),
+    RW("ekf_q2", PARAM_DOUBLE, &model.ekf.Q[2]),
+    RW("ekf_r", PARAM_DOUBLE, &model.ekf.R),
+    RW("ekf_min_slope", PARAM_DOUBLE, &model.ekf.min_ocv_slope),
+    RW("ekf_knee_slope", PARAM_DOUBLE, &model.ekf.knee_ocv_slope),
+    RW("ekf_r_ohm", PARAM_DOUBLE, &model.ekf.R_ohm),
+    RW("ekf_offset_tau", PARAM_DOUBLE, &model.ekf.offset_tau_s),
+    RO("cal_battery_voltage_mul", PARAM_FLOAT, &model.battery_voltage_mul),
+    RO("cal_output_voltage_mul", PARAM_FLOAT, &model.output_voltage_mul),
+    RO("cal_neg_contactor_mul", PARAM_FLOAT, &model.neg_contactor_mul),
+    RO("cal_neg_contactor_offset_mV", PARAM_FLOAT, &model.neg_contactor_offset_mV),
+    RO("cal_pos_contactor_mul", PARAM_FLOAT, &model.pos_contactor_mul),
+#if IS_BMS_BOARD(REV1)
+    RO("cal_pos_contactor_offset_mV", PARAM_FLOAT, &model.pos_contactor_offset_mV),
+    RO("cal_link_voltage_mul", PARAM_FLOAT, &model.link_voltage_mul),
+#endif
+    RO("cal_current_offset", PARAM_INT32, &model.current_offset),
 };
 #define NUM_PARAMS (sizeof(params) / sizeof(params[0]))
 
-static const cli_param_t *find_param(const char *name) {
-    for(size_t i = 0; i < NUM_PARAMS; i++) {
-        if(strcmp(params[i].name, name) == 0) {
-            return &params[i];
-        }
-    }
-    return NULL;
-}
-
-static double param_value(const cli_param_t *p) {
-    return p->f ? (double)*p->f : *p->d;
-}
-
 static void print_param(const cli_param_t *p) {
-    info_printf("%s = %g\n", p->name, param_value(p));
+    const char *ro = p->writable ? "" : " (read-only)";
+    if(p->type == PARAM_INT32) {
+        info_printf("%s = %ld%s\n", p->name, *(int32_t *)p->ptr, ro);
+    } else {
+        double v = p->type == PARAM_FLOAT ? (double)*(float *)p->ptr : *(double *)p->ptr;
+        info_printf("%s = %g%s\n", p->name, v, ro);
+    }
 }
 
-// Command handlers return NULL on success or a short error reason.
-// args is the rest of the line after the command word ("" if none).
+// Command handlers return NULL on success or a short error reason. args is
+// the rest of the line after the command word ("" if none), and may be
+// modified.
 
-static const char *cmd_help(const char *args);
+static const char *cmd_help(char *args);
 
-static const char *cmd_status(const char *args) {
+static const char *cmd_status(char *args) {
     (void)args;
     bms_print_status();
     return NULL;
 }
 
-static const char *cmd_params(const char *args) {
-    (void)args;
+// Lists the parameters whose name contains args (all if empty)
+static const char *cmd_params(char *args) {
+    bool any = false;
     for(size_t i = 0; i < NUM_PARAMS; i++) {
-        print_param(&params[i]);
+        if(strstr(params[i].name, args)) {
+            print_param(&params[i]);
+            any = true;
+        }
     }
-    return NULL;
+    return any ? NULL : "no matching parameter";
 }
 
-static const char *cmd_get(const char *args) {
-    const cli_param_t *p = find_param(args);
-    if(!p) {
-        return "unknown parameter (see params)";
-    }
-    print_param(p);
-    return NULL;
-}
-
-static const char *cmd_set(const char *args) {
-    char name[64];
-    const char *space = strchr(args, ' ');
-    if(!space || (size_t)(space - args) >= sizeof(name)) {
+static const char *cmd_set(char *args) {
+    char *value = strchr(args, ' ');
+    if(!value) {
         return "usage: set <name> <value>";
     }
-    memcpy(name, args, space - args);
-    name[space - args] = '\0';
+    *value++ = '\0';
 
-    const cli_param_t *p = find_param(name);
+    const cli_param_t *p = NULL;
+    for(size_t i = 0; i < NUM_PARAMS; i++) {
+        if(strcmp(params[i].name, args) == 0) {
+            p = &params[i];
+            break;
+        }
+    }
     if(!p) {
         return "unknown parameter (see params)";
+    }
+    if(!p->writable) {
+        return "parameter is read-only";
     }
 
     // The whole value must parse, and NaN/inf would poison the estimators
     char *end;
-    double value = strtod(space + 1, &end);
-    if(end == space + 1 || *end != '\0' || !isfinite(value)) {
+    double v = strtod(value, &end);
+    if(end == value || *end != '\0' || !isfinite(v)) {
         return "invalid value";
     }
-
-    if(p->f) {
-        *p->f = (float)value;
-    } else {
-        *p->d = value;
+    switch(p->type) {
+        case PARAM_FLOAT: *(float *)p->ptr = (float)v; break;
+        case PARAM_DOUBLE: *(double *)p->ptr = v; break;
+        case PARAM_INT32:
+            if(v < INT32_MIN || v > INT32_MAX) {
+                return "invalid value";
+            }
+            *(int32_t *)p->ptr = (int32_t)(v < 0 ? v - 0.5 : v + 0.5);
+            break;
     }
     print_param(p);
     return NULL;
 }
 
-static const char *cmd_stop(const char *args) {
-    (void)args;
-    info_printf("Requesting inactive mode\n");
-    model.system_req = SYSTEM_REQUEST_STOP;
-    return NULL;
-}
+static const char *const system_state_names[] = {
+    "uninitialized", "initializing", "calibrating", "inactive", "operating", "fault",
+};
 
-static const char *cmd_toggle(const char *args) {
-    (void)args;
-    if(model.system_sm.state == SYSTEM_STATE_INACTIVE) {
-        info_printf("Requesting operation mode\n");
-        model.system_req = SYSTEM_REQUEST_RUN;
-    } else if(model.system_sm.state == SYSTEM_STATE_OPERATING) {
-        info_printf("Requesting inactive mode\n");
-        model.system_req = SYSTEM_REQUEST_STOP;
-    } else {
-        return "can only toggle from inactive or operating";
+// Requests a system state change, if the system is in one of the allowed
+// states (a bitmask of 1 << SYSTEM_STATE_*), since the state machine only
+// acts on a request in those states and would otherwise leave it pending.
+static const char *request(system_requests_t req, unsigned allowed_states) {
+    unsigned state = model.system_sm.state;
+    if(!(allowed_states & (1u << state))) {
+        static char err[40];
+        snprintf(err, sizeof(err), "not possible while %s",
+            state < sizeof(system_state_names) / sizeof(system_state_names[0])
+                ? system_state_names[state] : "?");
+        return err;
     }
+    model.system_req = req;
     return NULL;
 }
 
-static const char *cmd_calibrate(const char *args) {
+#define IN(state) (1u << SYSTEM_STATE_##state)
+
+static const char *cmd_run(char *args) {
     (void)args;
-    info_printf("Requesting contactor calibration (offline long)...\n");
-    model.system_req = SYSTEM_REQUEST_CALIBRATE_OFFLINE_LONG;
-    return NULL;
+    return request(SYSTEM_REQUEST_RUN, IN(INACTIVE));
 }
 
-static const char *cmd_calibrate_short(const char *args) {
+static const char *cmd_stop(char *args) {
     (void)args;
-    info_printf("Requesting contactor calibration (offline short)...\n");
-    model.system_req = SYSTEM_REQUEST_CALIBRATE_OFFLINE_SHORT;
-    return NULL;
+    return request(SYSTEM_REQUEST_STOP, IN(OPERATING));
 }
 
-static const char *cmd_calibrate_online(const char *args) {
+// Before reflashing: stop from any state, so the request is still honoured if
+// the system only reaches operating later
+static const char *cmd_restart(char *args) {
     (void)args;
-    info_printf("Requesting online calibration...\n");
-    model.system_req = SYSTEM_REQUEST_CALIBRATE_ONLINE;
-    return NULL;
+    return request(SYSTEM_REQUEST_STOP, ~0u);
 }
 
-static const char *cmd_print_ekf_state(const char *args) {
+static const char *cmd_calibrate(char *args) {
+    static const struct {
+        const char *mode;
+        system_requests_t req;
+        unsigned allowed_states;
+    } modes[] = {
+        {"long", SYSTEM_REQUEST_CALIBRATE_OFFLINE_LONG, IN(INACTIVE)},
+        {"short", SYSTEM_REQUEST_CALIBRATE_OFFLINE_SHORT, IN(INACTIVE)},
+        {"online", SYSTEM_REQUEST_CALIBRATE_ONLINE, IN(INACTIVE) | IN(OPERATING)},
+    };
+    for(size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); i++) {
+        if(strcmp(args, modes[i].mode) == 0) {
+            return request(modes[i].req, modes[i].allowed_states);
+        }
+    }
+    return "usage: calibrate long|short|online";
+}
+
+static const char *cmd_ekf(char *args) {
     (void)args;
     info_printf("EKF Constants: Q=[%e, %e, %e], R=%f, min_slope=%f, knee_slope=%f, R_ohm=%f, offset_tau=%f\n",
                  model.ekf.Q[0], model.ekf.Q[1], model.ekf.Q[2],
@@ -189,17 +222,7 @@ static const char *cmd_print_ekf_state(const char *args) {
     return NULL;
 }
 
-static const char *cmd_print_working_charge_settings(const char *args) {
-    (void)args;
-    for(size_t i = 0; i < NUM_PARAMS; i++) {
-        if(strncmp(params[i].name, "working_charge_", 15) == 0) {
-            print_param(&params[i]);
-        }
-    }
-    return NULL;
-}
-
-static const char *cmd_adc(const char *args) {
+static const char *cmd_adc(char *args) {
     (void)args;
     millis_t now = millis();
     info_printf("ADC: now=%lu ms | Temp: %ld dC\n", now, get_temperature_c_times10());
@@ -214,57 +237,123 @@ static const char *cmd_adc(const char *args) {
     return NULL;
 }
 
-static const char *cmd_ads(const char *args) {
+// Rate of a counter since the previous call that took a snapshot, in Hz
+static double rate_hz(uint32_t now_count, uint32_t prev_count, millis_t dt_ms) {
+    return dt_ms ? (double)(now_count - prev_count) * 1000.0 / dt_ms : 0.0;
+}
+
+static const char *cmd_ads(char *args) {
     (void)args;
+    // Counters at the previous call, so rates cover the time in between
+    static millis_t prev_ms;
+    static ads1115_stats_t prev;
+
     millis_t now = millis();
+    ads1115_stats_t st = ads1115_stats; // racy copy, fine for diagnostics
+    ads1115_stats.max_cycle_us = 0;
+    millis_t dt = prev_ms ? now - prev_ms : now;
+
     info_printf("ADS A (0x48): %s\n", ads1115_dev.present ? "present" : "NOT DETECTED");
 #if HAS_ADS1115_SECONDARY()
     info_printf("ADS B (0x49): %s\n", ads1115_dev_b.present ? "present" : "NOT DETECTED");
 #endif
+    info_printf("ADS scan: %lu cycles (%.2f Hz over %lu ms), %lu errors (+%lu), cycle %lu us (max %lu us)\n",
+        st.cycles, rate_hz(st.cycles, prev.cycles, dt), dt,
+        st.errors, st.errors - prev.errors, st.last_cycle_us, st.max_cycle_us);
+    // V is at the uncalibrated default divider ratio (single-ended channels
+    // read the ADC pin itself, in mV)
     for(int ch = 0; ch < ADS1115_CHANNEL_COUNT; ch++) {
-        info_printf("ADS ch%d: raw %8.1f (age %lu ms)\n",
-            ch, (double)filtered_samples[ch], now - ads1115_get_sample_millis(ch));
+        bool single = ads1115_channel_single_ended(ch);
+        info_printf("ADS ch%d %-15s raw %8.1f (dev %5.1f) = %8.3f %s | %lu samples (%.2f Hz) | age %lu ms\n",
+            ch, ads1115_channel_name(ch), (double)filtered_samples[ch], (double)sample_deviations[ch],
+            single ? (double)filtered_samples[ch] * (4096.0 / 32768.0) : (double)filtered_samples[ch] * ADS1115_DEFAULT_MUL,
+            single ? "mV" : "V",
+            st.samples[ch], rate_hz(st.samples[ch], prev.samples[ch], dt),
+            now - ads1115_get_sample_millis(ch));
     }
-    info_printf("INA228 (0x40): %s\n", ina228_dev.present ? "present" : "NOT DETECTED");
-    if(model.current_millis > 0) {
-        info_printf("INA228 current: %ld mA (age %lu ms)\n",
-            model.current_mA, now - model.current_millis);
+    prev_ms = now;
+    prev = st;
+    return NULL;
+}
+
+static const char *cmd_ina(char *args) {
+    (void)args;
+    static millis_t prev_ms;
+    static uint32_t prev_samples;
+    static int64_t prev_charge_raw;
+
+    millis_t now = millis();
+    ina228_stats_t st = ina228_stats;
+    ina228_stats.max_gap_us = 0;
+    millis_t dt = prev_ms ? now - prev_ms : now;
+
+    info_printf("INA228 (0x40): %s | SHUNT_CAL %u\n",
+        ina228_dev.present ? "present" : "NOT DETECTED", (unsigned)INA228_SHUNT_CAL);
+    info_printf("INA228 samples: %lu (%.3f Hz over %lu ms), max gap %lu ms, I2C errors %lu\n",
+        st.samples, rate_hz(st.samples, prev_samples, dt), dt,
+        st.max_gap_us / 1000, st.i2c_errors);
+    info_printf("INA228 raw %ld - vos %ld - offset %ld = %ld counts -> %ld mA (age %lu ms) | filtered %.2f mA (dev %.2f)\n",
+        st.last_raw, st.last_vos_counts, model.current_offset,
+        st.last_raw - st.last_vos_counts - model.current_offset,
+        model.current_mA, model.current_millis ? now - model.current_millis : 0,
+        (double)model.current_filtered_mA, (double)model.current_deviation);
+    // Average current from the charge integral since the last call should
+    // match the sampled current
+    int64_t dq = model.charge_raw - prev_charge_raw;
+    info_printf("INA228 charge: %lld mC, +%lld mC since last (avg %.2f mA)\n",
+        (long long)raw_charge_to_mC(model.charge_raw), (long long)raw_charge_to_mC(dq),
+        dt ? (double)dq / INA228_CHARGE_RAW_PER_MC / (dt / 1000.0) : 0.0);
+    if(st.die_measurements) {
+        info_printf("INA228 die: %.2f C (%lu readings, age %lu ms)\n",
+            (double)model.shunt_die_temperature, st.die_measurements,
+            now - model.shunt_die_temperature_millis);
     } else {
-        info_printf("INA228 current: no reading yet\n");
+        info_printf("INA228 die: no reading yet (vos assumes 25 C)\n");
     }
+    if(st.ntc_measurements) {
+        info_printf("INA228 NTC: %.3f V -> %.0f ohm -> %.1f C (%lu readings, age %lu ms)\n",
+            (double)st.ntc_volts, (double)model.shunt_ntc_resistance_ohms,
+            (double)model.shunt_ntc_temperature, st.ntc_measurements,
+            now - model.shunt_ntc_millis);
+    } else {
+        info_printf("INA228 NTC: no reading yet\n");
+    }
+
+    prev_ms = now;
+    prev_samples = st.samples;
+    prev_charge_raw = model.charge_raw;
     return NULL;
 }
 
 typedef struct {
     const char *name;
-    const char *(*handler)(const char *args);
-    bool takes_args;
+    const char *args; // usage, or NULL if the command takes no arguments
+    const char *(*handler)(char *args);
     const char *help;
 } cli_command_t;
 
+// Stats and rates in ads/ina cover the time since that command was last run
 static const cli_command_t commands[] = {
-    {"help", cmd_help, false, "list commands"},
-    {"status", cmd_status, false, "full status dump"},
-    {"params", cmd_params, false, "list tunable parameters and values"},
-    {"get", cmd_get, true, "get <name>: show one parameter"},
-    {"set", cmd_set, true, "set <name> <value>: change a parameter (not persisted)"},
-    {"stop", cmd_stop, false, "request inactive mode"},
-    {"restart", cmd_stop, false, "same as stop (used by reflash_bms.sh before flashing)"},
-    {"toggle", cmd_toggle, false, "switch between inactive and operating"},
-    {"calibrate", cmd_calibrate, false, "contactor calibration (offline long)"},
-    {"calibrate_short", cmd_calibrate_short, false, "contactor calibration (offline short)"},
-    {"calibrate_online", cmd_calibrate_online, false, "online calibration"},
-    {"print_ekf_state", cmd_print_ekf_state, false, "EKF constants and state"},
-    {"print_working_charge_settings", cmd_print_working_charge_settings, false, "working_charge_* parameters"},
-    {"adc", cmd_adc, false, "internal ADC readings"},
-    {"ads", cmd_ads, false, "ADS1115 and INA228 readings"},
+    {"help", NULL, cmd_help, "list commands"},
+    {"status", NULL, cmd_status, "full status dump"},
+    {"params", "[filter]", cmd_params, "list parameters whose name contains filter"},
+    {"set", "<name> <value>", cmd_set, "change a parameter (not persisted)"},
+    {"run", NULL, cmd_run, "request operating mode (from inactive)"},
+    {"stop", NULL, cmd_stop, "request inactive mode (from operating)"},
+    {"restart", NULL, cmd_restart, "request inactive mode from any state (used by reflash_bms.sh)"},
+    {"calibrate", "long|short|online", cmd_calibrate, "contactor (offline) or online calibration"},
+    {"ekf", NULL, cmd_ekf, "EKF constants and state"},
+    {"adc", NULL, cmd_adc, "internal ADC readings"},
+    {"ads", NULL, cmd_ads, "ADS1115 readings, scan rate and errors"},
+    {"ina", NULL, cmd_ina, "INA228 current, charge, temperatures and sampling stats"},
 };
 #define NUM_COMMANDS (sizeof(commands) / sizeof(commands[0]))
 
-static const char *cmd_help(const char *args) {
+static const char *cmd_help(char *args) {
     (void)args;
     for(size_t i = 0; i < NUM_COMMANDS; i++) {
-        info_printf("%-30s %s\n", commands[i].name, commands[i].help);
+        const cli_command_t *c = &commands[i];
+        info_printf("%-10s %-18s %s\n", c->name, c->args ? c->args : "", c->help);
     }
     return NULL;
 }
@@ -287,7 +376,7 @@ static void cli_handle_command(char *line) {
     const char *err = "unknown command (see help)";
     for(size_t i = 0; i < NUM_COMMANDS; i++) {
         if(strcmp(line, commands[i].name) == 0) {
-            if(!commands[i].takes_args && *args) {
+            if(!commands[i].args && *args) {
                 err = "command takes no arguments";
             } else {
                 err = commands[i].handler(args);
@@ -307,7 +396,7 @@ static char line_buf[120];
 static uint8_t line_buf_idx = 0;
 static bool line_overflow = false;
 
-static void cli_handle_line() {
+static void cli_handle_line(void) {
     if(line_overflow) {
         info_printf("ERR line too long (max %u chars)\n", (unsigned)sizeof(line_buf) - 1);
         return;
@@ -328,7 +417,7 @@ static void cli_handle_line() {
     }
 }
 
-void cli_tick() {
+void cli_tick(void) {
     for(int n = 0; n < CLI_MAX_CHARS_PER_TICK; n++) {
         int c = stdio_getchar_timeout_us(0);
         if(c == PICO_ERROR_TIMEOUT) {

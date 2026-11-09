@@ -1,1 +1,1 @@
-void cli_tick();
+void cli_tick(void);

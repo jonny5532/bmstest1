@@ -74,8 +74,10 @@ class Cli:
         words = readline.get_line_buffer()[:readline.get_begidx()].split()
         if not words:
             options = self.commands
-        elif words[0] in ("get", "set") and len(words) == 1:
+        elif words[0] in ("params", "set") and len(words) == 1:
             options = self.params
+        elif words[0] == "calibrate" and len(words) == 1:
+            options = ["long", "short", "online"]
         else:
             options = []
         matches = [o + " " for o in options if o.startswith(text)]
