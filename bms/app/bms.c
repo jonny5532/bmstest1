@@ -137,6 +137,131 @@ void read_inputs(bms_model_t *model) {
 uint32_t timings[10];
 uint32_t max_timings[10];
 
+// Full status dump: cells, events, supplies, temperatures, HV, current/SoC,
+// limits and isolation. Printed by the "status" CLI command, and every 64
+// ticks when VERBOSE_DEBUG is set.
+void bms_print_status() {
+    //isosnoop_print_buffer();
+    uint32_t total = 0;
+    for(int i=0; i<NUM_CELLS; i++) {
+        debug_printf("[c%3d]: %4" PRIu32 " mV | ", i, (uint32_t)model.raw_cell_voltages_mV[i]);
+        total += model.raw_cell_voltages_mV[i];
+        if((i % 5) == 4) {
+            debug_printf("\n");
+        }
+    }
+    debug_printf("Total: %" PRIu32 "mV | Temps: %.1fC - %.1fC | Delta: %d mV %s%s\n\n", 
+        total, 
+        model.temperature_min, model.temperature_max, 
+        (int)(model.cell_voltage_max_mV - model.cell_voltage_min_mV),
+        model.cell_voltage_slow_mode ? " | Slow" : "",
+        model.balancing_active ? " | Balancing" : ""
+    );
+
+    debug_printf("Now: %lu ms (uptime %llu ms)\n", (unsigned long)millis(), (unsigned long long)millis64());
+    print_bms_events();
+    inverter_debug_print();
+    
+    debug_printf("MCU: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
+        get_temperature_c_times10(),
+        model.supply_voltages.voltage_3V3_mV,
+        model.supply_voltages.voltage_5V_mV,
+        model.supply_voltages.voltage_12V_mV,
+        model.supply_voltages.voltage_contactor_mV
+    );
+
+    {
+        millis_t now = millis();
+        debug_printf("ModTemps:");
+        for(int i=0; i<NUM_MODULE_TEMPS; i++) {
+            debug_printf(" [%d]=%.1fC", i, model.module_temperatures[i]);
+        }
+        debug_printf(" (age %lums) | ShuntDie: %.1fC (age %lums) | ShuntNTC: %.1fC / %.0f ohm (age %lums)\n",
+            model.module_temperatures_millis ? (now - model.module_temperatures_millis) : 0,
+            model.shunt_die_temperature,
+            model.shunt_die_temperature_millis ? (now - model.shunt_die_temperature_millis) : 0,
+            model.shunt_ntc_temperature,
+            model.shunt_ntc_resistance_ohms,
+            model.shunt_ntc_millis ? (now - model.shunt_ntc_millis) : 0
+        );
+    }
+
+    debug_printf("Batt: %6.3fV (%3.3f) | Out: %6.3fV (%3.3f) | NegCtr: %6.3fV (%3.3f) | PosCtr: %6.3fV (%3.3f)\n",
+        model.high_voltages.battery,
+        model.high_voltages.battery_deviation,
+        model.high_voltages.output,
+        model.high_voltages.output_deviation,
+        model.high_voltages.neg_contactor,
+        model.high_voltages.neg_contactor_deviation,
+        model.high_voltages.pos_contactor,
+        model.high_voltages.pos_contactor_deviation
+    );
+#if IS_BMS_BOARD(REV1)
+    debug_printf("Link: %6.3fV (%3.3f) | Fuse: %6.3fV (%3.3f)\n",
+        model.high_voltages.link,
+        model.high_voltages.link_deviation,
+        model.high_voltages.fuse_drop,
+        model.high_voltages.fuse_drop_deviation
+    );
+#endif
+    int64_t charge_mC = raw_charge_to_mC(model.charge_raw);
+    debug_printf("Current: %6ld mA | Charge: %lld mC | SoC: %2.2f %% | SoC(VB): %2.2f %% | SoC(BC): %2.2f %% | SoC(FC): %2.2f %%\n",
+        model.current_mA,
+        charge_mC,
+        model.soc / 100.0f,
+        model.soc_voltage_based / 100.0f,
+        model.soc_basic_count / 100.0f,
+        model.soc_fancy_count / 100.0f
+    );
+    debug_printf("Current filtered: %6f mA (%f)\n",
+        model.current_filtered_mA,
+        model.current_deviation
+    );
+    debug_printf("CV: %2.1f/%2.1f A | W: %2.1f A | T: %2.1f/%2.1f A | Inv. min: %2.1f V | Inv. max: %2.1f V\n\n",
+        model.cell_voltage_charge_current_limit_dA / 10.0f,
+        model.cell_voltage_discharge_current_limit_dA / 10.0f,
+        model.working_charge_current_limit_dA / 10.0f,
+        model.temp_charge_current_limit_dA / 10.0f,
+        model.temp_discharge_current_limit_dA / 10.0f,
+        model.inverter_outputs.min_voltage_limit_dV / 10.0f,
+        model.inverter_outputs.max_voltage_limit_dV / 10.0f
+    );
+
+    /*
+    char ascii[127-33+1];
+    for(int i=33; i<=126; i++) {
+        ascii[i-33] = (char)i;
+    }
+    for(int i=0;i<30;i++) {
+        debug_printf("%.*s\n", 126-33+1, ascii);
+    }
+    */
+
+    // printf("DUART0 RX: %lu, crcfail %lu | DUART1 RX: %lu, crcfail %lu\n",
+    //     debug_counters.uart0_packets_received, debug_counters.uart0_crc_errors,
+    //     debug_counters.uart1_packets_received, debug_counters.uart1_crc_errors
+    // );
+
+    float cal_midpoint = 22496.4f;
+    float cal_midpoint_temp_dC = 285.0f;
+
+    cal_midpoint += (get_temperature_c_times10() - cal_midpoint_temp_dC) * 0.28f; //compensate for temp drift
+
+    float vp = ads1115_float_sample(4, 1.0f);
+    float vn = ads1115_float_sample(5, 1.0f);
+    debug_printf("midpoint is %1.1f | ", (vp + vn)/2.0f);
+
+    float vpos = (vp - cal_midpoint) * (4.096f/32768);
+    float vneg = (cal_midpoint - vn) * (4.096f/32768);
+    float r = vpos / vneg;
+    // Cap at 1Gohm
+    float r_iso = 10000000 * fminf(r / fmaxf(fabsf(1.0f - r), 0.009f), 100.0f);
+
+    debug_printf("Vpos: %1.3f V | Vneg: %1.3f V | Riso: %1.2f Mohm\n",
+        vpos, vneg, r_iso/1000000
+    );
+}
+
 void bms_tick() {
     // The main tick function
 
@@ -251,133 +376,7 @@ void bms_tick() {
 
     if((timestep() & 0x3f) == 32) {
         debug_printf("\033[2J\033[H"); // Clear terminal
-
-        //isosnoop_print_buffer();
-        uint32_t total = 0;
-        for(int i=0; i<NUM_CELLS; i++) {
-            debug_printf("[c%3d]: %4" PRIu32 " mV | ", i, (uint32_t)model.raw_cell_voltages_mV[i]);
-            total += model.raw_cell_voltages_mV[i];
-            if((i % 5) == 4) {
-                debug_printf("\n");
-            }
-        }
-        debug_printf("Total: %" PRIu32 "mV | Temps: %.1fC - %.1fC | Delta: %d mV %s%s\n\n", 
-            total, 
-            model.temperature_min, model.temperature_max, 
-            (int)(model.cell_voltage_max_mV - model.cell_voltage_min_mV),
-            model.cell_voltage_slow_mode ? " | Slow" : "",
-            model.balancing_active ? " | Balancing" : ""
-        );
-
-        //printf("Bal mask: %02X %02X\n", bitmap_set[14], bitmap_set[15]);
-    }
-
-    if((timestep() & 0x3f) == 32) {
-        // every 64 ticks, output stuff
-        //isosnoop_print_buffer();
-        debug_printf("Now: %lu ms (uptime %llu ms)\n", (unsigned long)millis(), (unsigned long long)millis64());
-        print_bms_events();
-        inverter_debug_print();
-        
-        debug_printf("MCU: %3ld dC | 3V3: %4ld mV | 5V: %4ld mV | 12V: %5ld mV | CtrV: %5ld mV\n",
-            get_temperature_c_times10(),
-            model.supply_voltages.voltage_3V3_mV,
-            model.supply_voltages.voltage_5V_mV,
-            model.supply_voltages.voltage_12V_mV,
-            model.supply_voltages.voltage_contactor_mV
-        );
-
-        {
-            millis_t now = millis();
-            debug_printf("ModTemps:");
-            for(int i=0; i<NUM_MODULE_TEMPS; i++) {
-                debug_printf(" [%d]=%.1fC", i, model.module_temperatures[i]);
-            }
-            debug_printf(" (age %lums) | ShuntDie: %.1fC (age %lums) | ShuntNTC: %.1fC / %.0f ohm (age %lums)\n",
-                model.module_temperatures_millis ? (now - model.module_temperatures_millis) : 0,
-                model.shunt_die_temperature,
-                model.shunt_die_temperature_millis ? (now - model.shunt_die_temperature_millis) : 0,
-                model.shunt_ntc_temperature,
-                model.shunt_ntc_resistance_ohms,
-                model.shunt_ntc_millis ? (now - model.shunt_ntc_millis) : 0
-            );
-        }
-
-        debug_printf("Batt: %6.3fV (%3.3f) | Out: %6.3fV (%3.3f) | NegCtr: %6.3fV (%3.3f) | PosCtr: %6.3fV (%3.3f)\n",
-            model.high_voltages.battery,
-            model.high_voltages.battery_deviation,
-            model.high_voltages.output,
-            model.high_voltages.output_deviation,
-            model.high_voltages.neg_contactor,
-            model.high_voltages.neg_contactor_deviation,
-            model.high_voltages.pos_contactor,
-            model.high_voltages.pos_contactor_deviation
-        );
-#if IS_BMS_BOARD(REV1)
-        debug_printf("Link: %6.3fV (%3.3f) | Fuse: %6.3fV (%3.3f)\n",
-            model.high_voltages.link,
-            model.high_voltages.link_deviation,
-            model.high_voltages.fuse_drop,
-            model.high_voltages.fuse_drop_deviation
-        );
-#endif
-        int64_t charge_mC = raw_charge_to_mC(model.charge_raw);
-        debug_printf("Current: %6ld mA | Charge: %lld mC | SoC: %2.2f %% | SoC(VB): %2.2f %% | SoC(BC): %2.2f %% | SoC(FC): %2.2f %%\n",
-            model.current_mA,
-            charge_mC,
-            model.soc / 100.0f,
-            model.soc_voltage_based / 100.0f,
-            model.soc_basic_count / 100.0f,
-            model.soc_fancy_count / 100.0f
-        );
-        debug_printf("Current filtered: %6f mA (%f)\n",
-            model.current_filtered_mA,
-            model.current_deviation
-        );
-        debug_printf("CV: %2.1f/%2.1f A | W: %2.1f A | T: %2.1f/%2.1f A | Inv. min: %2.1f V | Inv. max: %2.1f V\n\n",
-            model.cell_voltage_charge_current_limit_dA / 10.0f,
-            model.cell_voltage_discharge_current_limit_dA / 10.0f,
-            model.working_charge_current_limit_dA / 10.0f,
-            model.temp_charge_current_limit_dA / 10.0f,
-            model.temp_discharge_current_limit_dA / 10.0f,
-            model.inverter_outputs.min_voltage_limit_dV / 10.0f,
-            model.inverter_outputs.max_voltage_limit_dV / 10.0f
-        );
-
-        /*
-        char ascii[127-33+1];
-        for(int i=33; i<=126; i++) {
-            ascii[i-33] = (char)i;
-        }
-        for(int i=0;i<30;i++) {
-            debug_printf("%.*s\n", 126-33+1, ascii);
-        }
-        */
-
-        // printf("DUART0 RX: %lu, crcfail %lu | DUART1 RX: %lu, crcfail %lu\n",
-        //     debug_counters.uart0_packets_received, debug_counters.uart0_crc_errors,
-        //     debug_counters.uart1_packets_received, debug_counters.uart1_crc_errors
-        // );
-
-        float cal_midpoint = 22496.4f;
-        float cal_midpoint_temp_dC = 285.0f;
-
-        cal_midpoint += (get_temperature_c_times10() - cal_midpoint_temp_dC) * 0.28f; //compensate for temp drift
-
-        float vp = ads1115_float_sample(4, 1.0f);
-        float vn = ads1115_float_sample(5, 1.0f);
-        debug_printf("midpoint is %1.1f | ", (vp + vn)/2.0f);
-
-        float vpos = (vp - cal_midpoint) * (4.096f/32768);
-        float vneg = (cal_midpoint - vn) * (4.096f/32768);
-        float r = vpos / vneg;
-        // Cap at 1Gohm
-        float r_iso = 10000000 * fminf(r / fmaxf(fabsf(1.0f - r), 0.009f), 100.0f);
-
-        debug_printf("Vpos: %1.3f V | Vneg: %1.3f V | Riso: %1.2f Mohm\n",
-            vpos, vneg, r_iso/1000000
-        );
-
+        bms_print_status();
     }
 #endif
 
