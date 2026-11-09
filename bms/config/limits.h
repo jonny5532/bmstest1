@@ -62,6 +62,22 @@
 #endif
 #define IS_PRECHARGE_ON_NEGATIVE() (PRECHARGE_ON_NEGATIVE)
 
+// Boards modified with an external D+ pull-up powered from the host's VBUS, so
+// a switched-off host is never back-powered through D+. The chip's own pull-up
+// then stays off. A profile (or -D) sets USB_EXTERNAL_PULLUP to 1 for such a
+// board; never on an unmodified one, which would then never connect over USB.
+// Check it with #if IS_USB_EXTERNAL_PULLUP().
+#ifndef USB_EXTERNAL_PULLUP
+#define USB_EXTERNAL_PULLUP 0
+#endif
+#if USB_EXTERNAL_PULLUP != 0 && USB_EXTERNAL_PULLUP != 1
+#error "USB_EXTERNAL_PULLUP must be 0 or 1"
+#endif
+#if USB_EXTERNAL_PULLUP && defined(BMS_USB_VBUS_SENSE)
+#error "USB_EXTERNAL_PULLUP and BMS_USB_VBUS_SENSE are alternatives; a board has one or neither"
+#endif
+#define IS_USB_EXTERNAL_PULLUP() (USB_EXTERNAL_PULLUP)
+
 // Isolation monitor (app/isolation.h)
 #define ISOLATION_DIVIDER_BOTTOM_OHMS 24000.0f // bottom resistor of each HV divider
 #define ISOLATION_RESISTANCE_CAP_OHMS 100e6f   // report at most 100 Mohm

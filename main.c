@@ -3,10 +3,33 @@
 #include "pico/stdlib.h"
 
 #include "app/bms.h"
+#include "config/limits.h"
+
+#if IS_USB_EXTERNAL_PULLUP() || defined(BMS_USB_VBUS_SENSE)
+#include "tusb.h"
+#endif
+
+#if IS_USB_EXTERNAL_PULLUP()
+#include "hardware/structs/usb.h"
+
+// The external pull-up is powered from VBUS, so switch the chip's own one
+// (enabled by the USB stack at init) off so it can't back-power the host. As
+// the external one keeps D+ high through a reboot, the host would never see
+// this device go away and would keep talking to the old one, so also drive SE0
+// for a moment to make it register a disconnect and enumerate again.
+static void usb_external_pullup_init(void) {
+    tud_disconnect();
+
+    // SIE direct bus drive: DP and DM both low = SE0
+    hw_clear_bits(&usb_hw->sie_ctrl, USB_SIE_CTRL_DIRECT_DP_BITS | USB_SIE_CTRL_DIRECT_DM_BITS);
+    hw_set_bits(&usb_hw->sie_ctrl, USB_SIE_CTRL_DIRECT_EN_BITS);
+    sleep_ms(50);
+    hw_clear_bits(&usb_hw->sie_ctrl, USB_SIE_CTRL_DIRECT_EN_BITS);
+}
+#endif
 
 #ifdef BMS_USB_VBUS_SENSE
 #include "config/pins.h"
-#include "tusb.h"
 
 // USB VBUS reaches PIN_USB_VBUS_SENSE through a 3.3k/5.1k divider. The chip's
 // D+ pull-up is only switched on while the host supplies VBUS, so a switched-off
@@ -69,6 +92,9 @@ void core1_entry() {
 int main() {
     stdio_usb_init();
 
+#if IS_USB_EXTERNAL_PULLUP()
+    usb_external_pullup_init();
+#endif
 #ifdef BMS_USB_VBUS_SENSE
     usb_vbus_sense_init();
 #endif
