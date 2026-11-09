@@ -122,32 +122,22 @@ print(list(((hex(n), hex(crc8_2f(bytes([n])))) for n in range(0, 0xFF))))
 #define BMB3Y_MODULE_ID_CHECK_SHIFT 11
 #define BMB3Y_MODULE_ID_CHECK_MASK 0x1F
 
-// The IDs are static, so re-sample the 0x33 read at most this often.
+// Re-read the module IDs this often: they are static, but a re-read keeps
+// each one's validity (as reported to the HMI) current.
 #define BMB3Y_MODULE_ID_READ_INTERVAL_MS 60000
 
 #define BMB3Y_MAX_MODULES 8
 
-// Last-read snapshot and sticky stats for one module's 0x33 ID word.
-// The 11-bit code / 5-bit check split is derived from raw on demand.
-typedef struct {
-    uint16_t raw_last;       // last raw ID word seen (LE, 0 = none yet)
-    uint16_t crc_field_last; // received CRC14 field for that read
-    uint16_t crc_calc_last;  // calculated CRC14 for that read
-    bool crc_ok_last;        // transport check passed on that read
-    bool hamming_ok_last;    // Hamming content check passed on that read
-    uint16_t validated_id;   // last fully-validated raw word (0 = none yet)
-    uint32_t reads;          // total 0x33 reads sampling this module
-    uint32_t crc_errors;     // CRC14 mismatches (transport noise)
-    uint32_t hamming_errors; // CRC-ok but Hamming-invalid (BMB-side data fault)
-} bmb3y_module_diag_t;
+// A module whose last ID read failed its CRC or check bits, or wasn't read.
+// IDs are 11 bits, so this is never a real one.
+#define BMB3Y_MODULE_ID_NONE 0xFFFF
 
-// BMB communication diagnostics, sampled by the 0x33 reads. Runtime only -
-// never persisted to NVM. Zero-initialised at startup.
+// BMB diagnostics. Runtime only - never persisted to NVM.
 typedef struct {
-    bmb3y_module_diag_t module[BMB3Y_MAX_MODULES];
-    millis_t last_read_millis; // last 0x33 sample (any outcome, 0 = none yet)
-    millis_t validated_millis; // last read with every module fully validated
-    uint32_t transport_errors; // malformed isoSPI transactions
+    // Each module's ID code from the last 0x33 read (the 11-bit code, without
+    // its check bits), or BMB3Y_MODULE_ID_NONE. Set to NONE at startup.
+    uint16_t module_ids[BMB3Y_MAX_MODULES];
+    millis_t module_ids_millis; // last 0x33 read, any outcome (0 = none yet)
 
     // Observed cell presence, built from actual BMB voltage reads (raw 0xFFFF
     // = absent channel). Physical channels, LSB = channel 0; compared against

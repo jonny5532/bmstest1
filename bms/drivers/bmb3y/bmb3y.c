@@ -25,6 +25,10 @@ const uint8_t MODULE_COUNT = 8;
 _Static_assert(BMB3Y_MAX_MODULES * 9 == 72, "bank reads are 72 bytes");
 _Static_assert(BMB3Y_MAX_MODULES <= CELL_MAP_MODULES, "the cell map must cover the chain");
 _Static_assert(NUM_MODULE_VOLTAGES <= BMB3Y_MAX_MODULES, "the BMS reads at most BMB3Y_MAX_MODULES modules");
+// NUM_MODULE_VOLTAGES is the number of BMBs. Only one temperature per BMB is
+// decoded so far (module_temperatures[bmb]), so modules with more sensors need
+// the temperature reads to map them first.
+_Static_assert(NUM_MODULE_TEMPS == NUM_MODULE_VOLTAGES, "one temperature per BMB is all the BMB3Y driver decodes");
 
 // Low level functions
 
@@ -414,7 +418,7 @@ bool bmb3y_read_more_temps_blocking(bms_model_t *model) {
     }
 
     bool crc_ok = true;
-    for(int module=0; module<NUM_MODULE_TEMPS; module++) {
+    for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
         uint16_t module_crc = (uint16_t)(rx_buf[module * 8 + 6] << 8) | (uint16_t)(rx_buf[module * 8 + 7]);
         //uint16_t calc_crc = crc14(&rx_buf[module * 8], 6, 0x0010);
         uint16_t calc_crc = crc14(&rx_buf[module * 8], 6, 0x0010, module_crc);
@@ -459,7 +463,7 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
     }
 
     bool crc_ok = true;
-    for(int module=0; module<NUM_MODULE_TEMPS; module++) {
+    for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
         // Each module has 8 bytes: 6 bytes data, 2 bytes CRC
         // The temp is in bytes 2 and 3 (little-endian)
         
@@ -549,72 +553,50 @@ static bool bmb3y_module_id_valid(uint16_t word) {
         bmb3y_module_id_check(word & BMB3Y_MODULE_ID_CODE_MASK);
 }
 
-// Sample the 0x33 module-ID instruction and log the result.
+// Read every module's ID with the 0x33 instruction into model->bmb_diag.
 //
-// Response is 4 bytes per module: a 16-bit ID in bytes 0-1 (little-endian),
-// then a big-endian CRC14 (init 0x0010) over the two ID bytes in bytes 2-3.
-// Anything after is bus idle (0xFF).
+// Response is 4 bytes per module: a 16-bit ID word in bytes 0-1
+// (little-endian), then a big-endian CRC14 (init 0x0010) over the two ID bytes
+// in bytes 2-3. Anything after is bus idle (0xFF). Logs a module only when
+// its ID changes.
 bool bmb3y_read_module_ids_blocking(bms_model_t *model) {
-    uint8_t rx_buf[8 * 4];
+    uint8_t rx_buf[BMB3Y_MAX_MODULES * 4];
+    uint16_t *ids = model->bmb_diag.module_ids;
+    model->bmb_diag.module_ids_millis = millis();
 
-    int response_len = NUM_MODULE_TEMPS * 4;
-    if(response_len > (int)sizeof(rx_buf)) {
-        response_len = sizeof(rx_buf);
-    }
-
-    if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_MODULE_ID, rx_buf, response_len)) {
+    if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_MODULE_ID, rx_buf, NUM_MODULE_VOLTAGES * 4)) {
         error_printf("BMB3Y module ID read failed\n");
         count_bms_event(ERR_BMB_READ_ERROR, 0x0400000000000000);
-        model->bmb_diag.transport_errors++;
+        for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
+            ids[module] = BMB3Y_MODULE_ID_NONE;
+        }
         return false;
     }
 
     bool all_ok = true;
-    for(int module=0; module<NUM_MODULE_TEMPS; module++) {
-        uint8_t *m = &rx_buf[module * 4];
-        bmb3y_module_diag_t *diag = &model->bmb_diag.module[module];
-
-        uint16_t id_le = (uint16_t)m[0] | ((uint16_t)m[1] << 8);
-        uint16_t id_be = ((uint16_t)m[0] << 8) | m[1];
+    for(int module=0; module<NUM_MODULE_VOLTAGES; module++) {
+        const uint8_t *m = &rx_buf[module * 4];
+        uint16_t word = (uint16_t)m[0] | ((uint16_t)m[1] << 8);
         uint16_t crc_field = ((uint16_t)m[2] << 8) | m[3];
         uint16_t calc = crc14(m, 2, 0x0010, crc_field);
+        bool crc_ok = (crc_field & 0x3fff) == calc;
+        bool check_ok = bmb3y_module_id_valid(word);
 
-        // The 16-bit word splits into an 11-bit code and a 5-bit
-        // Hamming/SECDED-style check.
-        uint16_t id_code = id_le & BMB3Y_MODULE_ID_CODE_MASK;
-        uint8_t id_check = (uint8_t)((id_le >> BMB3Y_MODULE_ID_CHECK_SHIFT) & BMB3Y_MODULE_ID_CHECK_MASK);
-
-        bool ok = ((crc_field & 0x3fff) == calc);
-        bool hamming_ok = bmb3y_module_id_valid(id_le);
-
-        // Snapshot this read for diagnostics.
-        diag->raw_last = id_le;
-        diag->crc_field_last = crc_field;
-        diag->crc_calc_last = calc;
-        diag->crc_ok_last = ok;
-        diag->hamming_ok_last = hamming_ok;
-        diag->reads++;
-        if(!ok) {
-            diag->crc_errors++;
-        } else if(!hamming_ok) {
-            diag->hamming_errors++;
+        if(!crc_ok && millis64() > 2000) {
+            count_bms_event(ERR_BMB_CRC_MISMATCH, 0x0400000000000000 | ((uint64_t)module << 48) | ((uint64_t)crc_field << 16) | calc);
         }
 
-        if(ok && hamming_ok) {
-            // Only store if the hamming check passes
-            diag->validated_id = id_le;
-        } else {
-            all_ok = false;
+        uint16_t id = (crc_ok && check_ok) ? (word & BMB3Y_MODULE_ID_CODE_MASK) : BMB3Y_MODULE_ID_NONE;
+        if(id != ids[module]) {
+            if(id != BMB3Y_MODULE_ID_NONE) {
+                info_printf("BMB3Y module %d ID 0x%03X\n", module, id);
+            } else {
+                error_printf("BMB3Y module %d ID invalid: word 0x%04X, CRC %s, check bits %s\n",
+                    module, word, crc_ok ? "OK" : "bad", check_ok ? "OK" : "bad");
+            }
         }
-
-        info_printf("BMB3Y module %d ID: raw LE 0x%04X BE 0x%04X code 0x%03X (%u) check 0x%02X raw %02X %02X %02X %02X CRC field 0x%04X calc 0x%04X %s Hamming %s\n",
-            module, id_le, id_be, id_code, (unsigned)id_code, id_check, m[0], m[1], m[2], m[3], crc_field, calc,
-            ok ? "OK" : "MISMATCH", hamming_ok ? "VALID" : "INVALID");
-    }
-
-    model->bmb_diag.last_read_millis = millis();
-    if(all_ok) {
-        model->bmb_diag.validated_millis = model->bmb_diag.last_read_millis;
+        ids[module] = id;
+        all_ok = all_ok && id != BMB3Y_MODULE_ID_NONE;
     }
 
     return all_ok;
@@ -721,8 +703,8 @@ void bmb3y_tick(bms_model_t *model) {
         // to have left enough time for voltages to settle.
         bmb3y_timestep_offset = (bmb3y_timestep_offset + (period_mask + 1) - PAUSE_CYCLE_LENGTH - 1) & period_mask;
     } else if(step == 10 &&
-            (model->bmb_diag.last_read_millis == 0 ||
-             millis() - model->bmb_diag.last_read_millis >= BMB3Y_MODULE_ID_READ_INTERVAL_MS)) {
+            (model->bmb_diag.module_ids_millis == 0 ||
+             millis() - model->bmb_diag.module_ids_millis >= BMB3Y_MODULE_ID_READ_INTERVAL_MS)) {
         // We're not in a pause cycle so there are spare steps for extra things.
         // Sample the 0x33 module IDs, if we haven't done so recently.
 

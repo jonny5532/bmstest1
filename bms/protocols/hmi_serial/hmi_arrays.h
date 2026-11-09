@@ -35,6 +35,12 @@ typedef struct bms_model bms_model_t;
                                     // until learning starts. Only used by the EKF with
                                     // OCV_LEARN_TABLE (NMC); LFP learns it for capacity only.
 
+// Read-only, one element per BMB, in chain order; no elements until the first
+// read (the sample time is that of the last read, re-read every minute)
+#define HMI_ARRAY_MODULE_IDS     13 // uint16, the BMB's 11-bit module ID code, or 0xFFFF
+                                    // (BMB3Y_MODULE_ID_NONE) if its last read failed the
+                                    // CRC or the ID's own check bits
+
 // Elements of HMI_ARRAY_EKF_TUNING
 #define HMI_EKF_TUNING_Q_AH           0 // EKF_Q_AH, >= 0
 #define HMI_EKF_TUNING_Q_OFFSET       1 // EKF_Q_OFFSET, >= 0

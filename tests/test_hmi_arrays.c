@@ -393,6 +393,31 @@ static void test_raw_temps_uint16_paged_by_capacity(void **state) {
     }
 }
 
+static void test_module_ids(void **state) {
+    (void) state;
+    uint8_t buf[MAX_PAYLOAD];
+
+    // Nothing until the first read
+    size_t len = hmi_build_read_array_response(buf, sizeof(buf), DEVICE_ADDRESS, &model, HMI_ARRAY_MODULE_IDS, 0);
+    response_t r = parse_response(buf, len);
+    assert_int_equal(r.encoding, HMI_TYPE_UINT16);
+    assert_int_equal(r.total, NUM_MODULE_VOLTAGES);
+    assert_int_equal(r.count, 0);
+
+    // One ID per module, with a failed read as BMB3Y_MODULE_ID_NONE
+    for (int i = 0; i < NUM_MODULE_VOLTAGES; i++) model.bmb_diag.module_ids[i] = (uint16_t)(0x020 + i);
+    model.bmb_diag.module_ids[NUM_MODULE_VOLTAGES - 1] = BMB3Y_MODULE_ID_NONE;
+    model.bmb_diag.module_ids_millis = 1234;
+    len = hmi_build_read_array_response(buf, sizeof(buf), DEVICE_ADDRESS, &model, HMI_ARRAY_MODULE_IDS, 0);
+    r = parse_response(buf, len);
+    assert_int_equal(r.count, NUM_MODULE_VOLTAGES);
+    assert_int_equal(r.sample_millis, 1234);
+    for (int i = 0; i < NUM_MODULE_VOLTAGES - 1; i++) {
+        assert_int_equal(get_uint16(&r.elements[i * 2]), 0x020 + i);
+    }
+    assert_int_equal(get_uint16(&r.elements[(NUM_MODULE_VOLTAGES - 1) * 2]), 0xFFFF);
+}
+
 // ============================================================================
 // Writes
 // ============================================================================
@@ -800,6 +825,7 @@ int main(void) {
         cmocka_unit_test_setup(test_balancing_times_untimestamped, setup),
         cmocka_unit_test_setup(test_module_temps_floats, setup),
         cmocka_unit_test_setup(test_raw_temps_uint16_paged_by_capacity, setup),
+        cmocka_unit_test_setup(test_module_ids, setup),
 
         // Writes
         cmocka_unit_test_setup(test_ekf_tuning_before_init, setup),

@@ -106,6 +106,11 @@ static void init_model() {
     sm_init((sm_t*)&model.balancing_sm, "balancing");
     sm_init((sm_t*)&model.calibration_sm, "calibration");
 
+    // No module IDs read yet
+    for (int i = 0; i < BMB3Y_MAX_MODULES; i++) {
+        model.bmb_diag.module_ids[i] = BMB3Y_MODULE_ID_NONE;
+    }
+
     // No isolation reading yet (zero would read as both terminals at chassis)
     model.isolation_pos_to_chassis_V = NAN;
     model.isolation_neg_to_chassis_V = NAN;

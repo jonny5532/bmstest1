@@ -39,7 +39,8 @@
 //   4 = READ_SUPERVISOR (answered by the supervisor); the BMS doesn't announce
 //       over its response
 //   5 = the lifetime throughput totals, HMI_REG_LIFETIME_*
-#define HMI_PROTOCOL_VERSION 5
+//   6 = HMI_ARRAY_MODULE_IDS
+#define HMI_PROTOCOL_VERSION 6
 
 #define HMI_ANNOUNCE_DEVICE_TYPE_BMS 0x01
 
