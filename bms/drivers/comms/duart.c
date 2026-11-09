@@ -438,8 +438,8 @@ size_t duart_read_packet(duart *u, uint8_t *buf, size_t buf_size) {
 bool duart_send_packet(duart *u, const uint8_t *payload, size_t payload_len) {
     // Sends a full packet with the given payload. Returns true on success.
 
-    if(payload_len > 256) {
-        // Too big
+    if(payload_len == 0 || payload_len > 256) {
+        // The length byte encodes len-1, so 0 can't be sent (and > 256 won't fit)
         return false;
     }
 
