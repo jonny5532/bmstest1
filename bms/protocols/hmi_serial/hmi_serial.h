@@ -46,20 +46,7 @@
 #define HMI_NACK_UNKNOWN_MESSAGE 1 // a message type this firmware doesn't know
 #define HMI_NACK_MALFORMED       2 // too short for its type
 
-// Version of this protocol, in HMI_REG_PROTOCOL_VERSION:
-//   1 = READ_ARRAY
-//   2 = WRITE_ARRAY, the EKF and OCV learner arrays, HMI_REG_OCV_LEARN_*
-//   3 = HMI_REG_NAMEPLATE_CAPACITY; HMI_REG_CAPACITY is the actual capacity, saved to NVM;
-//       the learned capacity, HMI_REG_OCV_LEARN_CAPACITY*
-//   4 = READ_SUPERVISOR (answered by the supervisor); the BMS doesn't announce
-//       over its response
-//   5 = the lifetime throughput totals, HMI_REG_LIFETIME_*
-//   6 = HMI_ARRAY_MODULE_IDS
-//   7 = registers renumbered into groups (only SERIAL and PROTOCOL_VERSION
-//       kept their IDs); READ_CELL_VOLTAGES, READ_BALANCING_TIMES and the
-//       per-cell / per-module register ranges removed; LIST_REGISTERS and NACK;
-//       events reordered by subsystem and the reserved ones removed
-#define HMI_PROTOCOL_VERSION 7
+#define HMI_PROTOCOL_VERSION 2
 
 #define HMI_ANNOUNCE_DEVICE_TYPE_BMS 0x01
 
