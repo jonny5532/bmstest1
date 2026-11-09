@@ -385,6 +385,19 @@ target_include_directories(test_hmi_arrays PRIVATE
 
 add_test(NAME test_hmi_arrays COMMAND ${MEMORY_CHECK} test_hmi_arrays)
 
+add_executable(test_hmi_registers
+    test_hmi_registers.c
+    ../bms/protocols/hmi_serial/hmi_registers.c
+)
+target_link_libraries(test_hmi_registers PRIVATE cmocka m)
+target_include_directories(test_hmi_registers PRIVATE
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_hmi_registers COMMAND ${MEMORY_CHECK} test_hmi_registers)
+
 add_executable(test_bmb3y_cells
     test_bmb3y_cells.c
 )
