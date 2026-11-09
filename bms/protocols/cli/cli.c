@@ -1,6 +1,7 @@
 #include "cli.h"
 #include "app/bms.h"
 #include "app/estimators/ekf.h"
+#include "app/firmware_id.h"
 #include "app/model.h"
 #include "app/state_machines/system.h"
 #include "drivers/sensors/internal_adc.h"
@@ -223,6 +224,12 @@ static const char *cmd_ekf(char *args) {
     return NULL;
 }
 
+static const char *cmd_version(char *args) {
+    (void)args;
+    info_printf("Firmware %s\n", bms_build_version);
+    return NULL;
+}
+
 static const char *cmd_adc(char *args) {
     (void)args;
     millis_t now = millis();
@@ -337,6 +344,7 @@ typedef struct {
 static const cli_command_t commands[] = {
     {"help", NULL, cmd_help, "list commands"},
     {"status", NULL, cmd_status, "full status dump"},
+    {"version", NULL, cmd_version, "firmware commit and build time"},
     {"params", "[filter]", cmd_params, "list parameters whose name contains filter"},
     {"set", "<name> <value>", cmd_set, "change a parameter (not persisted)"},
     {"run", NULL, cmd_run, "request operating mode (from inactive)"},

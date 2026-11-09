@@ -31,6 +31,7 @@ include(profiles/profiles.cmake)
 add_executable(bms
     bms/app/bms.c
     bms/app/board_id.c
+    bms/app/firmware_id.c
     bms/app/isolation.c
     bms/app/hardware_checks.c
     bms/app/init.c
@@ -80,6 +81,18 @@ add_executable(bms
     vendor/littlefs/lfs_util.c
     main.c
     )
+
+# The commit and time of this build (bms/app/firmware_id.c). Regenerated on every
+# build so a rebuild after a commit or an edit is never stale.
+set(BMS_FIRMWARE_ID_HEADER ${CMAKE_BINARY_DIR}/generated/firmware_id_generated.h)
+add_custom_target(bms_firmware_id ALL
+    COMMAND ${CMAKE_COMMAND} -DSRC=${CMAKE_CURRENT_LIST_DIR} -DOUT=${BMS_FIRMWARE_ID_HEADER}
+        -P ${CMAKE_CURRENT_LIST_DIR}/cmake/firmware_id.cmake
+    BYPRODUCTS ${BMS_FIRMWARE_ID_HEADER}
+    COMMENT "Stamping the firmware ID"
+)
+add_dependencies(bms bms_firmware_id)
+target_include_directories(bms PRIVATE ${CMAKE_BINARY_DIR}/generated)
 
 pico_generate_pio_header(bms ${CMAKE_CURRENT_LIST_DIR}/vendor/can2040/pio/can2040.pio)
 

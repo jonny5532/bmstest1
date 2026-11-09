@@ -14,6 +14,7 @@
 #include "../drivers/isospi/isosnoop.h"
 #include "../drivers/isospi/isospi_master.h"
 #include "board_id.h"
+#include "firmware_id.h"
 #include "sys/events/events.h"
 #include "state_machines/contactors.h"
 #include "model.h"
@@ -134,6 +135,7 @@ static void init_model() {
         model.system_req = SYSTEM_REQUEST_RUN;
     }
 
+    info_printf("Firmware %s\n", bms_build_version);
     info_printf("Pack profile: %s\n", BMS_PROFILE_NAME);
     info_printf("Capacity: %.1fAh%s (nameplate %.1fAh)\n", get_actual_capacity_mC(&model) / 3600000.0f,
                 model.actual_capacity_mC > 0 ? "" : " from the profile", (float)NAMEPLATE_CAPACITY_AH);

@@ -10,12 +10,18 @@
 #include "app/model.h"
 #include "protocols/hmi_serial/hmi_serial.h"
 #include "protocols/hmi_serial/hmi_registers.h"
+#include "app/firmware_id.h"
 
 #include "pico/unique_id.h"
 
 // Mock globals
 millis_t stored_millis = 0;
 millis64_t stored_millis64 = 0;
+
+// Stand in for the generated firmware ID
+const uint32_t bms_build_hash = 0x8b0c547u | BMS_BUILD_HASH_DIRTY;
+const uint32_t bms_build_time = 1792576800u;
+const char bms_build_version[] = "8b0c547-dirty, built 2026-10-21 10:00 UTC";
 
 void pico_get_unique_board_id(pico_unique_board_id_t *id_out) {
     memset(id_out, 0, sizeof(*id_out));
@@ -84,6 +90,24 @@ static void test_mcu_temperature_register(void **state) {
     assert_true(read_float_register(HMI_REG_MCU_TEMPERATURE) == 47.3f);
 }
 
+static uint32_t read_uint32_register(uint16_t reg_id) {
+    uint8_t buf[16];
+    uint8_t len = hmi_append_register_value(buf, reg_id, &model);
+    assert_int_equal(len, 2 + 1 + 4);
+    assert_int_equal((uint16_t)buf[0] | ((uint16_t)buf[1] << 8), reg_id);
+    assert_int_equal(buf[2], HMI_TYPE_UINT32);
+    return (uint32_t)buf[3] | ((uint32_t)buf[4] << 8) | ((uint32_t)buf[5] << 16) | ((uint32_t)buf[6] << 24);
+}
+
+static void test_build_id_registers(void **state) {
+    (void) state;
+    // Constants, so available from boot
+    assert_true(hmi_register_is_available(HMI_REG_BUILD_HASH, &model));
+    assert_true(hmi_register_is_available(HMI_REG_BUILD_TIME, &model));
+    assert_int_equal(read_uint32_register(HMI_REG_BUILD_HASH), 0x8b0c547u | BMS_BUILD_HASH_DIRTY);
+    assert_int_equal(read_uint32_register(HMI_REG_BUILD_TIME), 1792576800u);
+}
+
 static void test_unknown_register_writes_nothing(void **state) {
     (void) state;
     uint8_t buf[16];
@@ -96,6 +120,7 @@ int main(void) {
         cmocka_unit_test_setup(test_temperature_min_max_available_after_first_reading, setup),
         cmocka_unit_test_setup(test_module_temp_registers_are_floats, setup),
         cmocka_unit_test_setup(test_mcu_temperature_register, setup),
+        cmocka_unit_test_setup(test_build_id_registers, setup),
         cmocka_unit_test_setup(test_unknown_register_writes_nothing, setup),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);

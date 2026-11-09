@@ -120,6 +120,8 @@
 #define HMI_REG_ISOLATION_OPEN_AGE        65 // float (s) since the open reading; 0 = live, NaN = none this boot
 #define HMI_REG_ISOLATION_ZEROED          66 // uint8, 1 once calibrated (system request 6); events need it
 
+#define HMI_REG_BUILD_HASH             68 // uint32, firmware commit's first 7 hex digits; bit 31 = uncommitted changes; 0 = unknown
+#define HMI_REG_BUILD_TIME             69 // uint32, firmware build time (Unix seconds, UTC)
 #define HMI_REG_MCU_TEMPERATURE        70 // float (C), the controller chip's own sensor (a few C accurate)
 #define HMI_REG_PROTOCOL_VERSION       71 // uint16, HMI_PROTOCOL_VERSION; absent before READ_ARRAY
 

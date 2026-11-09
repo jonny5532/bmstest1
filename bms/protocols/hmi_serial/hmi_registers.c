@@ -2,6 +2,7 @@
 #include "hmi_buf.h"
 #include "hmi_serial.h"
 #include "sys/time/time.h"
+#include "app/firmware_id.h"
 #include "drivers/sensors/ina228.h"
 
 #include <math.h>
@@ -158,6 +159,14 @@ uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_model_t *mo
         case HMI_REG_TEMPERATURE_MAX:
             buf[idx++] = HMI_TYPE_FLOAT;
             idx += hmi_buf_append_float(&buf[idx], model->temperature_max);
+            break;
+        case HMI_REG_BUILD_HASH:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], bms_build_hash);
+            break;
+        case HMI_REG_BUILD_TIME:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], bms_build_time);
             break;
         case HMI_REG_MCU_TEMPERATURE:
             buf[idx++] = HMI_TYPE_FLOAT;
