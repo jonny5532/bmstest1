@@ -133,7 +133,10 @@ typedef enum {
                                                                 \
     X(LINK_VOLTAGE_MISMATCH, LEVEL_WARNING, 0)                  \
     X(FUSE_VOLTAGE_DROP_HIGH, LEVEL_CRITICAL, FUSE_DROP_FAULT_DELAY_MS) \
-    X(BMB_PACK_MISMATCH, LEVEL_WARNING, 0)
+    X(BMB_PACK_MISMATCH, LEVEL_WARNING, 0)                      \
+    /* Data: up to 8 missing cell indices, lowest first, one */ \
+    /* per byte from the LSB; unused bytes are 0xFF.          */ \
+    X(CELL_MISSING, LEVEL_WARNING, 0)
 
 typedef enum {
 #define X(name, _1, _2) ERR_##name,

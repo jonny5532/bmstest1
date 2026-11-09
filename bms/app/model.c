@@ -32,26 +32,47 @@ static void model_process_cell_voltages(bms_model_t *model) {
         // No valid data yet
         return;
     }
-    model->cell_voltage_min_mV = model->cell_voltages_mV[0];
-    model->cell_voltage_max_mV = model->cell_voltages_mV[0];
-    model->cell_voltage_total_mV = model->cell_voltages_mV[0];
-    for(int i=1; i<NUM_CELLS; i++) {
-        int32_t voltage = model->cell_voltages_mV[i];
+    // Missing cell indices are packed one per byte, so 0xFF must not be a
+    // valid index.
+    _Static_assert(NUM_CELLS < 0xFF, "cell indices must fit in a byte below 0xFF");
 
-        // TODO - decide on how to handle missing cells
+    int16_t min_mV = INT16_MAX;
+    int16_t max_mV = INT16_MIN;
+    int32_t total_mV = 0;
+    uint64_t missing_cells = UINT64_MAX; // 0xFF = unused slot
+    int missing_count = 0;
+    for(int i=0; i<NUM_CELLS; i++) {
+        int16_t voltage = model->cell_voltages_mV[i];
+
         if(voltage < 0) {
+            // A missing cell (e.g. a disconnected cell tap). Record the first
+            // eight indices for the event.
+            if(missing_count < 8) {
+                int shift = missing_count * 8;
+                missing_cells &= ~((uint64_t)0xFF << shift);
+                missing_cells |= (uint64_t)i << shift;
+            }
+            missing_count++;
             continue;
         }
 
-        model->cell_voltage_total_mV += voltage;
-
-        if(voltage < model->cell_voltage_min_mV) {
-            model->cell_voltage_min_mV = voltage;
-        }
-        if(voltage > model->cell_voltage_max_mV) {
-            model->cell_voltage_max_mV = voltage;
-        }
+        total_mV += voltage;
+        if(voltage < min_mV) min_mV = voltage;
+        if(voltage > max_mV) max_mV = voltage;
     }
+
+    if(missing_count > 0) {
+        // Don't update the derived values or their timestamp: they go stale
+        // and the stale check trips. Transient read failures (CRC errors)
+        // never store a negative voltage, so they don't come through here.
+        raise_bms_event(ERR_CELL_MISSING, missing_cells);
+        return;
+    }
+    clear_bms_event(ERR_CELL_MISSING);
+
+    model->cell_voltage_min_mV = min_mV;
+    model->cell_voltage_max_mV = max_mV;
+    model->cell_voltage_total_mV = total_mV;
     model->cell_voltage_millis = model->cell_voltages_millis;
 }
 

@@ -140,6 +140,101 @@ static void test_temperature_min_max_extraction(void **state) {
     assert_true(m.temperature_max >= 34.9f && m.temperature_max <= 35.1f);
 }
 
+static void test_missing_cell_leaves_derived_values_stale(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    // First tick with all cells present: derived values update
+    model_tick(&m);
+    assert_int_equal(m.cell_voltage_min_mV, 3700);
+    millis_t good_millis = m.cell_voltage_millis;
+
+    // A missing cell 0 (and separately, a missing cell in the middle) must
+    // not update min/max/total or the timestamp, so staleness trips.
+    for (int missing = 0; missing < 2; missing++) {
+        int idx = missing == 0 ? 0 : NUM_CELLS / 2;
+        setup_model_operating(&m);
+        model_tick(&m);
+        good_millis = m.cell_voltage_millis;
+
+        advance_time(1000);
+        m.cell_voltages_millis = stored_millis;
+        m.cell_voltages_mV[idx] = -1;
+        m.cell_voltages_mV[(idx + 1) % NUM_CELLS] = 3500;
+
+        model_tick(&m);
+
+        assert_int_equal(m.cell_voltage_millis, good_millis);
+        assert_int_equal(m.cell_voltage_min_mV, 3700);
+        assert_int_equal(m.cell_voltage_max_mV, 3700);
+        assert_int_equal(m.cell_voltage_total_mV, 3700 * NUM_CELLS);
+    }
+}
+
+static void test_missing_cell_recovers_when_present_again(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    m.cell_voltages_mV[0] = -1;
+    model_tick(&m);
+    assert_int_equal(m.cell_voltage_millis, stored_millis); // unchanged from setup
+
+    advance_time(1000);
+    m.cell_voltages_millis = stored_millis;
+    m.cell_voltages_mV[0] = 3500;
+    model_tick(&m);
+
+    assert_int_equal(m.cell_voltage_millis, stored_millis);
+    assert_int_equal(m.cell_voltage_min_mV, 3500);
+    assert_int_equal(m.cell_voltage_max_mV, 3700);
+    assert_int_equal(m.cell_voltage_total_mV, 3500 + 3700 * (NUM_CELLS - 1));
+}
+
+static void test_missing_cell_event_lists_indices(void **state) {
+    (void) state;
+    extern bms_event_slot_t bms_event_slots[];
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    // One missing cell: index in the low byte, the rest 0xFF
+    m.cell_voltages_mV[3] = -1;
+    model_tick(&m);
+    assert_int_equal(get_event_level(ERR_CELL_MISSING), LEVEL_WARNING);
+    assert_int_equal(get_event_count(ERR_CELL_MISSING), 1);
+    assert_true(bms_event_slots[ERR_CELL_MISSING].data64 == 0xFFFFFFFFFFFFFF03ULL);
+
+    // Still missing on later ticks: count doesn't climb
+    model_tick(&m);
+    assert_int_equal(get_event_count(ERR_CELL_MISSING), 1);
+
+    // More than 8 missing: the first 8, lowest index first from the LSB
+    assert_true(NUM_CELLS >= 10);
+    for (int i = 0; i < 10; i++) m.cell_voltages_mV[i] = -1;
+    model_tick(&m);
+    assert_true(bms_event_slots[ERR_CELL_MISSING].data64 == 0x0706050403020100ULL);
+
+    // All present again: event clears, keeping the count and last data
+    for (int i = 0; i < NUM_CELLS; i++) m.cell_voltages_mV[i] = 3700;
+    model_tick(&m);
+    assert_int_equal(get_event_level(ERR_CELL_MISSING), LEVEL_NONE);
+    assert_int_equal(get_event_count(ERR_CELL_MISSING), 1);
+    assert_true(bms_event_slots[ERR_CELL_MISSING].data64 == 0x0706050403020100ULL);
+}
+
+static void test_last_cell_missing_reported(void **state) {
+    (void) state;
+    extern bms_event_slot_t bms_event_slots[];
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    m.cell_voltages_mV[NUM_CELLS - 1] = -1;
+    model_tick(&m);
+    assert_true(bms_event_slots[ERR_CELL_MISSING].data64 ==
+                (0xFFFFFFFFFFFFFF00ULL | (uint64_t)(NUM_CELLS - 1)));
+}
+
 static void test_temperature_min_max_not_truncated(void **state) {
     (void) state;
     bms_model_t m = {0};
@@ -451,7 +546,11 @@ int main(void) {
         cmocka_unit_test_setup(test_cell_voltage_min_max_extraction, setup),
         cmocka_unit_test_setup(test_cell_voltage_total_calculation, setup),
         cmocka_unit_test_setup(test_temperature_min_max_extraction, setup),
+        cmocka_unit_test_setup(test_missing_cell_leaves_derived_values_stale, setup),
+        cmocka_unit_test_setup(test_missing_cell_recovers_when_present_again, setup),
         cmocka_unit_test_setup(test_temperature_min_max_not_truncated, setup),
+        cmocka_unit_test_setup(test_missing_cell_event_lists_indices, setup),
+        cmocka_unit_test_setup(test_last_cell_missing_reported, setup),
         
         // Current limit application
         cmocka_unit_test_setup(test_current_disabled_when_contactors_not_enabled, setup),
