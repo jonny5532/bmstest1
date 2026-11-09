@@ -16,7 +16,7 @@ static void model_process_temperatures(bms_model_t *model) {
     model->temperature_min = model->module_temperatures[0];
     model->temperature_max = model->module_temperatures[0];
     for(int i=1; i<NUM_MODULE_TEMPS; i++) {
-        int16_t temp = model->module_temperatures[i];
+        float temp = model->module_temperatures[i];
         if(temp < model->temperature_min) {
             model->temperature_min = temp;
         }

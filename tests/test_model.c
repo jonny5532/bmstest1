@@ -140,6 +140,23 @@ static void test_temperature_min_max_extraction(void **state) {
     assert_true(m.temperature_max >= 34.9f && m.temperature_max <= 35.1f);
 }
 
+static void test_temperature_min_max_not_truncated(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    // Module 0 seeds min/max; later modules must not be truncated to int
+    m.module_temperatures_raw_dC[1] = -9;
+    m.module_temperatures[1] = -0.9f;
+    m.module_temperatures_raw_dC[2] = 459;
+    m.module_temperatures[2] = 45.9f;
+
+    model_tick(&m);
+
+    assert_true(m.temperature_min <= -0.85f && m.temperature_min >= -0.95f);
+    assert_true(m.temperature_max >= 45.85f && m.temperature_max <= 45.95f);
+}
+
 // ============================================================================
 // Current Limit Application Tests
 // ============================================================================
@@ -434,6 +451,7 @@ int main(void) {
         cmocka_unit_test_setup(test_cell_voltage_min_max_extraction, setup),
         cmocka_unit_test_setup(test_cell_voltage_total_calculation, setup),
         cmocka_unit_test_setup(test_temperature_min_max_extraction, setup),
+        cmocka_unit_test_setup(test_temperature_min_max_not_truncated, setup),
         
         // Current limit application
         cmocka_unit_test_setup(test_current_disabled_when_contactors_not_enabled, setup),
