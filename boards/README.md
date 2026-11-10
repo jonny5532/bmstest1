@@ -6,7 +6,7 @@ how the pack is wired) belong in a pack profile instead (`profiles/`).
 
 ```
 boards/
-  builtin/   the revisions (rev0.h, rev1.h) and the modified boards we have
+  builtin/   the revisions (rev0.h, rev1.h, rev1_1.h) and the modified boards we have
   custom/    your own boards; ignored by git, so a pull won't touch them
 ```
 
@@ -22,6 +22,7 @@ cmake -S bms -B bms/build -DBMS_PROFILE=bluetesla -DBMS_BOARD=rev1
 |---|---|---|
 | `rev0` | Rev0 | none |
 | `rev1` | Rev1 | none |
+| `rev1_1` | Rev1.1 | none (USB VBUS is sensed on GPIO3 by the board's own divider) |
 | `desk` | Rev1 | USB VBUS sensed on GPIO3 (J12 pin 2) through a 3.3k/5.1k divider |
 | `ck0` | Rev1 | external D+ pull-up powered from the host's VBUS |
 
