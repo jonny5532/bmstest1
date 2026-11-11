@@ -108,11 +108,21 @@ static bool ina228_read_reg16(ina228_t *dev, uint8_t reg, uint16_t *value) {
     return true;
 }
 
+const char *ina228_chip_name(const ina228_t *dev) {
+    switch (dev->chip) {
+        case INA_CHIP_INA228: return "INA228";
+        case INA_CHIP_INA237: return "INA237";
+        case INA_CHIP_INA238: return "INA237/INA238";
+        default:              return "INA2xx";
+    }
+}
+
 bool ina228_init(ina228_t *dev, uint8_t i2c_addr, float shunt_resistor_ohms, float max_current_a) {
     (void)max_current_a; // current LSB is currently fixed in ina228_configure()
     dev->i2c = INA228_I2C;
     dev->addr = i2c_addr;
     dev->present = false;
+    dev->chip = 0;
     dev->shunt_resistor_ohms = shunt_resistor_ohms;
     dev->async_busy = false;
     
@@ -131,20 +141,21 @@ bool ina228_init(ina228_t *dev, uint8_t i2c_addr, float shunt_resistor_ohms, flo
         return false;
     }
     
-    // Read device ID (should be 0x228)
+    // Read device ID: 0x228, 0x237 or 0x238 in the upper 12 bits
     uint16_t dev_id;
     if (!ina228_read_reg16(dev, INA228_REG_DEVICE_ID, &dev_id)) {
         error_printf("INA228: Failed to read device ID\n");
         return false;
     }
     
-    uint16_t expected_id = (0x228 << 4);  // Device ID is in upper 12 bits
-    if ((dev_id & 0xFFF0) != expected_id) {
-        error_printf("INA228: Invalid device ID: 0x%04X (expected 0x%04X)\n", dev_id, expected_id);
+    uint16_t chip = dev_id >> 4;
+    if (chip != INA_CHIP_INA228 && chip != INA_CHIP_INA237 && chip != INA_CHIP_INA238) {
+        error_printf("INA228: Invalid device ID: 0x%04X (expected 0x228x, 0x237x or 0x238x)\n", dev_id);
         return false;
     }
-    
-    info_printf("INA228: Detected (MFG=0x%04X, DEV=0x%04X)\n", mfg_id, dev_id);
+    dev->chip = chip;
+
+    info_printf("%s: Detected (MFG=0x%04X, DEV=0x%04X)\n", ina228_chip_name(dev), mfg_id, dev_id);
     
     // Perform a software reset
     if (!ina228_write_reg16(dev, INA228_REG_CONFIG, INA228_CONFIG_RST)) {
@@ -182,6 +193,9 @@ void ina228_configure(ina228_t *dev) {
     // SHUNT_CAL = 13107.2e6 * Current_LSB * R_shunt (x4 with ADCRANGE=1).
     // INA228_SHUNT_CAL is chosen so the CURRENT register reads in 0.25mA units
     // (332 would read mA; x4 for adcrange, /4 for 0.25mA units cancel out).
+    // An INA237 or INA238 gets the same value: its SHUNT_CAL constant is
+    // 819.2e6, a sixteenth of the INA228's, so its 16-bit CURRENT register
+    // reads in 4mA units over the same range, and is scaled by 16 when read.
     dev->current_lsb = 0.001f;
     uint16_t shunt_cal = INA228_SHUNT_CAL;
     
@@ -255,18 +269,25 @@ static volatile bool temp_reading_available = false;
 
 static void on_read_complete(i2c_inst_t *i2c, bool success, void *user_data) {
     (void)i2c;
-    (void)user_data;
+    ina228_t *dev = (ina228_t *)user_data;
 
     if (success) {
         uint16_t diag = ((uint16_t)async_read_buf[0] << 8) | async_read_buf[1];
         if (diag & 0x0002) { // Conversion Ready
-            int32_t raw = ((int32_t)async_read_buf[2] << 12) | 
-                          ((int32_t)async_read_buf[3] << 4) | 
-                          ((int32_t)async_read_buf[4] >> 4);
-            
-            // Sign extend from 20 bits
-            if (raw & 0x80000) {
-                raw |= 0xFFF00000;
+            int32_t raw;
+            if (ina228_is_16bit(dev)) {
+                // Signed 16-bit value in 4mA steps; scale to 0.25mA counts
+                raw = (int16_t)(((uint16_t)async_read_buf[2] << 8) | async_read_buf[3]);
+                raw *= 16;
+            } else {
+                raw = ((int32_t)async_read_buf[2] << 12) |
+                      ((int32_t)async_read_buf[3] << 4) |
+                      ((int32_t)async_read_buf[4] >> 4);
+
+                // Sign extend from 20 bits
+                if (raw & 0x80000) {
+                    raw |= 0xFFF00000;
+                }
             }
             
             latest_async_current_raw = raw;
@@ -297,14 +318,18 @@ static void on_config_write_complete(i2c_inst_t *i2c, bool success, void *user_d
 
 static void on_temp_read_complete(i2c_inst_t *i2c, bool success, void *user_data) {
     (void)i2c;
-    (void)user_data;
+    ina228_t *dev = (ina228_t *)user_data;
 
     if (!success) {
         ina228_stats.i2c_errors++;
         return; // Stay in MEAS_STATE_CONVERTING; the timer will retry
     }
 
-    if (meas_is_ntc) {
+    if (meas_is_ntc && ina228_is_16bit(dev)) {
+        // VBUS is a 16-bit value in 3.125mV steps; scale to the INA228's
+        // 195.3125uV steps
+        latest_temp_raw = (int32_t)(((uint16_t)temp_read_buf[0] << 8) | temp_read_buf[1]) * 16;
+    } else if (meas_is_ntc) {
         // VBUS is a 20-bit value in the upper bits of 3 bytes
         int32_t raw = ((int32_t)temp_read_buf[0] << 12) |
                       ((int32_t)temp_read_buf[1] << 4) |
@@ -314,8 +339,15 @@ static void on_temp_read_complete(i2c_inst_t *i2c, bool success, void *user_data
         }
         latest_temp_raw = raw;
     } else {
-        // DIETEMP is a signed 16-bit value
-        latest_temp_raw = (int16_t)(((uint16_t)temp_read_buf[0] << 8) | temp_read_buf[1]);
+        // DIETEMP is a signed 16-bit value in 7.8125 m degree steps. The
+        // 16-bit chips' is 12 bits in the upper bits of the same register
+        // (125 m degree steps), which reads the same once the reserved low
+        // bits are cleared.
+        uint16_t reg = ((uint16_t)temp_read_buf[0] << 8) | temp_read_buf[1];
+        if (ina228_is_16bit(dev)) {
+            reg &= 0xFFF0;
+        }
+        latest_temp_raw = (int16_t)reg;
     }
     temp_result_is_ntc = meas_is_ntc;
     temp_reading_available = true;
@@ -342,7 +374,8 @@ static bool timer_callback(struct repeating_timer *t) {
         case MEAS_STATE_CURRENT:
             i2c_async_read_regs_dual(dev->i2c, dev->addr, 
                                      INA228_REG_DIAG_ALRT, 2, 
-                                     INA228_REG_CURRENT, 3, 
+                                     INA228_REG_CURRENT,
+                                     ina228_is_16bit(dev) ? 2 : 3, 
                                      async_read_buf, on_read_complete, dev);
             break;
         case MEAS_STATE_TRIGGER_PENDING:
@@ -355,7 +388,9 @@ static bool timer_callback(struct repeating_timer *t) {
             if ((time_us_32() - trigger_written_us) >= INA228_TEMP_CONVERSION_WAIT_US) {
                 if (meas_is_ntc) {
                     i2c_async_read_reg(dev->i2c, dev->addr, INA228_REG_VBUS,
-                                       temp_read_buf, 3, on_temp_read_complete, dev);
+                                       temp_read_buf,
+                                       ina228_is_16bit(dev) ? 2 : 3,
+                                       on_temp_read_complete, dev);
                 } else {
                     i2c_async_read_reg(dev->i2c, dev->addr, INA228_REG_DIETEMP,
                                        temp_read_buf, 2, on_temp_read_complete, dev);
@@ -376,6 +411,11 @@ static void ina228_start_async_timer(ina228_t *dev) {
     add_repeating_timer_us(-160000, timer_callback, dev, &timer);
 }
 
+// The NTC divider's supply, by the PCB revision detected at boot (Rev1.1 = 11)
+static float ntc_supply_v(void) {
+    return model.board_id >= 11 ? INA228_NTC_SUPPLY_REV1_1_V : INA228_NTC_SUPPLY_V;
+}
+
 // Convert and store a completed temperature measurement into the model
 static void store_temp_result(bool is_ntc, int32_t raw) {
     if (is_ntc) {
@@ -383,11 +423,12 @@ static void store_temp_result(bool is_ntc, int32_t raw) {
         float v = (float)raw * 195.3125e-6f;
         // Clamp to avoid division by zero / log of a non-positive number
         // (e.g. with the NTC disconnected the node floats up to the supply)
-        float v_max = INA228_NTC_SUPPLY_V - 0.001f;
+        float supply_v = ntc_supply_v();
+        float v_max = supply_v - 0.001f;
         if (v < 0.001f) v = 0.001f;
         if (v > v_max) v = v_max;
 
-        float r_ntc = INA228_NTC_PULLUP_OHMS * v / (INA228_NTC_SUPPLY_V - v);
+        float r_ntc = INA228_NTC_PULLUP_OHMS * v / (supply_v - v);
         // Beta equation: 1/T = 1/T25 + ln(R/R25)/B
         float temp_c = 1.0f / (1.0f / 298.15f
                                + logf(r_ntc / INA228_NTC_R25_OHMS) / INA228_NTC_BETA)
@@ -498,12 +539,17 @@ bool ina228_read_current_async(ina228_t *dev) {
     // integration. Applied to the raw value before the null-calibration
     // accumulator, so the stored zero-current offset stays
     // temperature-independent.
+    // The curve was fitted to an INA228 and isn't applied to the other chips,
+    // which have no fit of their own yet.
     static float vos_residual = 0.0f;
-    float die_temp_c = (model.shunt_die_temperature_millis > 0)
-                       ? model.shunt_die_temperature : 25.0f;
-    float vos_total = ina228_vos_counts(die_temp_c) + vos_residual;
-    int32_t vos_whole = (int32_t)lroundf(vos_total);
-    vos_residual = vos_total - (float)vos_whole;
+    int32_t vos_whole = 0;
+    if (dev->chip == INA_CHIP_INA228) {
+        float die_temp_c = (model.shunt_die_temperature_millis > 0)
+                           ? model.shunt_die_temperature : 25.0f;
+        float vos_total = ina228_vos_counts(die_temp_c) + vos_residual;
+        vos_whole = (int32_t)lroundf(vos_total);
+        vos_residual = vos_total - (float)vos_whole;
+    }
 
     int32_t raw_compensated = current_raw - vos_whole;
 

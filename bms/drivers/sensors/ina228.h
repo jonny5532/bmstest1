@@ -29,14 +29,28 @@
 
 #define INA228_I2C_TIMEOUT_US     10000
 
-// External shunt NTC divider (Shunt_5V -> 10k pullup -> NTC -> GND_Shunt),
-// sensed via the INA228 VBUS pin. The supply is an unregulated isolated DC-DC,
-// so absolute accuracy is limited; the computed resistance is exposed over the
-// HMI to allow later calibration of these constants.
+// The chips this driver runs, as the upper 12 bits of DEVICE_ID. The INA237
+// and INA238 (the same part with a tighter offset and gain) have the INA228's
+// pinout and register addresses, but 16-bit results: their CURRENT and VBUS
+// steps are 16 times the INA228's, and their DIETEMP has 12 bits.
+//
+// TI documents DEVICE_ID for the INA238 only. The ID can't be relied on to
+// tell an INA237 from an INA238 (the sensor on the first Rev1.1 boards reads
+// 0x2381), so 0x237 and 0x238 are both accepted and treated alike.
+#define INA_CHIP_INA228 0x228
+#define INA_CHIP_INA237 0x237
+#define INA_CHIP_INA238 0x238
+
+// External shunt NTC divider (shunt-side supply -> 10k pullup -> NTC ->
+// GND_Shunt), sensed via the INA228 VBUS pin. Up to Rev1.0 the supply is an
+// unregulated isolated DC-DC, so absolute accuracy is limited; the computed
+// resistance is exposed over the HMI to allow later calibration of these
+// constants. From Rev1.1 the divider runs from a 3.3V regulator.
 #define INA228_NTC_PULLUP_OHMS   10000.0f
 #define INA228_NTC_R25_OHMS      10000.0f
 #define INA228_NTC_BETA          3950.0f
 #define INA228_NTC_SUPPLY_V      5.55f
+#define INA228_NTC_SUPPLY_REV1_1_V 3.3f
 
 // How many accepted current samples (~531ms each) between temperature
 // measurements. Each trigger alternates between the die temp and the NTC.
@@ -55,6 +69,7 @@ typedef struct {
     i2c_inst_t *i2c;
     uint8_t addr;
     bool present;
+    uint16_t chip; // INA_CHIP_*, from DEVICE_ID; 0 if none was found
     float current_lsb;
     float shunt_resistor_ohms;
 
@@ -77,11 +92,19 @@ typedef struct {
     uint32_t i2c_errors;       // failed I2C transactions
     uint32_t die_measurements; // completed die temperature measurements
     uint32_t ntc_measurements; // completed NTC (VBUS) measurements
-    int32_t last_raw;          // last CURRENT register value (0.25mA counts)
+    int32_t last_raw;          // last CURRENT reading (0.25mA counts; multiples of 16 from an INA237/INA238)
     int32_t last_vos_counts;   // offset voltage correction applied to it
     float ntc_volts;           // last NTC divider voltage
 } ina228_stats_t;
 extern ina228_stats_t ina228_stats;
+
+// "INA228", "INA237" or "INA237/INA238"; "INA2xx" if no chip has been detected
+const char *ina228_chip_name(const ina228_t *dev);
+
+// Whether the chip has the INA237/INA238's 16-bit result registers
+static inline bool ina228_is_16bit(const ina228_t *dev) {
+    return dev->chip == INA_CHIP_INA237 || dev->chip == INA_CHIP_INA238;
+}
 
 bool ina228_init(ina228_t *dev, uint8_t i2c_addr, float shunt_resistor_ohms, float max_current_a);
 void ina228_configure(ina228_t *dev);

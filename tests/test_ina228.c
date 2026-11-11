@@ -68,6 +68,16 @@ static int64_t true_charge_raw = 0;
 #define INA_DIETEMP_25C 3200 // 7.8125 m degrees C per LSB
 #define INA_VBUS_NTC 13824   // ~2.7V on the NTC divider
 
+// Which chip is fitted. An INA237 or INA238 has 16-bit CURRENT and VBUS
+// registers with steps 16 times the INA228's, and a 12-bit DIETEMP.
+static uint16_t ina_chip = INA_CHIP_INA228;
+static uint16_t ina_device_id = 0x2281;
+static bool ina_16bit(void) {
+    return ina_chip == INA_CHIP_INA237 || ina_chip == INA_CHIP_INA238;
+}
+// How many bytes the driver last read from each result register
+static size_t current_read_len, vbus_read_len;
+
 static struct {
     bool continuous;
     uint64_t conv_start_us;      // start of the current conversion (continuous)
@@ -104,7 +114,9 @@ static void ina_advance(uint32_t us) {
         if (now_us >= conv_end_us) {
             // Split the step at the end of the conversion
             int64_t overshoot = (int64_t)true_current_raw * (int64_t)(now_us - conv_end_us);
-            ina.current_reg = (int32_t)((ina.conv_charge - overshoot) / INA_PERIOD_US) + INA_VOS_COUNTS;
+            // The driver only corrects an INA228's offset
+            ina.current_reg = (int32_t)((ina.conv_charge - overshoot) / INA_PERIOD_US)
+                + (ina_chip == INA_CHIP_INA228 ? INA_VOS_COUNTS : 0);
             ina.cnvrf = true;
             ina.conv_start_us = conv_end_us;
             ina.conv_charge = overshoot;
@@ -130,19 +142,31 @@ static void ina_read_reg(uint8_t reg, uint8_t *buf, size_t len) {
             ina.cnvrf = false;
             break;
         case INA228_REG_CURRENT:
-            put_be(buf, ((uint32_t)ina.current_reg & 0xFFFFF) << 4, len);
+            current_read_len = len;
+            if (ina_16bit()) {
+                // 4mA steps, rounded down
+                put_be(buf, (uint32_t)(ina.current_reg >> 4) & 0xFFFF, len);
+            } else {
+                put_be(buf, ((uint32_t)ina.current_reg & 0xFFFFF) << 4, len);
+            }
             break;
         case INA228_REG_DIETEMP:
-            put_be(buf, INA_DIETEMP_25C, len);
+            // The 16-bit chips' low four bits are reserved; the driver must ignore them
+            put_be(buf, ina_16bit() ? (INA_DIETEMP_25C | 0x5) : INA_DIETEMP_25C, len);
             break;
         case INA228_REG_VBUS:
-            put_be(buf, (uint32_t)INA_VBUS_NTC << 4, len);
+            vbus_read_len = len;
+            if (ina_16bit()) {
+                put_be(buf, INA_VBUS_NTC >> 4, len); // 3.125mV steps
+            } else {
+                put_be(buf, (uint32_t)INA_VBUS_NTC << 4, len);
+            }
             break;
         case INA228_REG_MANUFACTURER_ID:
             put_be(buf, 0x5449, len);
             break;
         case INA228_REG_DEVICE_ID:
-            put_be(buf, 0x2281, len);
+            put_be(buf, ina_device_id, len);
             break;
         default:
             put_be(buf, 0, len);
@@ -366,11 +390,145 @@ static void test_charge_through_a_long_stall(void **state) {
     assert_non_null(strstr(log_text, "since the last current sample"));
 }
 
+// Fit a chip with the given DEVICE_ID and start the driver on it, on a board
+// of the given revision (app/board_id.h codes)
+static bool fit_chip(uint16_t device_id, uint16_t board_id) {
+    ina_chip = device_id >> 4;
+    ina_device_id = device_id;
+    memset(&ina, 0, sizeof(ina));
+    memset(&model, 0, sizeof(model));
+    model.board_id = board_id;
+    true_current_raw = 0;
+    current_read_len = vbus_read_len = 0;
+    return ina228_init(&dev, 0x40, 0.001f, 100.0f);
+}
+
+static void test_ina228_register_widths_and_temperatures(void **state) {
+    (void)state;
+
+    assert_true(fit_chip(0x2281, 10));
+    assert_int_equal(dev.chip, INA_CHIP_INA228);
+    assert_string_equal(ina228_chip_name(&dev), "INA228");
+
+    true_current_raw = 4943; // 1235.75mA
+    start_measuring();
+    run(120000000, 0);
+    assert_int_equal(current_read_len, 3);
+    assert_int_equal(vbus_read_len, 3);
+    assert_int_equal(model.current_mA, 1236);
+    assert_int_equal(ina228_stats.last_vos_counts, INA_VOS_COUNTS);
+    assert_float_equal(model.shunt_die_temperature, 25.0f, 0.001f);
+    // 2.7V on a divider from 5.55V
+    assert_float_equal(model.shunt_ntc_resistance_ohms, 9473.7f, 5.0f);
+}
+
+static void test_ina237_current_and_charge(void **state) {
+    (void)state;
+
+    assert_true(fit_chip(0x2370, 11));
+    assert_int_equal(dev.chip, INA_CHIP_INA237);
+    assert_true(dev.present);
+    assert_string_equal(ina228_chip_name(&dev), "INA237");
+    assert_non_null(strstr(log_text, "INA237: Detected"));
+
+    true_current_raw = 400000; // 100A
+    run(2000000, 0);
+    start_measuring();
+    run(300000000, 0);
+
+    // Two-byte reads, scaled to the INA228's units, with no offset curve
+    assert_int_equal(current_read_len, 2);
+    assert_int_equal(ina228_stats.last_raw, 400000);
+    assert_int_equal(ina228_stats.last_vos_counts, 0);
+    assert_int_equal(model.current_mA, 100000);
+    assert_true(ina.triggered_count >= 5);
+    assert_true(samples > 500);
+    assert_charge_matches();
+
+    true_current_raw = -320000; // -80A
+    run(2000000, 0);
+    start_measuring();
+    run(60000000, 0);
+    assert_int_equal(model.current_mA, -80000);
+    assert_charge_matches();
+}
+
+static void test_ina237_small_current_reads_in_4mA_steps(void **state) {
+    (void)state;
+
+    assert_true(fit_chip(0x2370, 11));
+    true_current_raw = 4943; // 1235.75mA, between two 4mA steps
+    run(5000000, 0);
+    assert_int_equal(ina228_stats.last_raw, 4928);
+    assert_int_equal(model.current_mA, 1232);
+
+    true_current_raw = -4943; // rounds down, away from zero
+    run(5000000, 0);
+    assert_int_equal(ina228_stats.last_raw, -4944);
+    assert_int_equal(model.current_mA, -1236);
+}
+
+static void test_ina237_temperatures(void **state) {
+    (void)state;
+
+    // Rev1.1: the NTC divider runs from 3.3V
+    assert_true(fit_chip(0x2370, 11));
+    run(120000000, 0);
+    assert_int_equal(vbus_read_len, 2);
+    assert_true(model.shunt_die_temperature_millis > 0);
+    assert_float_equal(model.shunt_die_temperature, 25.0f, 0.001f);
+    assert_true(model.shunt_ntc_millis > 0);
+    assert_float_equal(ina228_stats.ntc_volts, 2.7f, 0.001f);
+    assert_float_equal(model.shunt_ntc_resistance_ohms, 45000.0f, 5.0f);
+}
+
+// DEVICE_ID 0x238x (an INA238, or an INA237 that reports the same ID) is read
+// exactly as 0x237x is
+static void test_ina238(void **state) {
+    (void)state;
+
+    log_len = 0;
+    assert_true(fit_chip(0x2381, 11));
+    assert_int_equal(dev.chip, INA_CHIP_INA238);
+    assert_string_equal(ina228_chip_name(&dev), "INA237/INA238");
+    assert_non_null(strstr(log_text, "INA237/INA238: Detected"));
+
+    true_current_raw = -320000; // -80A
+    run(2000000, 0);
+    start_measuring();
+    run(120000000, 0);
+    assert_int_equal(current_read_len, 2);
+    assert_int_equal(vbus_read_len, 2);
+    assert_int_equal(ina228_stats.last_raw, -320000);
+    assert_int_equal(ina228_stats.last_vos_counts, 0);
+    assert_int_equal(model.current_mA, -80000);
+    assert_charge_matches();
+    assert_float_equal(model.shunt_die_temperature, 25.0f, 0.001f);
+    assert_float_equal(model.shunt_ntc_resistance_ohms, 45000.0f, 5.0f);
+}
+
+static void test_unknown_chip_is_rejected(void **state) {
+    (void)state;
+
+    log_len = 0;
+    assert_false(fit_chip(0x2290, 11));
+    assert_false(dev.present);
+    assert_int_equal(dev.chip, 0);
+    assert_string_equal(ina228_chip_name(&dev), "INA2xx");
+    assert_non_null(strstr(log_text, "Invalid device ID: 0x2290"));
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_charge_through_temperature_measurements),
         cmocka_unit_test(test_charge_in_both_directions),
         cmocka_unit_test(test_charge_through_a_long_stall),
+        cmocka_unit_test(test_ina228_register_widths_and_temperatures),
+        cmocka_unit_test(test_ina237_current_and_charge),
+        cmocka_unit_test(test_ina237_small_current_reads_in_4mA_steps),
+        cmocka_unit_test(test_ina237_temperatures),
+        cmocka_unit_test(test_ina238),
+        cmocka_unit_test(test_unknown_chip_is_rejected),
     };
     return cmocka_run_group_tests(tests, setup, NULL);
 }

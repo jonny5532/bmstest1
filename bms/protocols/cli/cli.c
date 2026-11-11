@@ -326,7 +326,7 @@ static const char *cmd_ina(char *args) {
     ina228_stats.max_gap_us = 0;
     millis_t dt = prev_ms ? now - prev_ms : now;
 
-    info_printf("INA228 (0x40): %s | SHUNT_CAL %u\n",
+    info_printf("%s (0x40): %s | SHUNT_CAL %u\n", ina228_chip_name(&ina228_dev),
         ina228_dev.present ? "present" : "NOT DETECTED", (unsigned)INA228_SHUNT_CAL);
     info_printf("INA228 samples: %lu (%.3f Hz over %lu ms), max gap %lu ms, I2C errors %lu\n",
         st.samples, rate_hz(st.samples, prev_samples, dt), dt,
@@ -385,7 +385,7 @@ static const cli_command_t commands[] = {
     {"ekf", NULL, cmd_ekf, "EKF constants and state"},
     {"adc", NULL, cmd_adc, "internal ADC readings"},
     {"ads", NULL, cmd_ads, "ADS1115 readings, scan rate and errors"},
-    {"ina", NULL, cmd_ina, "INA228 current, charge, temperatures and sampling stats"},
+    {"ina", NULL, cmd_ina, "INA228/INA237/INA238 current, charge, temperatures and sampling stats"},
     {"cells_raw", NULL, cmd_cells_raw, "last reading of every BMB channel (* = in the cell map)"},
     {"temps", NULL, cmd_temps, "every BMB thermistor channel (#n = in the profile) and die temperature"},
     {"supervisor", NULL, cmd_supervisor, "supervisor state, reasons and the cell map it enforces"},

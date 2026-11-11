@@ -162,6 +162,7 @@ target_link_libraries(bms
     hardware_pio
     hardware_pwm
     cmsis_core
+    m # lroundf: linking as C leaves libm out
 )
 
 target_compile_definitions(bms PRIVATE
