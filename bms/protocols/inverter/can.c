@@ -8,6 +8,11 @@ static can2040_rx_cb saved_rx_cb = 0;
 
 static const int can_bitrate = 500000; // 500 kbps
 
+// Frames counted before the last bus restart: can2040_setup() clears the
+// can2040 statistics
+static uint32_t frames_sent_before_restart = 0;
+static uint32_t frames_received_before_restart = 0;
+
 static void PIOx_IRQHandler(void)
 {
     can2040_pio_irq_handler(&cbus);
@@ -32,6 +37,11 @@ void inverter_can_reset(void) {
     // Documented can2040 sequence for discarding any queued (possibly
     // never-acknowledged) transmits and restarting the bus. The PIO IRQ
     // handler stays installed.
+    struct can2040_stats stats;
+    can2040_get_statistics(&cbus, &stats);
+    frames_sent_before_restart += stats.tx_total;
+    frames_received_before_restart += stats.rx_total;
+
     can2040_stop(&cbus);
     can2040_setup(&cbus, CAN2040_PIO_NUM);
     can2040_callback_config(&cbus, saved_rx_cb);
@@ -44,4 +54,16 @@ int inverter_can_transmit(const struct can2040_msg *msg) {
 
 void inverter_can_get_stats(struct can2040_stats *stats) {
     can2040_get_statistics(&cbus, stats);
+}
+
+uint32_t inverter_can_frames_sent(void) {
+    struct can2040_stats stats;
+    can2040_get_statistics(&cbus, &stats);
+    return frames_sent_before_restart + stats.tx_total;
+}
+
+uint32_t inverter_can_frames_received(void) {
+    struct can2040_stats stats;
+    can2040_get_statistics(&cbus, &stats);
+    return frames_received_before_restart + stats.rx_total;
 }

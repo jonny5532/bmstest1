@@ -104,6 +104,8 @@ another register's value.
 
 #define HMI_REG_SYSTEM_STATE           0x1010 // uint8
 #define HMI_REG_CONTACTORS_STATE       0x1011 // uint8
+#define HMI_REG_BALANCING_STATE        0x1012 // uint8, enum balancing_states (0 = idle, 1 = active)
+#define HMI_REG_CALIBRATION_STATE      0x1013 // uint8, calibration_state_t (0 = idle)
 
 // 0x11xx: measurements
 #define HMI_REG_BATTERY_VOLTAGE        0x1100 // int32 (mV)
@@ -137,6 +139,15 @@ another register's value.
 #define HMI_REG_PACK_NEG_TO_CHASSIS       0x1152 // float (V), pack- to chassis (normally negative); NaN if unusable
 #define HMI_REG_ISOLATION_OPEN_AGE        0x1153 // float (s) since the open reading; 0 = live, NaN = none this boot
 #define HMI_REG_ISOLATION_ZEROED          0x1154 // uint8, 1 once calibrated (system request 6); events need it
+
+// How close the pack is to a protection trip: the charge counted against a
+// limit, as a percentage of the amount that raises the event (so it trips
+// just past 100). They fall back towards 0 once the current is within limits.
+#define HMI_REG_OVERCURRENT_CHARGE_BUFFER    0x1160 // float (%), charge beyond the charge current limit (OVERCURRENT_CHARGING)
+#define HMI_REG_OVERCURRENT_DISCHARGE_BUFFER 0x1161 // float (%), the same for discharging (OVERCURRENT_DISCHARGING)
+#define HMI_REG_SOFT_CHARGE_BUFFER           0x1162 // float (%), charge past the soft cell voltage limits: positive
+                                                    // above the upper one, negative below the lower one
+                                                    // (SOFT_CHARGE_BUFFER_EXCEEDED past +100 or -100)
 
 // 0x12xx: SOC and estimators
 #define HMI_REG_SOC                    0x1200 // uint16; writable (sets the EKF's SOC, not saved)
@@ -213,6 +224,18 @@ another register's value.
 
 // 0x30xx: commands
 #define HMI_REG_SYSTEM_REQUEST             0x3000 // uint8, system_requests_t (6 = zero the isolation monitor)
+
+// 0xF0xx: debug. Link counters since boot (all uint32, wrapping at 2^32), for
+// finding a noisy or dead link.
+// UART0 is the internal link to the supervisor, UART1 the HMI link.
+#define HMI_REG_UART0_PACKETS_RECEIVED     0xF000 // packets with a good CRC
+#define HMI_REG_UART0_PACKETS_SENT         0xF001
+#define HMI_REG_UART0_CRC_ERRORS           0xF002 // corrupted frames, and false syncs after losing our place
+#define HMI_REG_UART1_PACKETS_RECEIVED     0xF010
+#define HMI_REG_UART1_PACKETS_SENT         0xF011
+#define HMI_REG_UART1_CRC_ERRORS           0xF012
+#define HMI_REG_CAN_FRAMES_SENT            0xF020 // frames acknowledged on the inverter CAN bus
+#define HMI_REG_CAN_FRAMES_RECEIVED        0xF021
 
 /* 
 

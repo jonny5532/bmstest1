@@ -11,6 +11,9 @@
 #include "protocols/hmi_serial/hmi_serial.h"
 #include "protocols/hmi_serial/hmi_registers.h"
 #include "app/firmware_id.h"
+#include "app/monitoring/counters.h"
+#include "config/limits.h"
+#include "protocols/inverter/can.h"
 
 #include "pico/unique_id.h"
 
@@ -28,10 +31,18 @@ void pico_get_unique_board_id(pico_unique_board_id_t *id_out) {
 }
 
 bms_model_t model;
+debug_counters_t debug_counters;
+
+// Stand in for the inverter CAN driver's frame counts
+static uint32_t can_frames_sent, can_frames_received;
+uint32_t inverter_can_frames_sent(void) { return can_frames_sent; }
+uint32_t inverter_can_frames_received(void) { return can_frames_received; }
 
 static int setup(void **state) {
     (void) state;
     memset(&model, 0, sizeof(model));
+    memset(&debug_counters, 0, sizeof(debug_counters));
+    can_frames_sent = can_frames_received = 0;
     return 0;
 }
 
@@ -115,6 +126,68 @@ static void test_lifetime_registers(void **state) {
     assert_int_equal(read_uint32_register(HMI_REG_LIFETIME_DISCHARGED_WH), 3456u);
 }
 
+static uint8_t read_uint8_register(uint16_t reg_id) {
+    uint8_t buf[16];
+    uint8_t len = hmi_append_register_value(buf, reg_id, &model);
+    assert_int_equal(len, 2 + 1 + 1);
+    assert_int_equal((uint16_t)buf[0] | ((uint16_t)buf[1] << 8), reg_id);
+    assert_int_equal(buf[2], HMI_TYPE_UINT8);
+    return buf[3];
+}
+
+static void test_balancing_and_calibration_state_registers(void **state) {
+    (void) state;
+    assert_int_equal(read_uint8_register(HMI_REG_BALANCING_STATE), BALANCING_STATE_IDLE);
+    assert_int_equal(read_uint8_register(HMI_REG_CALIBRATION_STATE), CALIBRATION_STATE_IDLE);
+    model.balancing_sm.state = BALANCING_STATE_ACTIVE;
+    model.calibration_sm.state = CALIBRATION_STATE_SHORT_MEASURING_OPEN;
+    assert_int_equal(read_uint8_register(HMI_REG_BALANCING_STATE), BALANCING_STATE_ACTIVE);
+    assert_int_equal(read_uint8_register(HMI_REG_CALIBRATION_STATE), CALIBRATION_STATE_SHORT_MEASURING_OPEN);
+}
+
+static void test_protection_buffer_registers(void **state) {
+    (void) state;
+    // Available from the start, at zero
+    assert_true(hmi_register_is_available(HMI_REG_OVERCURRENT_CHARGE_BUFFER, &model));
+    assert_true(read_float_register(HMI_REG_OVERCURRENT_CHARGE_BUFFER) == 0.0f);
+    assert_true(read_float_register(HMI_REG_OVERCURRENT_DISCHARGE_BUFFER) == 0.0f);
+    assert_true(read_float_register(HMI_REG_SOFT_CHARGE_BUFFER) == 0.0f);
+
+    // 100% is the limit the safety checks trip just past
+    model.excess_charge_buffer_dC = OVERCURRENT_BUFFER_LIMIT_dC;
+    model.excess_discharge_buffer_dC = OVERCURRENT_BUFFER_LIMIT_dC / 4;
+    assert_float_equal(read_float_register(HMI_REG_OVERCURRENT_CHARGE_BUFFER), 100.0f, 0.001f);
+    assert_float_equal(read_float_register(HMI_REG_OVERCURRENT_DISCHARGE_BUFFER), 25.0f, 0.001f);
+
+    // The soft buffer is signed, each direction against its own limit
+    model.soft_limit_charge_buffer_dC = OVERCHARGE_BUFFER_LIMIT_dC / 2;
+    assert_float_equal(read_float_register(HMI_REG_SOFT_CHARGE_BUFFER), 50.0f, 0.001f);
+    model.soft_limit_charge_buffer_dC = -OVERDISCHARGE_BUFFER_LIMIT_dC;
+    assert_float_equal(read_float_register(HMI_REG_SOFT_CHARGE_BUFFER), -100.0f, 0.001f);
+    model.soft_limit_charge_buffer_dC = -OVERDISCHARGE_BUFFER_LIMIT_dC / 5;
+    assert_float_equal(read_float_register(HMI_REG_SOFT_CHARGE_BUFFER), -20.0f, 0.001f);
+}
+
+static void test_link_counter_registers(void **state) {
+    (void) state;
+    debug_counters.uart0_packets_received = 11;
+    debug_counters.uart0_packets_sent = 12;
+    debug_counters.uart0_crc_errors = 13;
+    debug_counters.uart1_packets_received = 0xFFFFFFFEu;
+    debug_counters.uart1_packets_sent = 22;
+    debug_counters.uart1_crc_errors = 23;
+    can_frames_sent = 31;
+    can_frames_received = 32;
+    assert_int_equal(read_uint32_register(HMI_REG_UART0_PACKETS_RECEIVED), 11);
+    assert_int_equal(read_uint32_register(HMI_REG_UART0_PACKETS_SENT), 12);
+    assert_int_equal(read_uint32_register(HMI_REG_UART0_CRC_ERRORS), 13);
+    assert_int_equal(read_uint32_register(HMI_REG_UART1_PACKETS_RECEIVED), 0xFFFFFFFEu);
+    assert_int_equal(read_uint32_register(HMI_REG_UART1_PACKETS_SENT), 22);
+    assert_int_equal(read_uint32_register(HMI_REG_UART1_CRC_ERRORS), 23);
+    assert_int_equal(read_uint32_register(HMI_REG_CAN_FRAMES_SENT), 31);
+    assert_int_equal(read_uint32_register(HMI_REG_CAN_FRAMES_RECEIVED), 32);
+}
+
 static void test_unknown_register_writes_nothing(void **state) {
     (void) state;
     uint8_t buf[16];
@@ -133,7 +206,7 @@ static void test_protocol_version(void **state) {
     uint8_t buf[16];
     assert_int_equal(hmi_append_register_value(buf, HMI_REG_PROTOCOL_VERSION, &model), 5);
     assert_int_equal(buf[2], HMI_TYPE_UINT16);
-    assert_int_equal((uint16_t)buf[3] | ((uint16_t)buf[4] << 8), 7);
+    assert_int_equal((uint16_t)buf[3] | ((uint16_t)buf[4] << 8), 2);
 }
 
 static void test_register_table_sorted_and_unique(void **state) {
@@ -264,6 +337,9 @@ int main(void) {
         cmocka_unit_test_setup(test_mcu_temperature_register, setup),
         cmocka_unit_test_setup(test_build_id_registers, setup),
         cmocka_unit_test_setup(test_lifetime_registers, setup),
+        cmocka_unit_test_setup(test_balancing_and_calibration_state_registers, setup),
+        cmocka_unit_test_setup(test_protection_buffer_registers, setup),
+        cmocka_unit_test_setup(test_link_counter_registers, setup),
         cmocka_unit_test_setup(test_unknown_register_writes_nothing, setup),
         cmocka_unit_test_setup(test_protocol_version, setup),
         cmocka_unit_test_setup(test_register_table_sorted_and_unique, setup),

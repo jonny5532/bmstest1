@@ -412,6 +412,7 @@ target_include_directories(test_hmi_registers PRIVATE
     ${cmocka_SOURCE_DIR}/include
     include
     ../bms
+    ../vendor/can2040/src
 )
 
 add_test(NAME test_hmi_registers COMMAND ${MEMORY_CHECK} test_hmi_registers)

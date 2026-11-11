@@ -8,3 +8,7 @@ void init_inverter_can(can2040_rx_cb rx_cb);
 void inverter_can_reset(void);
 int inverter_can_transmit(const struct can2040_msg *msg);
 void inverter_can_get_stats(struct can2040_stats *stats);
+// Frames sent (and acknowledged) and received since boot. Unlike the can2040
+// statistics, these carry on across inverter_can_reset().
+uint32_t inverter_can_frames_sent(void);
+uint32_t inverter_can_frames_received(void);
