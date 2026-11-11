@@ -18,6 +18,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
+// How many raw thermistor words stored per BMB
+#define BMB_RAW_TEMP_WORDS 3
+
 // Persistent data (saved to NVM as raw bytes) 
 // These are naturally aligned but unpadded, so you will need to manually add
 // any necessary padding as reserved fields to maintain the layout (the compiler
@@ -248,9 +251,15 @@ typedef struct bms_model {
 
     // BATTERY DATA
 
-    int16_t module_temperatures_raw_dC[NUM_MODULE_TEMPS];
-    millis_t module_temperatures_millis;
-    float module_temperatures[NUM_MODULE_TEMPS];
+    // Pack temperatures from the thermistors (1-2 per BMB)
+    int16_t thermistor_temperatures_raw_dC[THERMISTOR_ARRAY_LEN]; // last reading, unfiltered
+    float thermistor_temperatures[THERMISTOR_ARRAY_LEN]; // C, NaN until read
+    millis_t thermistor_temperatures_millis;
+
+    // Each BMB's own die temperature
+    int16_t bmb_die_temperatures_raw_dC[NUM_MODULES]; // last reading, unfiltered
+    float bmb_die_temperatures[NUM_MODULES]; // C, NaN until read
+    millis_t bmb_die_temperatures_millis;
 
 
     ekf_t ekf;
@@ -270,7 +279,9 @@ typedef struct bms_model {
     int16_t raw_cell_voltages_mV[120]; // are unstable during balancing
     millis_t raw_cell_voltages_millis;
 
-    uint16_t raw_temperatures[16+24+8];
+    // The raw thermistor value slots from each BMB, which can be useful to
+    // identify whether thermistors are present or faulty.
+    uint16_t bmb_raw_temps[NUM_MODULES * BMB_RAW_TEMP_WORDS];
 
     bool cell_voltage_slow_mode; // only request BMB data infrequently
 
@@ -378,8 +389,10 @@ static inline bool supervisor_contactors_enabled(const bms_model_t *model) {
 }
 
 void model_tick(bms_model_t *model);
-void store_cell_voltage(uint8_t logical_index, int16_t voltage_mV);
-void store_module_temperature(uint8_t module_index, int16_t raw_temp_dC);
+void store_cell_voltage(bms_model_t *model, uint8_t logical_index, int16_t voltage_mV);
+void store_thermistor_temperature(bms_model_t *model, uint8_t thermistor_index, int16_t temp_dC, bool valid);
+uint32_t thermistor_fault_mask(const bms_model_t *model);
+void store_bmb_die_temperature(bms_model_t *model, uint8_t module_index, int16_t temp_dC);
 
 static inline uint16_t get_cell_voltage_soft_min_mV(const bms_model_t *model) {
     return max(

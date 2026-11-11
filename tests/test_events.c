@@ -49,8 +49,8 @@ static void setup_model(bms_model_t *model) {
 
     model->cell_voltage_min_mV = 3500;
     model->cell_voltage_max_mV = 3500;
-    for(int i = 0; i < 8; i++) {
-        model->module_temperatures_raw_dC[i] = 250; // 25.0C
+    for(int i = 0; i < NUM_THERMISTORS; i++) {
+        model->thermistor_temperatures_raw_dC[i] = 250; // 25.0C
     }
     model->contactor_sm.enable_current = true;
 }
@@ -84,7 +84,7 @@ static void test_safety_voltage_events(void **state) {
     model.high_voltages.battery = (float)model.cell_voltage_max_mV * NUM_CELLS * 0.001f;
     model.cell_voltages_millis = stored_millis;
     model.high_voltages.battery_millis = stored_millis;
-    model.module_temperatures_millis = stored_millis;
+    model.thermistor_temperatures_millis = stored_millis;
     model.temperature_millis = stored_millis;
     model.current_millis = stored_millis;
     model.supply_voltages.voltage_3V3_millis = stored_millis;

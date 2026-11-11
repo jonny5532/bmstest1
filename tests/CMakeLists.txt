@@ -442,6 +442,18 @@ target_include_directories(test_bmb3y_power PRIVATE
 
 add_test(NAME test_bmb3y_power COMMAND ${MEMORY_CHECK} test_bmb3y_power)
 
+add_executable(test_bmb3y_temps
+    test_bmb3y_temps.c
+)
+target_link_libraries(test_bmb3y_temps PRIVATE cmocka)
+target_include_directories(test_bmb3y_temps PRIVATE
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_bmb3y_temps COMMAND ${MEMORY_CHECK} test_bmb3y_temps)
+
 add_custom_target(coverage
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/coverage_report.sh ${CMAKE_CURRENT_BINARY_DIR}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

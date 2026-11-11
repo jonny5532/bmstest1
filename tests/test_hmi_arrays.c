@@ -238,45 +238,77 @@ static void test_balancing_times_untimestamped(void **state) {
     assert_memory_equal(out, model.balancing_sm.balance_time_remaining, sizeof(out));
 }
 
-static void test_module_temps_floats(void **state) {
-    (void) state;
-    for (int i = 0; i < NUM_MODULE_TEMPS; i++) model.module_temperatures[i] = 20.5f + i;
-    model.module_temperatures[0] = NAN;
-    model.module_temperatures_millis = 42;
-
+static void assert_float_array(uint8_t array_id, const float *values, int total, millis_t sample_millis) {
     uint8_t buf[MAX_PAYLOAD];
-    size_t len = hmi_build_read_array_response(buf, sizeof(buf), DEVICE_ADDRESS, &model, HMI_ARRAY_MODULE_TEMPS, 0);
+    size_t len = hmi_build_read_array_response(buf, sizeof(buf), DEVICE_ADDRESS, &model, array_id, 0);
     response_t r = parse_response(buf, len);
 
     assert_int_equal(r.encoding, HMI_TYPE_FLOAT);
-    assert_int_equal(r.total, NUM_MODULE_TEMPS);
-    assert_int_equal(r.count, NUM_MODULE_TEMPS);
-    assert_int_equal(r.sample_millis, 42);
-    assert_int_equal(len, HMI_ARRAY_RESPONSE_HEADER_LEN + 4 * NUM_MODULE_TEMPS);
+    assert_int_equal(r.total, total);
+    assert_int_equal(r.count, total);
+    assert_int_equal(r.sample_millis, sample_millis);
+    assert_int_equal(len, HMI_ARRAY_RESPONSE_HEADER_LEN + 4 * total);
 
-    for (int i = 0; i < NUM_MODULE_TEMPS; i++) {
+    for (int i = 0; i < total; i++) {
         uint32_t u = get_uint32(&r.elements[i * 4]);
         float f;
         memcpy(&f, &u, sizeof(f));
-        if (i == 0) {
+        if (isnan(values[i])) {
             assert_true(isnan(f));
         } else {
-            assert_true(f == model.module_temperatures[i]);
+            assert_true(f == values[i]);
         }
     }
 }
 
-static void test_raw_temps_uint16_paged_by_capacity(void **state) {
+static void test_thermistor_temps_floats(void **state) {
     (void) state;
-    const int total = sizeof(model.raw_temperatures) / sizeof(model.raw_temperatures[0]);
-    for (int i = 0; i < total; i++) model.raw_temperatures[i] = (uint16_t)(0xF000 + i);
+    for (int i = 0; i < NUM_THERMISTORS; i++) model.thermistor_temperatures[i] = 20.5f + i;
+    model.thermistor_temperatures[0] = NAN; // faulty or not read
+    model.thermistor_temperatures_millis = 42;
+
+    assert_float_array(HMI_ARRAY_THERMISTOR_TEMPS, model.thermistor_temperatures, NUM_THERMISTORS, 42);
+}
+
+static void test_bmb_die_temps_floats(void **state) {
+    (void) state;
+    for (int i = 0; i < NUM_MODULES; i++) model.bmb_die_temperatures[i] = 30.5f + i;
+    model.bmb_die_temperatures[1] = NAN;
+    model.bmb_die_temperatures_millis = 43;
+
+    assert_float_array(HMI_ARRAY_BMB_DIE_TEMPS, model.bmb_die_temperatures, NUM_MODULES, 43);
+}
+
+static void test_thermistor_presence_from_profile(void **state) {
+    (void) state;
+    const uint8_t expected[NUM_MODULES] = { THERMISTOR_PRESENCE };
+    uint8_t buf[MAX_PAYLOAD];
+    size_t len = hmi_build_read_array_response(buf, sizeof(buf), DEVICE_ADDRESS, &model, HMI_ARRAY_THERMISTOR_PRESENCE, 0);
+    response_t r = parse_response(buf, len);
+    assert_int_equal(r.encoding, HMI_TYPE_UINT16);
+    assert_int_equal(r.total, NUM_MODULES);
+    assert_int_equal(r.count, NUM_MODULES);
+    int bits = 0;
+    for (int i = 0; i < NUM_MODULES; i++) {
+        uint16_t presence = get_uint16(&r.elements[i * 2]);
+        assert_int_equal(presence, expected[i]);
+        bits += __builtin_popcount(presence);
+    }
+    assert_int_equal(bits, NUM_THERMISTORS);
+}
+
+static void test_bmb_raw_temps_uint16_paged_by_capacity(void **state) {
+    (void) state;
+    const int total = NUM_MODULES * BMB_RAW_TEMP_WORDS;
+    assert_int_equal(sizeof(model.bmb_raw_temps) / sizeof(model.bmb_raw_temps[0]), total);
+    for (int i = 0; i < total; i++) model.bmb_raw_temps[i] = (uint16_t)(0xF000 + i);
 
     // A small buffer forces several pages: room for 10 elements each
     const size_t capacity = HMI_ARRAY_RESPONSE_HEADER_LEN + 2 * 10 + 1;
     uint16_t start = 0;
     while (start < total) {
         uint8_t buf[MAX_PAYLOAD];
-        size_t len = hmi_build_read_array_response(buf, capacity, DEVICE_ADDRESS, &model, HMI_ARRAY_RAW_TEMPS, start);
+        size_t len = hmi_build_read_array_response(buf, capacity, DEVICE_ADDRESS, &model, HMI_ARRAY_BMB_RAW_TEMPS, start);
         assert_true(len <= capacity);
         response_t r = parse_response(buf, len);
 
@@ -284,7 +316,7 @@ static void test_raw_temps_uint16_paged_by_capacity(void **state) {
         assert_int_equal(r.total, total);
         assert_int_equal(r.count, (total - start) < 10 ? (total - start) : 10);
         for (int i = 0; i < r.count; i++) {
-            assert_int_equal(get_uint16(&r.elements[i * 2]), model.raw_temperatures[start + i]);
+            assert_int_equal(get_uint16(&r.elements[i * 2]), model.bmb_raw_temps[start + i]);
         }
         start += r.count;
     }
@@ -715,8 +747,10 @@ int main(void) {
         cmocka_unit_test_setup(test_start_past_end, setup),
         cmocka_unit_test_setup(test_unknown_array, setup),
         cmocka_unit_test_setup(test_balancing_times_untimestamped, setup),
-        cmocka_unit_test_setup(test_module_temps_floats, setup),
-        cmocka_unit_test_setup(test_raw_temps_uint16_paged_by_capacity, setup),
+        cmocka_unit_test_setup(test_thermistor_temps_floats, setup),
+        cmocka_unit_test_setup(test_bmb_die_temps_floats, setup),
+        cmocka_unit_test_setup(test_thermistor_presence_from_profile, setup),
+        cmocka_unit_test_setup(test_bmb_raw_temps_uint16_paged_by_capacity, setup),
         cmocka_unit_test_setup(test_module_ids, setup),
 
         // Writes

@@ -134,16 +134,23 @@ typedef enum {
     X(ABSENT_CHANNEL_VOLTAGE, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS) \
                                                                 \
     /* Pack temperature */                                      \
-    X(BATTERY_TEMPERATURE_VERY_LOW, LEVEL_CRITICAL, 1000)       \
+    X(BATTERY_TEMPERATURE_VERY_LOW, LEVEL_CRITICAL, TEMPERATURE_FAULT_ESCALATION_MS) \
     X(BATTERY_TEMPERATURE_LOW, LEVEL_WARNING, 0)                \
     X(BATTERY_TEMPERATURE_HIGH, LEVEL_WARNING, 0)               \
-    X(BATTERY_TEMPERATURE_VERY_HIGH, LEVEL_CRITICAL, 1000)      \
+    X(BATTERY_TEMPERATURE_VERY_HIGH, LEVEL_CRITICAL, TEMPERATURE_FAULT_ESCALATION_MS) \
+    /* A thermistor the profile lists reads outside -40 to     */ \
+    /* 115C (open or shorted), so the pack reads hot (and      */ \
+    /* BATTERY_TEMPERATURE_VERY_HIGH is raised too). Data: bit */ \
+    /* per faulty thermistor                                   */ \
+    X(THERMISTOR_FAULT, LEVEL_CRITICAL, TEMPERATURE_FAULT_ESCALATION_MS) \
                                                                 \
     /* BMBs */                                                  \
     X(BMB_READ_ERROR, LEVEL_WARNING, 0)                         \
     X(BMB_CRC_MISMATCH, LEVEL_WARNING, 0)                       \
     X(CELL_VOLTAGE_GLITCH, LEVEL_WARNING, 0)                    \
-    X(MODULE_TEMPERATURE_GLITCH, LEVEL_WARNING, 0)              \
+    /* Data: (0 thermistor / 1 BMB die) << 40 | index << 32 | */ \
+    /* previous dC << 16 | new dC                             */ \
+    X(BMB_TEMPERATURE_GLITCH, LEVEL_WARNING, 0)                 \
     X(BMB_PACK_MISMATCH, LEVEL_WARNING, 0)                      \
                                                                 \
     /* Isolation */                                             \

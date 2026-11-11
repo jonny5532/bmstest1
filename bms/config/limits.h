@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 // We include the relevant pack profile header, which defines pack-specific
 // constants and settings (see profiles/README.md).
 
@@ -10,6 +12,19 @@
 #include "validate.h"
 
 #define CELL_PRESENCE_MASK { CELL_PRESENCE_WORDS }
+
+// Thermistors wired on each BMB, from the profile: bit 0 = channel A (0x0D
+// word 0), bit 1 = channel B (0x0D word 2)
+static const uint8_t THERMISTOR_PRESENCE_BY_MODULE[NUM_MODULES] = { THERMISTOR_PRESENCE };
+// The thermistor arrays have an element even when the profile has none
+#define THERMISTOR_ARRAY_LEN (NUM_THERMISTORS > 0 ? NUM_THERMISTORS : 1)
+_Static_assert(NUM_THERMISTORS <= 32, "thermistor_fault_mask() has a bit per thermistor");
+// Store a deliberately very-high temperature if a thermistor is not reading
+// correctly.
+#define THERMISTOR_FAULT_dC INT16_MAX
+// How long to wait before escalating a thermistor fault to FATAL. Gives an
+// opportunity for a couple of misreads to then be corrected.
+#define TEMPERATURE_FAULT_ESCALATION_MS 4000
 
 // Timing shared with the supervisor (the BMB stale threshold, the force-open
 // wait, the watchdog and the supervisor's own delays)
@@ -173,8 +188,8 @@ _Static_assert(CELL_VOLTAGE_LOW_ESCALATION_MS / 100 <= 0xFFFF, "CELL_VOLTAGE_LOW
 // Threshold for detecting a cell voltage glitch (sudden jump in one cycle)
 #define CELL_VOLTAGE_GLITCH_THRESHOLD_mV 100
 
-// Threshold for detecting a module temperature glitch (sudden jump in one cycle)
-#define MODULE_TEMPERATURE_GLITCH_THRESHOLD_dC 100
+// Threshold for detecting a BMB temperature glitch (sudden jump in one cycle)
+#define TEMPERATURE_GLITCH_THRESHOLD_dC 100
 
 // The 3V3 measurement is really just measuring the divider resistor tolerances...
 #define SUPPLY_VOLTAGE_3V3_MIN_MV 3200

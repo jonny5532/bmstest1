@@ -2,6 +2,7 @@
 #include "crc.h"
 #include "bmb3y_cells.h"
 #include "bmb3y_power.h"
+#include "bmb3y_temps.h"
 
 #include "config/limits.h"
 #include "app/model.h"
@@ -25,9 +26,7 @@ const uint8_t MODULE_COUNT = 8;
 _Static_assert(BMB3Y_MAX_MODULES * 9 == 72, "bank reads are 72 bytes");
 _Static_assert(BMB3Y_MAX_MODULES <= CELL_MAP_MODULES, "the cell map must cover the chain");
 _Static_assert(NUM_MODULES <= BMB3Y_MAX_MODULES, "the BMS reads at most BMB3Y_MAX_MODULES modules");
-// Only one temperature per BMB is decoded so far (module_temperatures[bmb]),
-// so modules with more sensors need the temperature reads to map them first.
-_Static_assert(NUM_MODULE_TEMPS == NUM_MODULES, "one temperature per BMB is all the BMB3Y driver decodes");
+_Static_assert(BMB_RAW_TEMP_WORDS == BMB3Y_TEMPS3_WORDS, "the model matches the 0x0D word count");
 
 // Low level functions
 
@@ -294,7 +293,7 @@ bool bmb3y_read_cell_voltage_bank_blocking(bms_model_t *model, int bank_index) {
 
             // Don't store voltages during balancing, as they are unstable
             if(!model->balancing_active) {
-                store_cell_voltage(logical_index, converted);
+                store_cell_voltage(model, logical_index, converted);
             }
         }
     }
@@ -406,7 +405,47 @@ Temp hex: 80 20 C0 BD 5C 70
 */
 
 
-// Read some temperature-like values
+// Unlike the cell voltages, the temperature reads' words are little-endian
+static inline uint16_t le_word(const uint8_t *bytes) {
+    return (uint16_t)(bytes[0] | (bytes[1] << 8));
+}
+
+static void print_dC(char *buf, size_t size, int16_t dC) {
+    int magnitude = dC < 0 ? -dC : dC;
+    snprintf(buf, size, "%s%d.%d", dC < 0 ? "-" : "", magnitude / 10, magnitude % 10);
+}
+
+void bmb3y_print_temperatures(const bms_model_t *model) {
+    // Every thermistor channel, listed in the profile or not: an unlisted one
+    // reading on the curve may be a thermistor the profile is missing, and a
+    // listed one reading off it (or in the floating band an unwired channel
+    // shows) is faulty or unwired.
+    info_printf("Thermistors (profile lists %d), BMB die temperatures:\n", NUM_THERMISTORS);
+    for(int module=0; module<NUM_MODULES; module++) {
+        const uint16_t *raw = &model->bmb_raw_temps[module * BMB3Y_TEMPS3_WORDS];
+        char line[160];
+        int len = snprintf(line, sizeof(line), "BMB %d:", module);
+        for(int channel=0; channel<BMB3Y_THERMISTOR_CHANNELS; channel++) {
+            uint16_t code = raw[BMB3Y_NTC_WORD(channel)];
+            int index = bmb3y_thermistor_index(THERMISTOR_PRESENCE_BY_MODULE, module, channel);
+            char temp[12];
+            print_dC(temp, sizeof(temp), bmb3y_ntc_raw_to_dC(code));
+            char listed[8] = "--";
+            if(index >= 0) {
+                snprintf(listed, sizeof(listed), "#%d", index);
+            }
+            len += snprintf(&line[len], sizeof(line) - len, " %c=%6sC (%5u, %-3s%s)",
+                'A' + channel, temp, code, listed,
+                !bmb3y_ntc_raw_valid(code) ? " off-curve" : (bmb3y_ntc_raw_to_dC(code) >= 600 ? " floating?" : ""));
+        }
+        char die[12];
+        print_dC(die, sizeof(die), model->bmb_die_temperatures_raw_dC[module]);
+        snprintf(&line[len], sizeof(line) - len, " die=%sC", die);
+        info_printf("%s\n", line);
+    }
+}
+
+// Read the NTC thermistors (0x0D): word 0 = channel A, word 2 = channel B
 bool bmb3y_read_more_temps_blocking(bms_model_t *model) {
     uint8_t rx_buf[90];
 
@@ -432,28 +471,33 @@ bool bmb3y_read_more_temps_blocking(bms_model_t *model) {
             continue;
         }
 
-        model->raw_temperatures[16+module] = (
-            (int16_t)(rx_buf[module * 8 + 0]) |
-            (int16_t)(rx_buf[module * 8 + 1] << 8)
-        );
-        model->raw_temperatures[24+module] = (
-            (int16_t)(rx_buf[module * 8 + 2]) |
-            (int16_t)(rx_buf[module * 8 + 3] << 8)
-        );
-        model->raw_temperatures[32+module] = (
-            (int16_t)(rx_buf[module * 8 + 4]) |
-            (int16_t)(rx_buf[module * 8 + 5] << 8)
-        );
+        uint16_t *raw = &model->bmb_raw_temps[module * BMB3Y_TEMPS3_WORDS];
+        for(int word=0; word<BMB3Y_TEMPS3_WORDS; word++) {
+            raw[word] = le_word(&rx_buf[module * 8 + word * 2]);
+        }
+
+        // Only the thermistors the profile lists: an unwired channel floats
+        // to a hot-looking value
+        for(int channel=0; channel<BMB3Y_THERMISTOR_CHANNELS; channel++) {
+            int index = bmb3y_thermistor_index(THERMISTOR_PRESENCE_BY_MODULE, module, channel);
+            if(index < 0) {
+                continue;
+            }
+            uint16_t code = raw[BMB3Y_NTC_WORD(channel)];
+            store_thermistor_temperature(model, index, bmb3y_ntc_raw_to_dC(code), bmb3y_ntc_raw_valid(code));
+        }
+    }
+
+    if(crc_ok) {
+        model->thermistor_temperatures_millis = millis();
     }
 
     return crc_ok;
 }
 
+// Read the BMBs' die temperatures (0x0E word 1)
 bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
     uint8_t rx_buf[90];
-
-    // LFP seems to have a temp value in BMB3Y_CMD_READ_TEMPS3 0:1
-    // NMC seems to use TEMPS and 2:3 like D/T's code
 
     if(!bmb3y_short_command_get_data_blocking(BMB3Y_CMD_READ_TEMPS, rx_buf, 64)) {
         error_printf("BMB3Y temperature read failed\n");
@@ -464,7 +508,6 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
     bool crc_ok = true;
     for(int module=0; module<NUM_MODULES; module++) {
         // Each module has 8 bytes: 6 bytes data, 2 bytes CRC
-        // The temp is in bytes 2 and 3 (little-endian)
         
         uint16_t module_crc = (uint16_t)(rx_buf[module * 8 + 6] << 8) | (uint16_t)(rx_buf[module * 8 + 7]);
         //uint16_t calc_crc = crc14(&rx_buf[module * 8], 6, 0x0010);
@@ -488,41 +531,11 @@ bool bmb3y_read_temperatures_blocking(bms_model_t *model) {
             continue;
         }
 
-        // D/T's algorithm: (TEMPS)
-        if(true) {
-            // // Unlike everything else, temps are little-endian??
-            int16_t raw_temp = 
-                (int16_t)(rx_buf[module * 8 + 2]) |
-                (int16_t)(rx_buf[module * 8 + 3] << 8);
-
-            store_module_temperature(module, raw_temp - 1131);
-        }
-        
-        // LFP algo: (TEMPS3)
-        if(false) {
-            int16_t raw_temp = 
-                (int16_t)(rx_buf[module * 8 + 0]) |
-                (int16_t)(rx_buf[module * 8 + 1] << 8);
-
-            // super-crude cal, 28c = 0x4300, 100c = 0x6e00
-            // FIXME - do proper thermistor conversion
-            int16_t temp_dC = ((raw_temp - 0x4300) * (1000 - 280)) / (0x6e00 - 0x4300) + 280;
-
-            store_module_temperature(module, temp_dC);
-        }
-
-        model->raw_temperatures[module] = (
-            (int16_t)(rx_buf[module * 8 + 0]) |
-            (int16_t)(rx_buf[module * 8 + 1] << 8)
-        );
-        model->raw_temperatures[8+module] = (
-            (int16_t)(rx_buf[module * 8 + 4]) |
-            (int16_t)(rx_buf[module * 8 + 5] << 8)
-        );
+        store_bmb_die_temperature(model, module, bmb3y_die_raw_to_dC(le_word(&rx_buf[module * 8 + 2])));
     }
 
     if(crc_ok) {
-        model->module_temperatures_millis = millis();
+        model->bmb_die_temperatures_millis = millis();
     }
 
     return crc_ok;

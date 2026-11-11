@@ -149,8 +149,11 @@ static void init_model() {
     model.current_filtered_mA = NAN;
     model.working_charge_current_limit_filtered_dA = NAN;
 
-    for(int i=0; i<NUM_MODULE_TEMPS; i++) {
-        model.module_temperatures[i] = NAN;
+    for(int i=0; i<THERMISTOR_ARRAY_LEN; i++) {
+        model.thermistor_temperatures[i] = NAN;
+    }
+    for(int i=0; i<NUM_MODULES; i++) {
+        model.bmb_die_temperatures[i] = NAN;
     }
 }
 

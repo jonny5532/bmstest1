@@ -13,8 +13,15 @@ typedef struct bms_model bms_model_t;
 // Array IDs
 #define HMI_ARRAY_CELL_VOLTAGES   1 // int16 (mV)
 #define HMI_ARRAY_BALANCING_TIMES 2 // int16 (balancing periods remaining)
-#define HMI_ARRAY_MODULE_TEMPS    3 // float (C)
-#define HMI_ARRAY_RAW_TEMPS       4 // uint16, raw BMB temperature readings
+// The cell temperatures: one element per thermistor the profile lists, in
+// chain order with channel A before B on each BMB (see
+// HMI_ARRAY_THERMISTOR_PRESENCE). NAN until read, and while a thermistor reads
+// off its curve (open or shorted; ERR_THERMISTOR_FAULT).
+#define HMI_ARRAY_THERMISTOR_TEMPS 3 // float (C)
+// Opaque raw thermistor words for diagnostics: the same number per BMB
+// (total / number of BMBs), in chain order, listed in the profile or not
+// (no sample time)
+#define HMI_ARRAY_BMB_RAW_TEMPS    4 // uint16
 
 // Writable. The EKF tuning starts from the profile at each boot, so a write
 // lasts until the next reboot; the OCV learner is saved to NVM. Neither has
@@ -40,6 +47,13 @@ typedef struct bms_model bms_model_t;
 #define HMI_ARRAY_MODULE_IDS     13 // uint16, the BMB's 11-bit module ID code, or 0xFFFF
                                     // (BMB3Y_MODULE_ID_NONE) if its last read failed the
                                     // CRC or the ID's own check bits
+
+// One element per BMB, in chain order
+#define HMI_ARRAY_BMB_DIE_TEMPS       14 // float (C), each BMB's own die temperature;
+                                         // NAN until read
+#define HMI_ARRAY_THERMISTOR_PRESENCE 15 // uint16, from the profile: the BMB's thermistor
+                                         // channels listed in HMI_ARRAY_THERMISTOR_TEMPS
+                                         // (bit 0 = channel A, bit 1 = channel B)
 
 // Elements of HMI_ARRAY_EKF_TUNING
 #define HMI_EKF_TUNING_Q_AH           0 // EKF_Q_AH, >= 0

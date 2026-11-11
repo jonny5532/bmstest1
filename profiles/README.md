@@ -68,7 +68,18 @@ Precharge on the negative pole (via the FC negative contactor) is the
 standard. A pack wired with the precharge element on the positive sets
 `PRECHARGE_ON_NEGATIVE` to 0.
 
+`NUM_THERMISTORS` and `THERMISTOR_PRESENCE` say which of each BMB's two NTC
+thermistor channels are wired to the cells: one entry per BMB, bit 0 for
+channel A and bit 1 for channel B (`0x3, 0x1, ...`). These are the pack's
+temperatures for the limits. A listed thermistor that reads outside its
+-40 to 115C range (open or shorted) raises THERMISTOR_FAULT. An unwired
+channel floats to a hot-looking value, so don't list one that isn't fitted; the
+CLI's `temps` command shows every channel, listed or not, to check. A pack with
+no thermistors (`NUM_THERMISTORS 0`, `0x0` for each BMB) uses the BMB die
+temperatures instead, which only suits a test rig.
+
 `validate.h` then checks the result: that every required setting is present,
 that the voltage and temperature limits nest properly (hard outside soft,
-soft outside working), and that `CELL_PRESENCE_WORDS` has exactly `NUM_CELLS`
-bits set.
+soft outside working), that `CELL_PRESENCE_WORDS` has exactly `NUM_CELLS`
+bits set, and that `THERMISTOR_PRESENCE` has an entry per BMB and exactly
+`NUM_THERMISTORS` bits set.

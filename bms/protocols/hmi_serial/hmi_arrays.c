@@ -58,6 +58,9 @@ static void ocv_learn_written(bms_model_t *model) {
 }
 #endif
 
+// The profile's THERMISTOR_PRESENCE, widened for HMI_ARRAY_THERMISTOR_PRESENCE
+static const uint16_t thermistor_presence[NUM_MODULES] = { THERMISTOR_PRESENCE };
+
 // Takes the model non-const for hmi_apply_write_array; reads cast to it
 static bool hmi_get_array(bms_model_t *model, uint8_t array_id, hmi_array_t *array) {
     switch (array_id) {
@@ -77,19 +80,35 @@ static bool hmi_get_array(bms_model_t *model, uint8_t array_id, hmi_array_t *arr
                 .encoding = HMI_TYPE_INT16,
             };
             return true;
-        case HMI_ARRAY_MODULE_TEMPS:
+        case HMI_ARRAY_THERMISTOR_TEMPS:
             *array = (hmi_array_t){
-                .values = model->module_temperatures,
-                .total = sizeof(model->module_temperatures) / sizeof(model->module_temperatures[0]),
+                .values = model->thermistor_temperatures,
+                .total = NUM_THERMISTORS,
                 .encoding = HMI_TYPE_FLOAT,
-                .sample_millis = model->module_temperatures_millis,
+                .sample_millis = model->thermistor_temperatures_millis,
                 .timestamped = true,
             };
             return true;
-        case HMI_ARRAY_RAW_TEMPS:
+        case HMI_ARRAY_BMB_RAW_TEMPS:
             *array = (hmi_array_t){
-                .values = model->raw_temperatures,
-                .total = sizeof(model->raw_temperatures) / sizeof(model->raw_temperatures[0]),
+                .values = model->bmb_raw_temps,
+                .total = sizeof(model->bmb_raw_temps) / sizeof(model->bmb_raw_temps[0]),
+                .encoding = HMI_TYPE_UINT16,
+            };
+            return true;
+        case HMI_ARRAY_BMB_DIE_TEMPS:
+            *array = (hmi_array_t){
+                .values = model->bmb_die_temperatures,
+                .total = NUM_MODULES,
+                .encoding = HMI_TYPE_FLOAT,
+                .sample_millis = model->bmb_die_temperatures_millis,
+                .timestamped = true,
+            };
+            return true;
+        case HMI_ARRAY_THERMISTOR_PRESENCE:
+            *array = (hmi_array_t){
+                .values = thermistor_presence,
+                .total = NUM_MODULES,
                 .encoding = HMI_TYPE_UINT16,
             };
             return true;

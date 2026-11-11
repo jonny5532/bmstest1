@@ -183,3 +183,5 @@ bool bmb3y_read_module_ids_blocking(bms_model_t *model);
 void bmb3y_tick(bms_model_t *model);
 // Print the last reading of every BMB channel, populated or not
 void bmb3y_print_physical_cells(void);
+// Print every BMB's thermistor channels and die temps
+void bmb3y_print_temperatures(const bms_model_t *model);

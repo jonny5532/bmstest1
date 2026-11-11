@@ -8,7 +8,13 @@
 #define CELL_PRESENCE_WORDS 0xc7ff8f7f, 0xf3ffe3ff, 0xfcfff8ff, 0x1ffe3d
 #define NUM_CELLS 96
 #define NUM_MODULES 8 // BMBs in the chain
-#define NUM_MODULE_TEMPS 8 // temperatures read, one per BMB for now
+
+// NTC thermistors: command 0x0D, word0 = A, word2 = B per BMB (bit0 = A, bit1 = B).
+// Confirmed T16 from the isoSPI logs: every BMB reports 2 wired channels (all 16
+// read ~18-20 C, none in the floating ~65-95 C band). The 0f7f cell map also ships
+// as T8 (0,3,3,0,0,3,3,0) and T13 (2,3,3,3,2,3,3,2) variants for other packs.
+#define NUM_THERMISTORS 16
+#define THERMISTOR_PRESENCE 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3
 #define NAMEPLATE_CAPACITY_AH 210 // possibly; unclear what voltage range it's rated over
 // Aged: three full-to-3.4V sweeps in Sep 2026 (kalman/replay) put it at ~173Ah on the G0 midpoint curve
 #define ACTUAL_CAPACITY_AH 173

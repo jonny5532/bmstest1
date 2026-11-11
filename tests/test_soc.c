@@ -190,16 +190,16 @@ static void test_inverter_soc_scaling(void **state) {
     model.cell_voltage_millis = stored_millis;
     model.cell_voltages_millis = stored_millis;
     model.temperature_millis = stored_millis;
-    model.module_temperatures_millis = stored_millis;
+    model.thermistor_temperatures_millis = stored_millis;
     model.current_millis = stored_millis;
     model.temperature_min = 25.0f;
     model.temperature_max = 25.0f;
     for (int i = 0; i < NUM_CELLS; i++) {
         model.cell_voltages_mV[i] = 3700;
     }
-    for (int i = 0; i < NUM_MODULE_TEMPS; i++) {
-        model.module_temperatures_raw_dC[i] = 250;
-        model.module_temperatures[i] = 25.0f;
+    for (int i = 0; i < NUM_THERMISTORS; i++) {
+        model.thermistor_temperatures_raw_dC[i] = 250;
+        model.thermistor_temperatures[i] = 25.0f;
     }
     model.high_voltages.battery = 3700.0f * NUM_CELLS * 0.001f;
 

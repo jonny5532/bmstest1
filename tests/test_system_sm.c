@@ -56,7 +56,7 @@ static void setup_fresh_timestamps(bms_model_t *m) {
     m->current_millis = stored_millis;
     m->cell_voltage_millis = stored_millis;
     m->temperature_millis = stored_millis;
-    m->module_temperatures_millis = stored_millis;
+    m->thermistor_temperatures_millis = stored_millis;
 }
 
 static void reset_model_for_test(bms_model_t *m) {

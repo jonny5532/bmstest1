@@ -83,7 +83,7 @@ void battery_model_tick(battery_model_t *bat, bms_model_t *model, float current_
     model->high_voltages.battery = (float)model->cell_voltage_min_mV * NUM_CELLS * 0.001f;
     model->high_voltages.battery_millis = stored_millis;
 
-    model->module_temperatures_millis = stored_millis;
+    model->thermistor_temperatures_millis = stored_millis;
 
     // printf("Battery: SoC %.2f, Cell Voltage %.2f V, Current %.2f A\n",
     //        bat->soc, v_cell, current_A);

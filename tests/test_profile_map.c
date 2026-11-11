@@ -28,9 +28,23 @@ static void test_profile_map_is_consistent(void **state) {
     assert_int_equal(errors, 0);
 }
 
+// One THERMISTOR_PRESENCE entry per BMB, with NUM_THERMISTORS channels in all
+static void test_profile_thermistors_are_consistent(void **state) {
+    (void) state;
+    const uint8_t presence[] = { THERMISTOR_PRESENCE };
+    assert_int_equal(sizeof(presence), NUM_MODULES);
+    int count = 0;
+    for(size_t i = 0; i < sizeof(presence); i++) {
+        assert_int_equal(presence[i] & ~0x3, 0);
+        count += __builtin_popcount(presence[i]);
+    }
+    assert_int_equal(count, NUM_THERMISTORS);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_profile_map_is_consistent),
+        cmocka_unit_test(test_profile_thermistors_are_consistent),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

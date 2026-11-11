@@ -18,8 +18,11 @@
 #ifndef NUM_MODULES
 #error "Profile must define NUM_MODULES"
 #endif
-#ifndef NUM_MODULE_TEMPS
-#error "Profile must define NUM_MODULE_TEMPS"
+#if !defined(NUM_THERMISTORS) || !defined(THERMISTOR_PRESENCE)
+#error "Profile must define NUM_THERMISTORS and THERMISTOR_PRESENCE (0 and one 0x0 per BMB if it has none)"
+#endif
+#ifdef NUM_MODULE_TEMPS
+#error "NUM_MODULE_TEMPS is gone: BMB die temperatures are one per BMB, and the cell temperatures come from NUM_THERMISTORS / THERMISTOR_PRESENCE"
 #endif
 #ifndef NAMEPLATE_CAPACITY_AH
 #error "Profile must define NAMEPLATE_CAPACITY_AH"
@@ -95,7 +98,22 @@ _Static_assert(TEMPERATURE_HARD_MIN <= MIN_DISCHARGE_TEMPERATURE_LIMIT
 _Static_assert(PROFILE_POPCOUNT4(CELL_PRESENCE_WORDS) == NUM_CELLS,
                "CELL_PRESENCE_WORDS must have exactly NUM_CELLS bits set");
 
-_Static_assert(NUM_MODULE_TEMPS >= 1, "NUM_MODULE_TEMPS must be at least 1");
+// THERMISTOR_PRESENCE: one entry per BMB, bit 0 = channel A, bit 1 = channel B.
+// (Up to 8 BMBs; the padding zeros cover shorter chains.)
+#define PROFILE_THERMISTOR_COUNT(...) (sizeof((const unsigned char[]){ __VA_ARGS__ }))
+#define PROFILE_POPCOUNT8_(a, b, c, d, e, f, g, h, ...) \
+    (__builtin_popcount(a) + __builtin_popcount(b) + __builtin_popcount(c) + __builtin_popcount(d) + \
+     __builtin_popcount(e) + __builtin_popcount(f) + __builtin_popcount(g) + __builtin_popcount(h))
+#define PROFILE_POPCOUNT8(...) PROFILE_POPCOUNT8_(__VA_ARGS__, 0, 0, 0, 0, 0, 0, 0, 0)
+#define PROFILE_OR8_(a, b, c, d, e, f, g, h, ...) ((a) | (b) | (c) | (d) | (e) | (f) | (g) | (h))
+#define PROFILE_OR8(...) PROFILE_OR8_(__VA_ARGS__, 0, 0, 0, 0, 0, 0, 0, 0)
+_Static_assert(PROFILE_THERMISTOR_COUNT(THERMISTOR_PRESENCE) == NUM_MODULES,
+               "THERMISTOR_PRESENCE must have one entry per BMB (NUM_MODULES)");
+_Static_assert(NUM_MODULES <= 8, "THERMISTOR_PRESENCE checks cover up to 8 BMBs");
+_Static_assert((PROFILE_OR8(THERMISTOR_PRESENCE) & ~0x3) == 0,
+               "THERMISTOR_PRESENCE entries are 0x0-0x3 (bit 0 = channel A, bit 1 = channel B)");
+_Static_assert(PROFILE_POPCOUNT8(THERMISTOR_PRESENCE) == NUM_THERMISTORS,
+               "THERMISTOR_PRESENCE must have exactly NUM_THERMISTORS bits set");
 _Static_assert(NAMEPLATE_CAPACITY_AH > 0, "NAMEPLATE_CAPACITY_AH must be positive");
 _Static_assert(ACTUAL_CAPACITY_AH >= 1 && ACTUAL_CAPACITY_AH <= 1000, "ACTUAL_CAPACITY_AH must be 1 to 1000Ah");
 _Static_assert(CHARGE_MAX_CURRENT_dA > 0 && DISCHARGE_MAX_CURRENT_dA > 0, "Max currents must be positive");

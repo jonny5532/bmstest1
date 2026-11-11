@@ -183,12 +183,19 @@ void bms_print_status() {
 
     {
         millis_t now = millis();
-        debug_printf("ModTemps:");
-        for(int i=0; i<NUM_MODULE_TEMPS; i++) {
-            debug_printf(" [%d]=%.1fC", i, model.module_temperatures[i]);
+        debug_printf("Thermistors:");
+        for(int i=0; i<NUM_THERMISTORS; i++) {
+            debug_printf(" [%d]=%.1fC", i, model.thermistor_temperatures[i]);
+        }
+        debug_printf(" (age %lums)%s\n",
+            model.thermistor_temperatures_millis ? (now - model.thermistor_temperatures_millis) : 0,
+            thermistor_fault_mask(&model) ? " FAULT" : "");
+        debug_printf("BMB die:");
+        for(int i=0; i<NUM_MODULES; i++) {
+            debug_printf(" [%d]=%.1fC", i, model.bmb_die_temperatures[i]);
         }
         debug_printf(" (age %lums) | ShuntDie: %.1fC (age %lums) | ShuntNTC: %.1fC / %.0f ohm (age %lums)\n",
-            model.module_temperatures_millis ? (now - model.module_temperatures_millis) : 0,
+            model.bmb_die_temperatures_millis ? (now - model.bmb_die_temperatures_millis) : 0,
             model.shunt_die_temperature,
             model.shunt_die_temperature_millis ? (now - model.shunt_die_temperature_millis) : 0,
             model.shunt_ntc_temperature,

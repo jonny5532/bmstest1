@@ -239,6 +239,12 @@ static const char *cmd_cells_raw(char *args) {
     return NULL;
 }
 
+static const char *cmd_temps(char *args) {
+    (void)args;
+    bmb3y_print_temperatures(&model);
+    return NULL;
+}
+
 static const char *cmd_supervisor(char *args) {
     (void)args;
     const sup_reply_t *r = &model.supervisor;
@@ -381,6 +387,7 @@ static const cli_command_t commands[] = {
     {"ads", NULL, cmd_ads, "ADS1115 readings, scan rate and errors"},
     {"ina", NULL, cmd_ina, "INA228 current, charge, temperatures and sampling stats"},
     {"cells_raw", NULL, cmd_cells_raw, "last reading of every BMB channel (* = in the cell map)"},
+    {"temps", NULL, cmd_temps, "every BMB thermistor channel (#n = in the profile) and die temperature"},
     {"supervisor", NULL, cmd_supervisor, "supervisor state, reasons and the cell map it enforces"},
 };
 #define NUM_COMMANDS (sizeof(commands) / sizeof(commands[0]))

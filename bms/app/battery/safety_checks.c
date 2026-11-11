@@ -65,8 +65,17 @@ void confirm_battery_safety(const bms_model_t *model) {
         );
     }
 
+    // Outside the staleness check, which a failing 0x0D read can trip while a
+    // thermistor is still marked faulty
+    uint32_t thermistor_faults = thermistor_fault_mask(model);
+    confirm(
+        thermistor_faults == 0,
+        ERR_THERMISTOR_FAULT,
+        thermistor_faults
+    );
+
     if(check_or_confirm(
-        millis_recent_enough(model->temperature_millis, 
+        millis_recent_enough(model->temperature_millis,
             TEMPERATURE_STALE_THRESHOLD_MS(model)
         ),
         // Don't raise faults if we're still initializing

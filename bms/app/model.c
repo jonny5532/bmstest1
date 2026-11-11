@@ -12,19 +12,44 @@
 
 bms_model_t model = {0};
 
-static void model_process_temperatures(bms_model_t *model) {
-    model->temperature_min = model->module_temperatures[0];
-    model->temperature_max = model->module_temperatures[0];
-    for(int i=1; i<NUM_MODULE_TEMPS; i++) {
-        float temp = model->module_temperatures[i];
-        if(temp < model->temperature_min) {
-            model->temperature_min = temp;
+static void temperature_range(const float *temps, int count, float *min, float *max) {
+    *min = NAN;
+    *max = NAN;
+    for(int i=0; i<count; i++) {
+        float temp = temps[i];
+        if(isnan(temp)) {
+            continue;
         }
-        if(temp > model->temperature_max) {
-            model->temperature_max = temp;
-        }   
+        if(isnan(*min) || temp < *min) {
+            *min = temp;
+        }
+        if(isnan(*max) || temp > *max) {
+            *max = temp;
+        }
     }
-    model->temperature_millis = model->module_temperatures_millis;
+}
+
+static void model_process_temperatures(bms_model_t *model) {
+#if NUM_THERMISTORS > 0
+    // Update the min/max temp from the cell temperatures themselves (if
+    // available).
+    temperature_range(model->thermistor_temperatures, NUM_THERMISTORS,
+                      &model->temperature_min, &model->temperature_max);
+    if(thermistor_fault_mask(model) != 0) {
+        // If any thermistor is faulty, the maximum temperature is set to the
+        // fault value.
+        model->temperature_max = THERMISTOR_FAULT_dC * 0.1f;
+        if(isnan(model->temperature_min)) {
+            model->temperature_min = model->temperature_max;
+        }
+    }
+    model->temperature_millis = isnan(model->temperature_max) ? 0 : model->thermistor_temperatures_millis;
+#else
+    // Pack has no thermistors, use BMB die temps instead
+    temperature_range(model->bmb_die_temperatures, NUM_MODULES,
+                      &model->temperature_min, &model->temperature_max);
+    model->temperature_millis = isnan(model->temperature_min) ? 0 : model->bmb_die_temperatures_millis;
+#endif
 }
 
 static void model_process_cell_voltages(bms_model_t *model) {
@@ -76,12 +101,12 @@ static void model_process_cell_voltages(bms_model_t *model) {
     model->cell_voltage_millis = model->cell_voltages_millis;
 }
 
-void store_cell_voltage(uint8_t logical_index, int16_t voltage_mV) {
+void store_cell_voltage(bms_model_t *model, uint8_t logical_index, int16_t voltage_mV) {
     if(logical_index >= NUM_CELLS) {
         return;
     }
 
-    int16_t previous_voltage = model.cell_voltages_mV[logical_index];
+    int16_t previous_voltage = model->cell_voltages_mV[logical_index];
 
     if(previous_voltage > 0) {
         int16_t delta = voltage_mV - previous_voltage;
@@ -95,39 +120,80 @@ void store_cell_voltage(uint8_t logical_index, int16_t voltage_mV) {
         }
     }
 
-    model.cell_voltages_mV[logical_index] = voltage_mV;
+    model->cell_voltages_mV[logical_index] = voltage_mV;
 }
 
-void store_module_temperature(uint8_t module_index, int16_t raw_temp_dC) {
-    if(module_index >= NUM_MODULE_TEMPS) {
-        return;
-    }
+// BMB_TEMPERATURE_GLITCH event kinds
+#define TEMPERATURE_GLITCH_THERMISTOR 0
+#define TEMPERATURE_GLITCH_DIE 1
 
-    int16_t previous_raw_temp = model.module_temperatures_raw_dC[module_index];
-
-    if(previous_raw_temp != 0) {
-        int16_t delta = raw_temp_dC - previous_raw_temp;
+static void store_temperature(float *filtered, int16_t *last_dC, int16_t temp_dC, uint8_t kind, uint8_t index) {
+    if(!isnan(*filtered)) {
+        int16_t delta = temp_dC - *last_dC;
         if(delta < 0) delta = -delta;
 
-        if(delta >= MODULE_TEMPERATURE_GLITCH_THRESHOLD_dC) {
-            uint64_t event_data = ((uint64_t)module_index << 32) |
-                                  ((uint32_t)(uint16_t)previous_raw_temp << 16) |
-                                  (uint16_t)raw_temp_dC;
-            count_bms_event(ERR_MODULE_TEMPERATURE_GLITCH, event_data);
+        if(delta >= TEMPERATURE_GLITCH_THRESHOLD_dC) {
+            uint64_t event_data = ((uint64_t)kind << 40) |
+                                  ((uint64_t)index << 32) |
+                                  ((uint32_t)(uint16_t)*last_dC << 16) |
+                                  (uint16_t)temp_dC;
+            count_bms_event(ERR_BMB_TEMPERATURE_GLITCH, event_data);
         }
     }
 
-    model.module_temperatures_raw_dC[module_index] = raw_temp_dC;
+    *last_dC = temp_dC;
 
     aema_update(
-        &model.module_temperatures[module_index],
+        filtered,
         NULL,
-        raw_temp_dC * 0.1f,
+        temp_dC * 0.1f,
         0.05f,  // slow alpha
         0.75f,  // fast alpha
         2.0f,   // slow threshold
         10.0f   // fast threshold
     );
+}
+
+void store_thermistor_temperature(bms_model_t *model, uint8_t thermistor_index, int16_t temp_dC, bool valid) {
+#if NUM_THERMISTORS == 0
+    (void)model;
+    (void)thermistor_index;
+    (void)temp_dC;
+    (void)valid;
+#else
+    if(thermistor_index >= NUM_THERMISTORS) {
+        return;
+    }
+
+    if(!valid) {
+        // Record an invalid reading as very hot, reset the AEMA until recovered.
+        model->thermistor_temperatures_raw_dC[thermistor_index] = THERMISTOR_FAULT_dC;
+        model->thermistor_temperatures[thermistor_index] = NAN;
+        return;
+    }
+
+    store_temperature(&model->thermistor_temperatures[thermistor_index],
+                      &model->thermistor_temperatures_raw_dC[thermistor_index], temp_dC,
+                      TEMPERATURE_GLITCH_THERMISTOR, thermistor_index);
+#endif
+}
+
+uint32_t thermistor_fault_mask(const bms_model_t *model) {
+    uint32_t mask = 0;
+    for(int i=0; i<NUM_THERMISTORS; i++) {
+        if(model->thermistor_temperatures_raw_dC[i] == THERMISTOR_FAULT_dC) {
+            mask |= 1u << i;
+        }
+    }
+    return mask;
+}
+
+void store_bmb_die_temperature(bms_model_t *model, uint8_t module_index, int16_t temp_dC) {
+    if(module_index >= NUM_MODULES) {
+        return;
+    }
+    store_temperature(&model->bmb_die_temperatures[module_index], &model->bmb_die_temperatures_raw_dC[module_index],
+                      temp_dC, TEMPERATURE_GLITCH_DIE, module_index);
 }
 
 static void model_calculate_cell_current_limits(bms_model_t *model) {

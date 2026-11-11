@@ -57,7 +57,7 @@ static void setup_model_operating(bms_model_t *m) {
     m->cell_voltage_millis = stored_millis;
     m->cell_voltages_millis = stored_millis;
     m->temperature_millis = stored_millis;
-    m->module_temperatures_millis = stored_millis;
+    m->thermistor_temperatures_millis = stored_millis;
     m->current_millis = stored_millis;
     
     // Normal operating values
@@ -68,9 +68,9 @@ static void setup_model_operating(bms_model_t *m) {
     for (int i = 0; i < NUM_CELLS; i++) {
         m->cell_voltages_mV[i] = 3700;
     }
-    for (int i = 0; i < NUM_MODULE_TEMPS; i++) {
-        m->module_temperatures_raw_dC[i] = 250;
-        m->module_temperatures[i] = 25.0f;
+    for (int i = 0; i < NUM_THERMISTORS; i++) {
+        m->thermistor_temperatures_raw_dC[i] = 250;
+        m->thermistor_temperatures[i] = 25.0f;
     }
 }
 
@@ -125,13 +125,13 @@ static void test_temperature_min_max_extraction(void **state) {
     bms_model_t m = {0};
     setup_model_operating(&m);
     
-    m.module_temperatures_raw_dC[0] = 200;  // min (20.0C)
-    m.module_temperatures[0] = 20.0f;
-    m.module_temperatures_raw_dC[1] = 350;  // max (35.0C)
-    m.module_temperatures[1] = 35.0f;
-    for (int i = 2; i < NUM_MODULE_TEMPS; i++) {
-        m.module_temperatures_raw_dC[i] = 250;
-        m.module_temperatures[i] = 25.0f;
+    m.thermistor_temperatures_raw_dC[0] = 200;  // min (20.0C)
+    m.thermistor_temperatures[0] = 20.0f;
+    m.thermistor_temperatures_raw_dC[1] = 350;  // max (35.0C)
+    m.thermistor_temperatures[1] = 35.0f;
+    for (int i = 2; i < NUM_THERMISTORS; i++) {
+        m.thermistor_temperatures_raw_dC[i] = 250;
+        m.thermistor_temperatures[i] = 25.0f;
     }
     
     model_tick(&m);
@@ -241,15 +241,157 @@ static void test_temperature_min_max_not_truncated(void **state) {
     setup_model_operating(&m);
 
     // Module 0 seeds min/max; later modules must not be truncated to int
-    m.module_temperatures_raw_dC[1] = -9;
-    m.module_temperatures[1] = -0.9f;
-    m.module_temperatures_raw_dC[2] = 459;
-    m.module_temperatures[2] = 45.9f;
+    m.thermistor_temperatures_raw_dC[1] = -9;
+    m.thermistor_temperatures[1] = -0.9f;
+    m.thermistor_temperatures_raw_dC[2] = 459;
+    m.thermistor_temperatures[2] = 45.9f;
 
     model_tick(&m);
 
     assert_true(m.temperature_min <= -0.85f && m.temperature_min >= -0.95f);
     assert_true(m.temperature_max >= 45.85f && m.temperature_max <= 45.95f);
+}
+
+static void setup_thermistors_read(void) {
+    setup_model_operating(&model);
+    for (int i = 0; i < NUM_THERMISTORS; i++) {
+        model.thermistor_temperatures[i] = NAN;
+        store_thermistor_temperature(&model, i, 250, true);
+    }
+    for (int i = 0; i < NUM_MODULES; i++) {
+        model.bmb_die_temperatures[i] = NAN;
+    }
+    model.thermistor_temperatures_millis = stored_millis;
+}
+
+static void test_faulty_thermistor_left_out_and_raised(void **state) {
+    (void) state;
+    setup_thermistors_read();
+    store_thermistor_temperature(&model, 1, 3000, false); // open: reads 300C
+    model.thermistor_temperatures[2] = NAN;       // so it takes 20C straight away
+    store_thermistor_temperature(&model, 2, 200, true);
+
+    assert_int_equal(thermistor_fault_mask(&model), 1u << 1);
+    assert_true(isnan(model.thermistor_temperatures[1]));
+    assert_int_equal(model.thermistor_temperatures_raw_dC[1], THERMISTOR_FAULT_dC);
+
+    model_tick(&model);
+    confirm_battery_safety(&model);
+
+    // The open one makes the pack read hot, so the over-temperature limits
+    // trip; the others still give the minimum
+    assert_true(model.temperature_min >= 19.9f && model.temperature_min <= 20.1f);
+    assert_true(model.temperature_max == THERMISTOR_FAULT_dC * 0.1f);
+    assert_int_equal(model.temperature_millis, stored_millis);
+    assert_int_equal(get_event_level(ERR_THERMISTOR_FAULT), LEVEL_CRITICAL);
+    assert_true(bms_event_slots[ERR_THERMISTOR_FAULT].data64 == (1u << 1));
+    assert_int_not_equal(get_event_level(ERR_BATTERY_TEMPERATURE_VERY_HIGH), LEVEL_NONE);
+
+    // Back in range: counted again, and the fault clears
+    store_thermistor_temperature(&model, 1, 260, true);
+    assert_int_equal(thermistor_fault_mask(&model), 0);
+    assert_true(model.thermistor_temperatures[1] >= 25.9f && model.thermistor_temperatures[1] <= 26.1f);
+    model_tick(&model);
+    confirm_battery_safety(&model);
+    assert_true(model.temperature_max >= 25.9f && model.temperature_max <= 26.1f);
+    assert_int_equal(get_event_level(ERR_THERMISTOR_FAULT), LEVEL_NONE);
+}
+
+static void test_all_thermistors_faulty_reads_hot(void **state) {
+    (void) state;
+    setup_thermistors_read();
+    for (int i = 0; i < NUM_THERMISTORS; i++) {
+        store_thermistor_temperature(&model, i, -600, false); // shorted / disconnected low
+    }
+
+    model_tick(&model);
+    confirm_battery_safety(&model);
+
+    // A short reads cold, but a fault reads hot, not stale
+    assert_true(model.temperature_min == THERMISTOR_FAULT_dC * 0.1f);
+    assert_true(model.temperature_max == THERMISTOR_FAULT_dC * 0.1f);
+    assert_int_equal(model.temperature_millis, stored_millis);
+    assert_int_equal(get_event_level(ERR_THERMISTOR_FAULT), LEVEL_CRITICAL);
+    assert_int_not_equal(get_event_level(ERR_BATTERY_TEMPERATURE_VERY_HIGH), LEVEL_NONE);
+    assert_int_equal(get_event_level(ERR_BATTERY_TEMPERATURE_STALE), LEVEL_NONE);
+}
+
+// One thermistor read's worth of time, outside slow mode
+#define THERMISTOR_READ_PERIOD_MS 1280
+
+static void read_thermistor_and_tick(int16_t temp_dC, bool valid) {
+    store_thermistor_temperature(&model, 1, temp_dC, valid);
+    model.thermistor_temperatures_millis = stored_millis;
+    model_tick(&model);
+    confirm_battery_safety(&model);
+    advance_time(THERMISTOR_READ_PERIOD_MS);
+    events_tick();
+}
+
+static void test_thermistor_fault_escalation(void **state) {
+    (void) state;
+    extern millis_t last_tick_at;
+    setup_thermistors_read();
+    last_tick_at = stored_millis; // start the escalation clock now
+
+    // Two bad reads in a row, then good again: not fatal
+    read_thermistor_and_tick(3000, false);
+    read_thermistor_and_tick(3000, false);
+    assert_int_equal(get_event_level(ERR_THERMISTOR_FAULT), LEVEL_CRITICAL);
+    assert_int_equal(get_event_level(ERR_BATTERY_TEMPERATURE_VERY_HIGH), LEVEL_CRITICAL);
+    read_thermistor_and_tick(250, true);
+    assert_true(get_event_level(ERR_THERMISTOR_FAULT) < LEVEL_FATAL);
+    assert_true(get_event_level(ERR_BATTERY_TEMPERATURE_VERY_HIGH) < LEVEL_FATAL);
+
+    // Long enough after, a fault that persists goes fatal
+    for (int i = 0; i < 10; i++) {
+        read_thermistor_and_tick(250, true);
+    }
+    for (int i = 0; i < 4; i++) {
+        read_thermistor_and_tick(3000, false);
+    }
+    assert_int_equal(get_event_level(ERR_THERMISTOR_FAULT), LEVEL_FATAL);
+    assert_int_equal(get_event_level(ERR_BATTERY_TEMPERATURE_VERY_HIGH), LEVEL_FATAL);
+}
+
+static void test_cold_misreads_not_fatal(void **state) {
+    (void) state;
+    extern millis_t last_tick_at;
+    setup_thermistors_read();
+    last_tick_at = stored_millis;
+
+    // Two misreads at -40C (still on the curve, so through the filter): the
+    // pack reads very cold, but recovers before it's fatal
+    read_thermistor_and_tick(-400, true);
+    read_thermistor_and_tick(-400, true);
+    assert_int_equal(get_event_level(ERR_BATTERY_TEMPERATURE_VERY_LOW), LEVEL_CRITICAL);
+    read_thermistor_and_tick(250, true);
+    read_thermistor_and_tick(250, true);
+    assert_true(get_event_level(ERR_BATTERY_TEMPERATURE_VERY_LOW) < LEVEL_FATAL);
+}
+
+static void test_temperature_glitch_events(void **state) {
+    (void) state;
+    setup_thermistors_read();
+    assert_int_equal(get_event_count(ERR_BMB_TEMPERATURE_GLITCH), 0);
+
+    store_thermistor_temperature(&model, 3, 250 + TEMPERATURE_GLITCH_THRESHOLD_dC, true);
+    assert_int_equal(get_event_count(ERR_BMB_TEMPERATURE_GLITCH), 1);
+    assert_true(bms_event_slots[ERR_BMB_TEMPERATURE_GLITCH].data64 ==
+                ((3ULL << 32) | (250ULL << 16) | (uint64_t)(250 + TEMPERATURE_GLITCH_THRESHOLD_dC)));
+
+    // A BMB die: no glitch on its first reading, then one flagged as a die
+    store_bmb_die_temperature(&model, 1, 300);
+    assert_int_equal(get_event_count(ERR_BMB_TEMPERATURE_GLITCH), 1);
+    store_bmb_die_temperature(&model, 1, 300 - TEMPERATURE_GLITCH_THRESHOLD_dC);
+    assert_int_equal(get_event_count(ERR_BMB_TEMPERATURE_GLITCH), 2);
+    assert_true(bms_event_slots[ERR_BMB_TEMPERATURE_GLITCH].data64 ==
+                ((1ULL << 40) | (1ULL << 32) | (300ULL << 16) | (uint64_t)(300 - TEMPERATURE_GLITCH_THRESHOLD_dC)));
+
+    // After a fault, the next good reading starts afresh rather than glitching
+    store_thermistor_temperature(&model, 4, 3000, false);
+    store_thermistor_temperature(&model, 4, 250, true);
+    assert_int_equal(get_event_count(ERR_BMB_TEMPERATURE_GLITCH), 2);
 }
 
 // ============================================================================
@@ -275,9 +417,9 @@ static void test_temperature_limits_applied(void **state) {
     setup_model_operating(&m);
     
     // Set hot temperature that should derate
-    m.module_temperatures_raw_dC[0] = 480;  // 48.0C, near max of 50C
-    m.module_temperatures[0] = 48.0f;
-    m.module_temperatures_millis = stored_millis;
+    m.thermistor_temperatures_raw_dC[0] = 480;  // 48.0C, near max of 50C
+    m.thermistor_temperatures[0] = 48.0f;
+    m.thermistor_temperatures_millis = stored_millis;
     
     model_tick(&m);
     
@@ -314,9 +456,9 @@ static void test_overcurrent_accumulation_charge(void **state) {
     
     // Set hot temperature to limit charging to a low value
     // At 490 dC, limit = (500 - 490) * 2 = 20 dA = 2A
-    for (int i = 0; i < NUM_MODULE_TEMPS; i++) {
-        m.module_temperatures_raw_dC[i] = 490;
-        m.module_temperatures[i] = 49.0f;
+    for (int i = 0; i < NUM_THERMISTORS; i++) {
+        m.thermistor_temperatures_raw_dC[i] = 490;
+        m.thermistor_temperatures[i] = 49.0f;
     }
     
     // Set charge current well above what temperature will allow
@@ -336,9 +478,9 @@ static void test_overcurrent_accumulation_discharge(void **state) {
     
     // Set hot temperature to limit discharging
     // At 540 dC (near max 550), limit = (550 - 540) * 2 = 20 dA = 2A
-    for (int i = 0; i < NUM_MODULE_TEMPS; i++) {
-        m.module_temperatures_raw_dC[i] = 540;
-        m.module_temperatures[i] = 54.0f;
+    for (int i = 0; i < NUM_THERMISTORS; i++) {
+        m.thermistor_temperatures_raw_dC[i] = 540;
+        m.thermistor_temperatures[i] = 54.0f;
     }
     
     // Discharge at 50A when limit is ~2A
@@ -583,6 +725,11 @@ int main(void) {
         cmocka_unit_test_setup(test_missing_cell_leaves_derived_values_stale, setup),
         cmocka_unit_test_setup(test_missing_cell_recovers_when_present_again, setup),
         cmocka_unit_test_setup(test_temperature_min_max_not_truncated, setup),
+        cmocka_unit_test_setup(test_faulty_thermistor_left_out_and_raised, setup),
+        cmocka_unit_test_setup(test_all_thermistors_faulty_reads_hot, setup),
+        cmocka_unit_test_setup(test_thermistor_fault_escalation, setup),
+        cmocka_unit_test_setup(test_cold_misreads_not_fatal, setup),
+        cmocka_unit_test_setup(test_temperature_glitch_events, setup),
         cmocka_unit_test_setup(test_missing_cell_event_lists_indices, setup),
         cmocka_unit_test_setup(test_last_cell_missing_reported, setup),
         
