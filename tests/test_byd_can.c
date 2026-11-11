@@ -9,6 +9,7 @@
 
 #include "app/model.h"
 #include "protocols/inverter/inverter.h"
+#include "protocols/inverter/can.h"
 #include "can2040.h"
 #include "sys/logging/logging.h"
 
@@ -46,9 +47,11 @@ int can2040_transmit(struct can2040 *cd, const struct can2040_msg *msg) {
 }
 
 void can2040_stop(struct can2040 *cd) { (void)cd; can2040_stop_count++; }
+// What can2040 reports; cleared by can2040_setup, as the real one's are
+static struct can2040_stats mock_stats;
 void can2040_get_statistics(struct can2040 *cd, struct can2040_stats *stats) {
     (void)cd;
-    memset(stats, 0, sizeof(*stats));
+    *stats = mock_stats;
 }
 
 // Current callback function
@@ -60,7 +63,10 @@ void can2040_callback_config(struct can2040 *cd, void (*cb)(struct can2040 *, ui
     can2040_cb = cb;
 }
 
-void can2040_setup(struct can2040 *cd, uint32_t pio_num) { (void)cd; (void)pio_num; }
+void can2040_setup(struct can2040 *cd, uint32_t pio_num) {
+    (void)cd; (void)pio_num;
+    memset(&mock_stats, 0, sizeof(mock_stats));
+}
 void can2040_start(struct can2040 *cd, uint32_t sys_clock, uint32_t bitrate, uint32_t gpio_rx, uint32_t gpio_tx) { (void)cd; (void)sys_clock; (void)bitrate; (void)gpio_rx; (void)gpio_tx; }
 void can2040_pio_irq_handler(struct can2040 *cd) { (void)cd; }
 
@@ -186,9 +192,38 @@ static void test_inverter_restart_reidentifies(void **state) {
     assert_int_equal(tx_log[0], 0x250);
 }
 
+// can2040's statistics start again from zero when the bus is restarted; the
+// frame counts the HMI reads must not
+static void test_frame_counts_carry_across_a_bus_restart(void **state) {
+    (void)state;
+
+    uint32_t sent_before = inverter_can_frames_sent();
+    uint32_t received_before = inverter_can_frames_received();
+
+    mock_stats.tx_total = 5;
+    mock_stats.rx_total = 3;
+    assert_int_equal(inverter_can_frames_sent() - sent_before, 5);
+    assert_int_equal(inverter_can_frames_received() - received_before, 3);
+
+    inverter_can_reset();
+    assert_int_equal(mock_stats.tx_total, 0);
+    assert_int_equal(inverter_can_frames_sent() - sent_before, 5);
+    assert_int_equal(inverter_can_frames_received() - received_before, 3);
+
+    mock_stats.tx_total = 2;
+    mock_stats.rx_total = 1;
+    assert_int_equal(inverter_can_frames_sent() - sent_before, 7);
+    assert_int_equal(inverter_can_frames_received() - received_before, 4);
+
+    inverter_can_reset();
+    assert_int_equal(inverter_can_frames_sent() - sent_before, 7);
+    assert_int_equal(inverter_can_frames_received() - received_before, 4);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_inverter_restart_reidentifies),
+        cmocka_unit_test(test_frame_counts_carry_across_a_bus_restart),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

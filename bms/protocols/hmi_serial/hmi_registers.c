@@ -3,7 +3,10 @@
 #include "hmi_serial.h"
 #include "sys/time/time.h"
 #include "app/firmware_id.h"
+#include "app/monitoring/counters.h"
+#include "config/limits.h"
 #include "drivers/sensors/ina228.h"
+#include "protocols/inverter/can.h"
 
 #include <math.h>
 
@@ -26,6 +29,8 @@ static const hmi_register_info_t registers[] = {
     { HMI_REG_MCU_TEMPERATURE,        HMI_TYPE_FLOAT,  0 },
     { HMI_REG_SYSTEM_STATE,           HMI_TYPE_UINT8,  0 },
     { HMI_REG_CONTACTORS_STATE,       HMI_TYPE_UINT8,  0 },
+    { HMI_REG_BALANCING_STATE,        HMI_TYPE_UINT8,  0 },
+    { HMI_REG_CALIBRATION_STATE,      HMI_TYPE_UINT8,  0 },
 
     { HMI_REG_BATTERY_VOLTAGE,        HMI_TYPE_INT32,  0 },
     { HMI_REG_OUTPUT_VOLTAGE,         HMI_TYPE_INT32,  0 },
@@ -50,6 +55,9 @@ static const hmi_register_info_t registers[] = {
     { HMI_REG_PACK_NEG_TO_CHASSIS,    HMI_TYPE_FLOAT,  0 },
     { HMI_REG_ISOLATION_OPEN_AGE,     HMI_TYPE_FLOAT,  0 },
     { HMI_REG_ISOLATION_ZEROED,       HMI_TYPE_UINT8,  0 },
+    { HMI_REG_OVERCURRENT_CHARGE_BUFFER,    HMI_TYPE_FLOAT, 0 },
+    { HMI_REG_OVERCURRENT_DISCHARGE_BUFFER, HMI_TYPE_FLOAT, 0 },
+    { HMI_REG_SOFT_CHARGE_BUFFER,     HMI_TYPE_FLOAT,  0 },
 
     { HMI_REG_SOC,                    HMI_TYPE_UINT16, W },
     { HMI_REG_SOC_VOLTAGE_BASED,      HMI_TYPE_UINT16, 0 },
@@ -106,6 +114,15 @@ static const hmi_register_info_t registers[] = {
     { HMI_REG_CAPACITY,                   HMI_TYPE_UINT32, WS },
 
     { HMI_REG_SYSTEM_REQUEST,             HMI_TYPE_UINT8,  W },
+
+    { HMI_REG_UART0_PACKETS_RECEIVED,     HMI_TYPE_UINT32, 0 },
+    { HMI_REG_UART0_PACKETS_SENT,         HMI_TYPE_UINT32, 0 },
+    { HMI_REG_UART0_CRC_ERRORS,           HMI_TYPE_UINT32, 0 },
+    { HMI_REG_UART1_PACKETS_RECEIVED,     HMI_TYPE_UINT32, 0 },
+    { HMI_REG_UART1_PACKETS_SENT,         HMI_TYPE_UINT32, 0 },
+    { HMI_REG_UART1_CRC_ERRORS,           HMI_TYPE_UINT32, 0 },
+    { HMI_REG_CAN_FRAMES_SENT,            HMI_TYPE_UINT32, 0 },
+    { HMI_REG_CAN_FRAMES_RECEIVED,        HMI_TYPE_UINT32, 0 },
 };
 
 #undef W
@@ -326,6 +343,65 @@ uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_model_t *mo
         case HMI_REG_CONTACTORS_STATE:
             buf[idx++] = HMI_TYPE_UINT8;
             buf[idx++] = (uint8_t)model->contactor_sm.state;
+            break;
+        case HMI_REG_BALANCING_STATE:
+            buf[idx++] = HMI_TYPE_UINT8;
+            buf[idx++] = (uint8_t)model->balancing_sm.state;
+            break;
+        case HMI_REG_CALIBRATION_STATE:
+            buf[idx++] = HMI_TYPE_UINT8;
+            buf[idx++] = (uint8_t)model->calibration_sm.state;
+            break;
+        case HMI_REG_OVERCURRENT_CHARGE_BUFFER:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx],
+                (float)model->excess_charge_buffer_dC * 100.0f / OVERCURRENT_BUFFER_LIMIT_dC);
+            break;
+        case HMI_REG_OVERCURRENT_DISCHARGE_BUFFER:
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx],
+                (float)model->excess_discharge_buffer_dC * 100.0f / OVERCURRENT_BUFFER_LIMIT_dC);
+            break;
+        case HMI_REG_SOFT_CHARGE_BUFFER: {
+            // Each direction against its own limit
+            int32_t buffer_dC = model->soft_limit_charge_buffer_dC;
+            buf[idx++] = HMI_TYPE_FLOAT;
+            idx += hmi_buf_append_float(&buf[idx], buffer_dC >= 0
+                ? (float)buffer_dC * 100.0f / OVERCHARGE_BUFFER_LIMIT_dC
+                : (float)buffer_dC * 100.0f / OVERDISCHARGE_BUFFER_LIMIT_dC);
+            break;
+        }
+        case HMI_REG_UART0_PACKETS_RECEIVED:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart0_packets_received);
+            break;
+        case HMI_REG_UART0_PACKETS_SENT:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart0_packets_sent);
+            break;
+        case HMI_REG_UART0_CRC_ERRORS:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart0_crc_errors);
+            break;
+        case HMI_REG_UART1_PACKETS_RECEIVED:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart1_packets_received);
+            break;
+        case HMI_REG_UART1_PACKETS_SENT:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart1_packets_sent);
+            break;
+        case HMI_REG_UART1_CRC_ERRORS:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], debug_counters.uart1_crc_errors);
+            break;
+        case HMI_REG_CAN_FRAMES_SENT:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], inverter_can_frames_sent());
+            break;
+        case HMI_REG_CAN_FRAMES_RECEIVED:
+            buf[idx++] = HMI_TYPE_UINT32;
+            idx += hmi_buf_append_uint32(&buf[idx], inverter_can_frames_received());
             break;
         case HMI_REG_SOC_VOLTAGE_BASED:
             buf[idx++] = HMI_TYPE_UINT16;
