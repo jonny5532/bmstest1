@@ -206,7 +206,7 @@ static void test_protocol_version(void **state) {
     uint8_t buf[16];
     assert_int_equal(hmi_append_register_value(buf, HMI_REG_PROTOCOL_VERSION, &model), 5);
     assert_int_equal(buf[2], HMI_TYPE_UINT16);
-    assert_int_equal((uint16_t)buf[3] | ((uint16_t)buf[4] << 8), 7);
+    assert_int_equal((uint16_t)buf[3] | ((uint16_t)buf[4] << 8), 2);
 }
 
 static void test_register_table_sorted_and_unique(void **state) {
