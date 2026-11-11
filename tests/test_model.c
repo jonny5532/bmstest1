@@ -370,6 +370,44 @@ static void test_cold_misreads_not_fatal(void **state) {
     assert_true(get_event_level(ERR_BATTERY_TEMPERATURE_VERY_LOW) < LEVEL_FATAL);
 }
 
+// One cell scan, as the BMB driver does it, then a cell read's worth of time
+static void read_cell_and_tick(int16_t cell0_mV) {
+    store_cell_voltage(&model, 0, cell0_mV);
+    model.cell_voltages_millis = stored_millis;
+    model.cell_voltage_millis = stored_millis;
+    model.high_voltages.battery_millis = stored_millis;
+    model.thermistor_temperatures_millis = stored_millis;
+    model.current_millis = stored_millis;
+    model_tick(&model);
+    confirm_battery_safety(&model);
+    advance_time(THERMISTOR_READ_PERIOD_MS);
+    events_tick();
+}
+
+static void test_cell_voltage_misreads_not_fatal(void **state) {
+    (void) state;
+    extern millis_t last_tick_at;
+    setup_thermistors_read();
+    last_tick_at = stored_millis;
+
+    // Two bad reads in a row, then good again: not fatal
+    for (int i = 0; i < 2; i++) {
+        read_cell_and_tick(CELL_VOLTAGE_HARD_MAX_mV + 100);
+    }
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_VERY_HIGH), LEVEL_CRITICAL);
+    read_cell_and_tick(3700);
+    assert_true(get_event_level(ERR_CELL_VOLTAGE_VERY_HIGH) < LEVEL_FATAL);
+
+    // A cell that stays over the limit is fatal
+    for (int i = 0; i < 10; i++) {
+        read_cell_and_tick(3700);
+    }
+    for (int i = 0; i < 4; i++) {
+        read_cell_and_tick(CELL_VOLTAGE_HARD_MAX_mV + 100);
+    }
+    assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_VERY_HIGH), LEVEL_FATAL);
+}
+
 static void test_temperature_glitch_events(void **state) {
     (void) state;
     setup_thermistors_read();
@@ -729,6 +767,7 @@ int main(void) {
         cmocka_unit_test_setup(test_all_thermistors_faulty_reads_hot, setup),
         cmocka_unit_test_setup(test_thermistor_fault_escalation, setup),
         cmocka_unit_test_setup(test_cold_misreads_not_fatal, setup),
+        cmocka_unit_test_setup(test_cell_voltage_misreads_not_fatal, setup),
         cmocka_unit_test_setup(test_temperature_glitch_events, setup),
         cmocka_unit_test_setup(test_missing_cell_event_lists_indices, setup),
         cmocka_unit_test_setup(test_last_cell_missing_reported, setup),

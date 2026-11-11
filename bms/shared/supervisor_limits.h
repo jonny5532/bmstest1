@@ -15,8 +15,10 @@
 #define CELL_VOLTAGE_STALE_THRESHOLD_MS 15000
 // How long we wait when force-opening contactors
 #define CONTACTORS_FORCE_OPEN_TIMEOUT_MS 2000
-// Escalation times of the BMS cell voltage events (see sys/events/events.h)
-#define CELL_VOLTAGE_FAULT_ESCALATION_MS 1000
+// Escalation times of the BMS cell voltage events (see sys/events/events.h).
+// The cells are read every 1.28s, so one bad read stays raised for at least
+// that long: allow two bad reads in a row, with some margin.
+#define CELL_VOLTAGE_FAULT_ESCALATION_MS 4000
 #define CELL_VOLTAGES_STALE_ESCALATION_MS 1000
 // The BMS watchdog reboots it (which opens the contactors) after this long
 #define BMS_WATCHDOG_TIMEOUT_MS 5000

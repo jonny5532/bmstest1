@@ -111,7 +111,8 @@ typedef enum {
     X(BATTERY_VOLTAGE_VERY_LOW, LEVEL_CRITICAL, 1000)           \
     X(BATTERY_VOLTAGE_HIGH, LEVEL_WARNING, 0)                   \
     X(BATTERY_VOLTAGE_VERY_HIGH, LEVEL_CRITICAL, 1000)          \
-    X(VOLTAGE_MISMATCH, LEVEL_CRITICAL, 1000)                   \
+    /* Checked against each cell read, so timed like the cells */ \
+    X(VOLTAGE_MISMATCH, LEVEL_CRITICAL, CELL_VOLTAGE_FAULT_ESCALATION_MS) \
     X(LINK_VOLTAGE_MISMATCH, LEVEL_WARNING, 0)                  \
     X(FUSE_VOLTAGE_DROP_HIGH, LEVEL_CRITICAL, FUSE_DROP_FAULT_DELAY_MS) \
     X(OVERCURRENT_CHARGING, LEVEL_WARNING, 0)                   \
