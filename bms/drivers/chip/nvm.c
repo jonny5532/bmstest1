@@ -93,10 +93,40 @@ static const struct lfs_config cfg = {
 
 static lfs_t lfs;
 
+// True if LittleFS's two superblocks (blocks 0 and 1) are erased, as on a
+// board that has never stored anything here.
+static bool nvm_area_blank(void) {
+    const uint32_t *words = (const uint32_t *)FLASH_MMAP_ADDR;
+    for (size_t i = 0; i < (2 * FLASH_SECTOR_SIZE) / sizeof(uint32_t); i++) {
+        if (words[i] != 0xFFFFFFFFu) return false;
+    }
+    return true;
+}
+
+bool nvm_format(void) {
+    int err = lfs_format(&lfs, &cfg);
+    if (err) {
+        error_printf("NVM: format failed (%d)\n", err);
+        return false;
+    }
+    info_printf("NVM: formatted\n");
+    return true;
+}
+
 int update_boot_count(void) {
     int err = lfs_mount(&lfs, &cfg);
     if (err) {
-        lfs_format(&lfs, &cfg);
+        // Only a blank area is formatted. Anything else may hold the
+        // settings, calibration and lifetime counters: leave it for a look
+        // (the BMS runs on defaults and saves nothing) rather than wipe it.
+        // `nvm_format yes` on the USB console formats it on purpose.
+        if (!nvm_area_blank()) {
+            error_printf("NVM: mount failed (%d) and the area isn't blank: not formatting it. "
+                         "Settings are at their defaults and won't be saved.\n", err);
+            return -1;
+        }
+        info_printf("NVM: blank, formatting\n");
+        if (!nvm_format()) return -1;
         err = lfs_mount(&lfs, &cfg);
         if (err) return -1;
     }

@@ -487,6 +487,42 @@ static void test_cell_voltage_limits_applied(void **state) {
 // Overcurrent Accumulation Tests
 // ============================================================================
 
+// The offsets correct for the inverter's voltage reading, within bounds, and
+// the limits sent never pass the hard cell limits
+static void test_voltage_limit_offsets_bounded(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    model_tick(&m);
+    const int32_t base_max = m.inverter_outputs.max_voltage_limit_dV;
+    const int32_t base_min = m.inverter_outputs.min_voltage_limit_dV;
+
+    // Within bounds: applied as given
+    m.pack_voltage_limit_upper_offset_dV = -90;
+    m.pack_voltage_limit_lower_offset_dV = 20;
+    model_tick(&m);
+    assert_int_equal(m.inverter_outputs.max_voltage_limit_dV, base_max - 90);
+    assert_int_equal(m.inverter_outputs.min_voltage_limit_dV, base_min + 20);
+
+    // Saved beyond the bounds: held at them
+    m.pack_voltage_limit_upper_offset_dV = 1000;
+    m.pack_voltage_limit_lower_offset_dV = -1000;
+    model_tick(&m);
+    const int32_t hard_max = ((int32_t)CELL_VOLTAGE_HARD_MAX_mV * NUM_CELLS) / 100;
+    const int32_t hard_min = ((int32_t)CELL_VOLTAGE_HARD_MIN_mV * NUM_CELLS + 99) / 100;
+    int32_t want_max = base_max + VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV;
+    int32_t want_min = base_min + VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV;
+    if(want_max > hard_max) want_max = hard_max;
+    if(want_min < hard_min) want_min = hard_min;
+    assert_int_equal(m.inverter_outputs.max_voltage_limit_dV, want_max);
+    assert_int_equal(m.inverter_outputs.min_voltage_limit_dV, want_min);
+    assert_true(m.inverter_outputs.max_voltage_limit_dV <= hard_max);
+    assert_true(m.inverter_outputs.min_voltage_limit_dV >= hard_min);
+    assert_int_equal(get_pack_voltage_limit_upper_offset_dV(&m), VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV);
+    assert_int_equal(get_pack_voltage_limit_lower_offset_dV(&m), VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV);
+}
+
 static void test_overcurrent_accumulation_charge(void **state) {
     (void) state;
     bms_model_t m = {0};
@@ -776,6 +812,7 @@ int main(void) {
         cmocka_unit_test_setup(test_current_disabled_when_contactors_not_enabled, setup),
         cmocka_unit_test_setup(test_temperature_limits_applied, setup),
         cmocka_unit_test_setup(test_cell_voltage_limits_applied, setup),
+        cmocka_unit_test_setup(test_voltage_limit_offsets_bounded, setup),
         
         // Overcurrent accumulation
         cmocka_unit_test_setup(test_overcurrent_accumulation_charge, setup),

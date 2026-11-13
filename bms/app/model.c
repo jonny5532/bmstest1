@@ -369,9 +369,16 @@ static void model_calculate_inverter_voltage_limits(const bms_model_t *model, in
     }
 
     // Apply user-configured offsets to account for errors in the inverter
-    // voltage reading.
-    max_voltage_limit_dV += model->pack_voltage_limit_upper_offset_dV;
-    min_voltage_limit_dV += model->pack_voltage_limit_lower_offset_dV;
+    // voltage reading (held within their bounds).
+    max_voltage_limit_dV += get_pack_voltage_limit_upper_offset_dV(model);
+    min_voltage_limit_dV += get_pack_voltage_limit_lower_offset_dV(model);
+
+    // Never ask the inverter to take the pack past every cell's hard limit,
+    // whatever the offsets and the cell spread say.
+    const int32_t hard_max_dV = ((int32_t)CELL_VOLTAGE_HARD_MAX_mV * NUM_CELLS) / 100;
+    const int32_t hard_min_dV = ((int32_t)CELL_VOLTAGE_HARD_MIN_mV * NUM_CELLS + 99) / 100;
+    if(max_voltage_limit_dV > hard_max_dV) max_voltage_limit_dV = hard_max_dV;
+    if(min_voltage_limit_dV < hard_min_dV) min_voltage_limit_dV = hard_min_dV;
 
     // Guard against a bad cell reading (e.g. one faulty tap skewing the mean)
     // or offsets driving the limits negative or inverting them.
