@@ -5,6 +5,7 @@
 #include "app/model.h"
 #include "app/state_machines/system.h"
 #include "drivers/bmb3y/bmb3y.h"
+#include "drivers/chip/nvm.h"
 #include "drivers/sensors/internal_adc.h"
 #include "drivers/sensors/ads1115.h"
 #include "drivers/sensors/ina228.h"
@@ -217,6 +218,19 @@ static const char *cmd_calibrate(char *args) {
     return "usage: calibrate long|short|online|isolation";
 }
 
+// Wipes the settings, calibration, learned capacity and lifetime counters.
+// What the BMS holds in memory is saved again on the next save.
+static const char *cmd_nvm_format(char *args) {
+    if(strcmp(args, "yes") != 0) {
+        return "usage: nvm_format yes (wipes the saved settings, calibration and counters)";
+    }
+    if(model.system_sm.state == SYSTEM_STATE_OPERATING) {
+        return "refused: stop first";
+    }
+    // nvm_format() logs the outcome
+    return nvm_format() ? NULL : "NVM format failed";
+}
+
 static const char *cmd_ekf(char *args) {
     (void)args;
     info_printf("EKF Constants: Q=[%e, %e, %e], R=%f, min_slope=%f, knee_slope=%f, R_ohm=%f, offset_tau=%f\n",
@@ -382,6 +396,7 @@ static const cli_command_t commands[] = {
     {"stop", NULL, cmd_stop, "request inactive mode (from operating)"},
     {"restart", NULL, cmd_restart, "request inactive mode from any state (used by reflash_bms.sh)"},
     {"calibrate", "long|short|online|isolation", cmd_calibrate, "contactor (offline), online or isolation zero calibration"},
+    {"nvm_format", "yes", cmd_nvm_format, "wipe the saved settings (only when they can't be read)"},
     {"ekf", NULL, cmd_ekf, "EKF constants and state"},
     {"adc", NULL, cmd_adc, "internal ADC readings"},
     {"ads", NULL, cmd_ads, "ADS1115 readings, scan rate and errors"},
