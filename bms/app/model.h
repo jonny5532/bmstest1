@@ -415,6 +415,20 @@ static inline uint16_t get_cell_voltage_working_min_mV(const bms_model_t *model)
     );
 }
 
+static inline int16_t get_pack_voltage_limit_upper_offset_dV(const bms_model_t *model) {
+    int16_t v = model->pack_voltage_limit_upper_offset_dV;
+    if(v < VOLTAGE_LIMIT_OFFSET_UPPER_MIN_dV) return VOLTAGE_LIMIT_OFFSET_UPPER_MIN_dV;
+    if(v > VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV) return VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV;
+    return v;
+}
+
+static inline int16_t get_pack_voltage_limit_lower_offset_dV(const bms_model_t *model) {
+    int16_t v = model->pack_voltage_limit_lower_offset_dV;
+    if(v < VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV) return VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV;
+    if(v > VOLTAGE_LIMIT_OFFSET_LOWER_MAX_dV) return VOLTAGE_LIMIT_OFFSET_LOWER_MAX_dV;
+    return v;
+}
+
 static inline uint16_t get_cell_voltage_working_max_mV(const bms_model_t *model) {
     return min(
         (model->cell_voltage_working_max_mV > 0) ? model->cell_voltage_working_max_mV : DEFAULT_CELL_VOLTAGE_WORKING_MAX_mV,

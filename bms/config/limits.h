@@ -111,6 +111,15 @@ _Static_assert(NUM_THERMISTORS <= 32, "thermistor_fault_mask() has a bit per the
 // could be a considerable time delay between cellvoltage and pack samples.
 #define VOLTAGE_MISMATCH_THRESHOLD_mV 20000
 
+// Bounds on the user's pack voltage limit offsets (0.1V), which correct for the
+// inverter's voltage reading. Up to 10V in the direction that moves a limit
+// outwards (more charge, deeper discharge), up to 30V in the safe direction.
+// Writes outside them are refused, and saved values are held inside them.
+#define VOLTAGE_LIMIT_OFFSET_UPPER_MIN_dV (-300)
+#define VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV 100
+#define VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV (-100)
+#define VOLTAGE_LIMIT_OFFSET_LOWER_MAX_dV 300
+
 // Current limits to apply in the soft-limit region
 #define OVERCHARGE_DISCHARGE_CURRENT_LIMIT_dA 50 // in 0.1A units
 #define OVERDISCHARGE_CHARGE_CURRENT_LIMIT_dA 50 // in 0.1A units
