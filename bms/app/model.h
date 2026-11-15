@@ -313,6 +313,9 @@ typedef struct bms_model {
     // current limits.
     int32_t excess_charge_buffer_dC; // in 0.1C units
     int32_t excess_discharge_buffer_dC; // in 0.1C units
+    // The part of each not yet a whole 0.1C, in 0.1A x ms (0 to 999)
+    int32_t excess_charge_remainder_dAms;
+    int32_t excess_discharge_remainder_dAms;
 
     supply_voltages_t supply_voltages;
     // int32_t supply_voltage_3V3_mV;

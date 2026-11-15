@@ -569,15 +569,59 @@ static void test_overcurrent_buffer_decay(void **state) {
     (void) state;
     bms_model_t m = {0};
     setup_model_operating(&m);
-    
+
     // Set initial buffer value
     m.excess_charge_buffer_dC = 100;
     m.current_mA = 0;  // No current
-    
+
+    // 10s at the decay rate of 0.1A drains 1C
+    for (int i = 0; i < 10000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.excess_charge_buffer_dC, 90);
+
+    // and it stops at zero
+    for (int i = 0; i < 200000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.excess_charge_buffer_dC, 0);
+    assert_int_equal(m.excess_charge_remainder_dAms, 0);
+}
+
+// The buffer is charge: the excess current times the time it lasted
+static void test_overcurrent_buffer_is_in_coulombs(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
     model_tick(&m);
-    
-    // Buffer should decay by 1
-    assert_int_equal(m.excess_charge_buffer_dC, 99);
+    const int32_t limit_dA = m.discharge_current_limit_dA;
+    assert_true(limit_dA > 0);
+
+    // 10A over the limit and its margin, for 5s: 50C less the decay's 0.5C
+    m.current_mA = -(limit_dA + CURRENT_LIMIT_ERROR_MARGIN_dA + 100) * 100;
+    for (int i = 0; i < 5000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.discharge_current_limit_dA, limit_dA);
+    assert_int_equal(m.excess_discharge_buffer_dC, 495);
+    assert_true(m.excess_discharge_buffer_dC < OVERCURRENT_BUFFER_LIMIT_dC);
+    assert_int_equal(m.excess_charge_buffer_dC, 0);
+
+    // Another 5.2s takes it past the 100C limit
+    for (int i = 0; i < 5200 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_true(m.excess_discharge_buffer_dC > OVERCURRENT_BUFFER_LIMIT_dC);
+
+    // Within the limit: nothing accumulates
+    bms_model_t m2 = {0};
+    setup_model_operating(&m2);
+    m2.current_mA = -limit_dA * 100;
+    for (int i = 0; i < 5000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m2);
+    }
+    assert_int_equal(m2.excess_discharge_buffer_dC, 0);
 }
 
 // ============================================================================
@@ -818,6 +862,7 @@ int main(void) {
         cmocka_unit_test_setup(test_overcurrent_accumulation_charge, setup),
         cmocka_unit_test_setup(test_overcurrent_accumulation_discharge, setup),
         cmocka_unit_test_setup(test_overcurrent_buffer_decay, setup),
+        cmocka_unit_test_setup(test_overcurrent_buffer_is_in_coulombs, setup),
         
         // Soft limit buffer
         cmocka_unit_test_setup(test_soft_limit_buffer_resets_in_normal_range, setup),

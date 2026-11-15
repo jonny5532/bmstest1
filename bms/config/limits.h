@@ -128,8 +128,12 @@ _Static_assert(NUM_THERMISTORS <= 32, "thermistor_fault_mask() has a bit per the
 #define CURRENT_LIMIT_ERROR_MARGIN_dA 10 // in 0.1A units
 
 // How much excess normal-region charge/discharge (beyond current limits) we allow before
-// cutting off the battery to protect it.
+// raising OVERCURRENT_CHARGING/DISCHARGING (warnings: they report, they don't
+// open the contactors). 100C is 10A over the limit for 10s.
 #define OVERCURRENT_BUFFER_LIMIT_dC 1000 // in 0.1Coulomb units
+
+// The excess buffers drain at this rate, so a brief excursion is forgotten
+#define OVERCURRENT_BUFFER_DECAY_dA 1 // in 0.1A units
 
 // How much excess charge/discharge we allow in the soft-limit region before
 // cutting off the battery to protect it.
