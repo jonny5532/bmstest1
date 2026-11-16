@@ -664,6 +664,80 @@ static void test_soft_limit_buffer_accumulates_when_overcharged(void **state) {
     assert_true(m.soft_limit_charge_buffer_dC > 0);
 }
 
+// The buffer is charge: the current beyond the limit times the time it lasted
+static void test_soft_limit_buffer_is_in_coulombs(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    // Above the soft maximum the charge limit is zero
+    for (int i = 0; i < NUM_CELLS; i++) {
+        m.cell_voltages_mV[i] = get_cell_voltage_soft_max_mV(&m) + 50;
+    }
+    model_tick(&m);
+    assert_int_equal(m.charge_current_limit_dA, 0);
+    assert_int_equal(m.soft_limit_charge_buffer_dC, 0);
+
+    // 1A for 100s is 100C: half of what is allowed
+    m.current_mA = 1000;
+    for (int i = 0; i < 100000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.soft_limit_charge_buffer_dC, 1000);
+    assert_true(m.soft_limit_charge_buffer_dC < OVERCHARGE_BUFFER_LIMIT_dC);
+
+    // 1A for 200s is the limit, and the next second passes it
+    for (int i = 0; i < 100000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.soft_limit_charge_buffer_dC, OVERCHARGE_BUFFER_LIMIT_dC);
+    for (int i = 0; i < 1000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_true(m.soft_limit_charge_buffer_dC > OVERCHARGE_BUFFER_LIMIT_dC);
+}
+
+// Below the soft minimum the discharge limit is zero: an inverter's standby
+// draw of 200mA is tolerated for about 40 minutes
+static void test_soft_limit_buffer_tolerates_standby_discharge(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    for (int i = 0; i < NUM_CELLS; i++) {
+        m.cell_voltages_mV[i] = get_cell_voltage_soft_min_mV(&m) - 50;
+    }
+    model_tick(&m);
+    assert_int_equal(m.discharge_current_limit_dA, 0);
+
+    // 200mA for 10 minutes is 120C
+    m.current_mA = -200;
+    for (int i = 0; i < 600000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.soft_limit_charge_buffer_dC, -1200);
+    assert_true(m.soft_limit_charge_buffer_dC > -OVERDISCHARGE_BUFFER_LIMIT_dC);
+
+    // The limit (500C) is passed between 41 and 42 minutes
+    for (int i = 0; i < 31 * 60000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_true(m.soft_limit_charge_buffer_dC > -OVERDISCHARGE_BUFFER_LIMIT_dC);
+    for (int i = 0; i < 60000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_true(m.soft_limit_charge_buffer_dC < -OVERDISCHARGE_BUFFER_LIMIT_dC);
+
+    // Back inside the soft limits the buffer and its remainder are cleared
+    for (int i = 0; i < NUM_CELLS; i++) {
+        m.cell_voltages_mV[i] = 3700;
+    }
+    m.current_mA = -30;
+    model_tick(&m);
+    assert_int_equal(m.soft_limit_charge_buffer_dC, 0);
+    assert_int_equal(m.soft_limit_charge_remainder_dAms, 0);
+}
+
 // ============================================================================
 // Voltage Mismatch Detection Tests
 // ============================================================================
@@ -867,6 +941,8 @@ int main(void) {
         // Soft limit buffer
         cmocka_unit_test_setup(test_soft_limit_buffer_resets_in_normal_range, setup),
         cmocka_unit_test_setup(test_soft_limit_buffer_accumulates_when_overcharged, setup),
+        cmocka_unit_test_setup(test_soft_limit_buffer_is_in_coulombs, setup),
+        cmocka_unit_test_setup(test_soft_limit_buffer_tolerates_standby_discharge, setup),
         
         // Voltage mismatch
         cmocka_unit_test_setup(test_voltage_mismatch_not_triggered_when_matched, setup),

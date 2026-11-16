@@ -308,6 +308,8 @@ typedef struct bms_model {
     // the problem worsening. We need a buffer to give some leeway during
     // inverter startup.
     int32_t soft_limit_charge_buffer_dC; // in 0.1C units
+    // The part of it not yet a whole 0.1C, in 0.1A x ms (-999 to 999)
+    int32_t soft_limit_charge_remainder_dAms;
 
     // The amount of charge that has gone into/out of the battery beyond the
     // current limits.

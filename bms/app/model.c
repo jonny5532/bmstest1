@@ -316,20 +316,25 @@ static void model_accumulate_soft_limit_overcurrent(bms_model_t *model) {
        model->cell_voltage_min_mV > get_cell_voltage_soft_min_mV(model)) {
         // Not in soft limit region, reset buffer
         model->soft_limit_charge_buffer_dC = 0;
+        model->soft_limit_charge_remainder_dAms = 0;
         return;
     }
 
+    // Charge beyond the limit counts up, discharge beyond the limit counts down
+    int32_t excess_dA = 0;
     if(model->current_mA > 0) {
         // Charging
-        int32_t excess_dA = (model->current_mA / 100) - model->charge_current_limit_dA;
-        model->soft_limit_charge_buffer_dC = sadd_i32(model->soft_limit_charge_buffer_dC,
-                                                      max(excess_dA, 0));
+        excess_dA = max((model->current_mA / 100) - model->charge_current_limit_dA, 0);
     } else if(model->current_mA < 0) {
         // Discharging
-        int32_t excess_dA = (-model->current_mA / 100) - model->discharge_current_limit_dA;
-        model->soft_limit_charge_buffer_dC = ssub_i32(model->soft_limit_charge_buffer_dC,
-                                                        max(excess_dA, 0));
+        excess_dA = -max((-model->current_mA / 100) - model->discharge_current_limit_dA, 0);
     }
+
+    // One tick of that current, in 0.1A x ms: 1000 of them make 0.1C. The part
+    // that isn't a whole 0.1C is carried to the next tick.
+    int32_t acc = model->soft_limit_charge_remainder_dAms + excess_dA * TIMESTEP_PERIOD_MS;
+    model->soft_limit_charge_buffer_dC = sadd_i32(model->soft_limit_charge_buffer_dC, acc / 1000);
+    model->soft_limit_charge_remainder_dAms = acc % 1000;
 }
 
 static void model_calculate_temperature_current_limits(bms_model_t *model) {

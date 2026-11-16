@@ -141,7 +141,7 @@ _Static_assert(NUM_THERMISTORS <= 32, "thermistor_fault_mask() has a bit per the
 // We dont't tolerate much overcharge (1A for 200 seconds)
 #define OVERCHARGE_BUFFER_LIMIT_dC 2000 // in 0.1Coulomb units
 
-// 5000 dC (50C) is 200mA (quiescent current for a big inverter) for ~40 minutes,
+// 5000 dC (500C) is 200mA (quiescent current for a big inverter) for ~40 minutes,
 // which should be long enough to get the inverter [dis]charging.
 #define OVERDISCHARGE_BUFFER_LIMIT_dC 5000 // in 0.1Coulomb units
 
