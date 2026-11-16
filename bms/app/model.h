@@ -308,11 +308,16 @@ typedef struct bms_model {
     // the problem worsening. We need a buffer to give some leeway during
     // inverter startup.
     int32_t soft_limit_charge_buffer_dC; // in 0.1C units
+    // The part of it not yet a whole 0.1C, in 0.1A x ms (-999 to 999)
+    int32_t soft_limit_charge_remainder_dAms;
 
     // The amount of charge that has gone into/out of the battery beyond the
     // current limits.
     int32_t excess_charge_buffer_dC; // in 0.1C units
     int32_t excess_discharge_buffer_dC; // in 0.1C units
+    // The part of each not yet a whole 0.1C, in 0.1A x ms (0 to 999)
+    int32_t excess_charge_remainder_dAms;
+    int32_t excess_discharge_remainder_dAms;
 
     supply_voltages_t supply_voltages;
     // int32_t supply_voltage_3V3_mV;
@@ -413,6 +418,20 @@ static inline uint16_t get_cell_voltage_working_min_mV(const bms_model_t *model)
         (model->cell_voltage_working_min_mV > 0) ? model->cell_voltage_working_min_mV : DEFAULT_CELL_VOLTAGE_WORKING_MIN_mV,
         get_cell_voltage_soft_min_mV(model) + 25
     );
+}
+
+static inline int16_t get_pack_voltage_limit_upper_offset_dV(const bms_model_t *model) {
+    int16_t v = model->pack_voltage_limit_upper_offset_dV;
+    if(v < VOLTAGE_LIMIT_OFFSET_UPPER_MIN_dV) return VOLTAGE_LIMIT_OFFSET_UPPER_MIN_dV;
+    if(v > VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV) return VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV;
+    return v;
+}
+
+static inline int16_t get_pack_voltage_limit_lower_offset_dV(const bms_model_t *model) {
+    int16_t v = model->pack_voltage_limit_lower_offset_dV;
+    if(v < VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV) return VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV;
+    if(v > VOLTAGE_LIMIT_OFFSET_LOWER_MAX_dV) return VOLTAGE_LIMIT_OFFSET_LOWER_MAX_dV;
+    return v;
 }
 
 static inline uint16_t get_cell_voltage_working_max_mV(const bms_model_t *model) {

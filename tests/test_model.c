@@ -487,6 +487,42 @@ static void test_cell_voltage_limits_applied(void **state) {
 // Overcurrent Accumulation Tests
 // ============================================================================
 
+// The offsets correct for the inverter's voltage reading, within bounds, and
+// the limits sent never pass the hard cell limits
+static void test_voltage_limit_offsets_bounded(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    model_tick(&m);
+    const int32_t base_max = m.inverter_outputs.max_voltage_limit_dV;
+    const int32_t base_min = m.inverter_outputs.min_voltage_limit_dV;
+
+    // Within bounds: applied as given
+    m.pack_voltage_limit_upper_offset_dV = -90;
+    m.pack_voltage_limit_lower_offset_dV = 20;
+    model_tick(&m);
+    assert_int_equal(m.inverter_outputs.max_voltage_limit_dV, base_max - 90);
+    assert_int_equal(m.inverter_outputs.min_voltage_limit_dV, base_min + 20);
+
+    // Saved beyond the bounds: held at them
+    m.pack_voltage_limit_upper_offset_dV = 1000;
+    m.pack_voltage_limit_lower_offset_dV = -1000;
+    model_tick(&m);
+    const int32_t hard_max = ((int32_t)CELL_VOLTAGE_HARD_MAX_mV * NUM_CELLS) / 100;
+    const int32_t hard_min = ((int32_t)CELL_VOLTAGE_HARD_MIN_mV * NUM_CELLS + 99) / 100;
+    int32_t want_max = base_max + VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV;
+    int32_t want_min = base_min + VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV;
+    if(want_max > hard_max) want_max = hard_max;
+    if(want_min < hard_min) want_min = hard_min;
+    assert_int_equal(m.inverter_outputs.max_voltage_limit_dV, want_max);
+    assert_int_equal(m.inverter_outputs.min_voltage_limit_dV, want_min);
+    assert_true(m.inverter_outputs.max_voltage_limit_dV <= hard_max);
+    assert_true(m.inverter_outputs.min_voltage_limit_dV >= hard_min);
+    assert_int_equal(get_pack_voltage_limit_upper_offset_dV(&m), VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV);
+    assert_int_equal(get_pack_voltage_limit_lower_offset_dV(&m), VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV);
+}
+
 static void test_overcurrent_accumulation_charge(void **state) {
     (void) state;
     bms_model_t m = {0};
@@ -533,15 +569,59 @@ static void test_overcurrent_buffer_decay(void **state) {
     (void) state;
     bms_model_t m = {0};
     setup_model_operating(&m);
-    
+
     // Set initial buffer value
     m.excess_charge_buffer_dC = 100;
     m.current_mA = 0;  // No current
-    
+
+    // 10s at the decay rate of 0.1A drains 1C
+    for (int i = 0; i < 10000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.excess_charge_buffer_dC, 90);
+
+    // and it stops at zero
+    for (int i = 0; i < 200000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.excess_charge_buffer_dC, 0);
+    assert_int_equal(m.excess_charge_remainder_dAms, 0);
+}
+
+// The buffer is charge: the excess current times the time it lasted
+static void test_overcurrent_buffer_is_in_coulombs(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
     model_tick(&m);
-    
-    // Buffer should decay by 1
-    assert_int_equal(m.excess_charge_buffer_dC, 99);
+    const int32_t limit_dA = m.discharge_current_limit_dA;
+    assert_true(limit_dA > 0);
+
+    // 10A over the limit and its margin, for 5s: 50C less the decay's 0.5C
+    m.current_mA = -(limit_dA + CURRENT_LIMIT_ERROR_MARGIN_dA + 100) * 100;
+    for (int i = 0; i < 5000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.discharge_current_limit_dA, limit_dA);
+    assert_int_equal(m.excess_discharge_buffer_dC, 495);
+    assert_true(m.excess_discharge_buffer_dC < OVERCURRENT_BUFFER_LIMIT_dC);
+    assert_int_equal(m.excess_charge_buffer_dC, 0);
+
+    // Another 5.2s takes it past the 100C limit
+    for (int i = 0; i < 5200 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_true(m.excess_discharge_buffer_dC > OVERCURRENT_BUFFER_LIMIT_dC);
+
+    // Within the limit: nothing accumulates
+    bms_model_t m2 = {0};
+    setup_model_operating(&m2);
+    m2.current_mA = -limit_dA * 100;
+    for (int i = 0; i < 5000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m2);
+    }
+    assert_int_equal(m2.excess_discharge_buffer_dC, 0);
 }
 
 // ============================================================================
@@ -582,6 +662,80 @@ static void test_soft_limit_buffer_accumulates_when_overcharged(void **state) {
     
     // Buffer should accumulate
     assert_true(m.soft_limit_charge_buffer_dC > 0);
+}
+
+// The buffer is charge: the current beyond the limit times the time it lasted
+static void test_soft_limit_buffer_is_in_coulombs(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    // Above the soft maximum the charge limit is zero
+    for (int i = 0; i < NUM_CELLS; i++) {
+        m.cell_voltages_mV[i] = get_cell_voltage_soft_max_mV(&m) + 50;
+    }
+    model_tick(&m);
+    assert_int_equal(m.charge_current_limit_dA, 0);
+    assert_int_equal(m.soft_limit_charge_buffer_dC, 0);
+
+    // 1A for 100s is 100C: half of what is allowed
+    m.current_mA = 1000;
+    for (int i = 0; i < 100000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.soft_limit_charge_buffer_dC, 1000);
+    assert_true(m.soft_limit_charge_buffer_dC < OVERCHARGE_BUFFER_LIMIT_dC);
+
+    // 1A for 200s is the limit, and the next second passes it
+    for (int i = 0; i < 100000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.soft_limit_charge_buffer_dC, OVERCHARGE_BUFFER_LIMIT_dC);
+    for (int i = 0; i < 1000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_true(m.soft_limit_charge_buffer_dC > OVERCHARGE_BUFFER_LIMIT_dC);
+}
+
+// Below the soft minimum the discharge limit is zero: an inverter's standby
+// draw of 200mA is tolerated for about 40 minutes
+static void test_soft_limit_buffer_tolerates_standby_discharge(void **state) {
+    (void) state;
+    bms_model_t m = {0};
+    setup_model_operating(&m);
+
+    for (int i = 0; i < NUM_CELLS; i++) {
+        m.cell_voltages_mV[i] = get_cell_voltage_soft_min_mV(&m) - 50;
+    }
+    model_tick(&m);
+    assert_int_equal(m.discharge_current_limit_dA, 0);
+
+    // 200mA for 10 minutes is 120C
+    m.current_mA = -200;
+    for (int i = 0; i < 600000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_int_equal(m.soft_limit_charge_buffer_dC, -1200);
+    assert_true(m.soft_limit_charge_buffer_dC > -OVERDISCHARGE_BUFFER_LIMIT_dC);
+
+    // The limit (500C) is passed between 41 and 42 minutes
+    for (int i = 0; i < 31 * 60000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_true(m.soft_limit_charge_buffer_dC > -OVERDISCHARGE_BUFFER_LIMIT_dC);
+    for (int i = 0; i < 60000 / TIMESTEP_PERIOD_MS; i++) {
+        model_tick(&m);
+    }
+    assert_true(m.soft_limit_charge_buffer_dC < -OVERDISCHARGE_BUFFER_LIMIT_dC);
+
+    // Back inside the soft limits the buffer and its remainder are cleared
+    for (int i = 0; i < NUM_CELLS; i++) {
+        m.cell_voltages_mV[i] = 3700;
+    }
+    m.current_mA = -30;
+    model_tick(&m);
+    assert_int_equal(m.soft_limit_charge_buffer_dC, 0);
+    assert_int_equal(m.soft_limit_charge_remainder_dAms, 0);
 }
 
 // ============================================================================
@@ -776,15 +930,19 @@ int main(void) {
         cmocka_unit_test_setup(test_current_disabled_when_contactors_not_enabled, setup),
         cmocka_unit_test_setup(test_temperature_limits_applied, setup),
         cmocka_unit_test_setup(test_cell_voltage_limits_applied, setup),
+        cmocka_unit_test_setup(test_voltage_limit_offsets_bounded, setup),
         
         // Overcurrent accumulation
         cmocka_unit_test_setup(test_overcurrent_accumulation_charge, setup),
         cmocka_unit_test_setup(test_overcurrent_accumulation_discharge, setup),
         cmocka_unit_test_setup(test_overcurrent_buffer_decay, setup),
+        cmocka_unit_test_setup(test_overcurrent_buffer_is_in_coulombs, setup),
         
         // Soft limit buffer
         cmocka_unit_test_setup(test_soft_limit_buffer_resets_in_normal_range, setup),
         cmocka_unit_test_setup(test_soft_limit_buffer_accumulates_when_overcharged, setup),
+        cmocka_unit_test_setup(test_soft_limit_buffer_is_in_coulombs, setup),
+        cmocka_unit_test_setup(test_soft_limit_buffer_tolerates_standby_discharge, setup),
         
         // Voltage mismatch
         cmocka_unit_test_setup(test_voltage_mismatch_not_triggered_when_matched, setup),

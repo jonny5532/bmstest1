@@ -266,29 +266,44 @@ static void model_apply_current_limits(bms_model_t *model) {
 // charge/discharge into separate buffers, so that we can cut off the battery if
 // it goes on for too long. This is to protect the battery from excessively high
 // charge or discharge currents.
-static void model_accumulate_overcurrent(bms_model_t *model) {
-    if(model->current_mA > 0) {
-        // We are charging. Work out the excess current above the limit.
-        int32_t excess_dA = (model->current_mA / 100) - model->charge_current_limit_dA - CURRENT_LIMIT_ERROR_MARGIN_dA;
-        // Accumulate into the charge buffer if there is excess
-        model->excess_charge_buffer_dC = sadd_i32(model->excess_charge_buffer_dC, 
-                                                  max(excess_dA, 0));
-    } else if(model->current_mA < 0) {
-        // Discharging
-        int32_t excess_dA = (-model->current_mA / 100) - model->discharge_current_limit_dA - CURRENT_LIMIT_ERROR_MARGIN_dA;
-        // Accumulate into the discharge buffer if there is excess
-        model->excess_discharge_buffer_dC = sadd_i32(model->excess_discharge_buffer_dC,
-                                                     max(excess_dA, 0));
+// Add one tick of a current (0.1A, negative to drain) to a buffer of charge
+// (0.1C), carrying the part that isn't a whole 0.1C. The buffer stops at zero.
+static void accumulate_excess_charge(int32_t *buffer_dC, int32_t *remainder_dAms, int32_t rate_dA) {
+    // 0.1A x ms: 1000 of them make 0.1C
+    int32_t acc = *remainder_dAms + rate_dA * TIMESTEP_PERIOD_MS;
+    int32_t whole = acc / 1000;
+    acc -= whole * 1000;
+    if(acc < 0) {
+        acc += 1000;
+        whole--;
     }
 
-    if(model->excess_charge_buffer_dC > 0) {
-        // Decay the excess charge buffer slowly
-        model->excess_charge_buffer_dC--;
+    int32_t buffer = sadd_i32(*buffer_dC, whole);
+    if(buffer < 0 || (buffer == 0 && rate_dA < 0)) {
+        buffer = 0;
+        acc = 0;
     }
-    if(model->excess_discharge_buffer_dC > 0) {
-        // Decay the excess discharge buffer slowly
-        model->excess_discharge_buffer_dC--;
+    *buffer_dC = buffer;
+    *remainder_dAms = acc;
+}
+
+static void model_accumulate_overcurrent(bms_model_t *model) {
+    int32_t charge_excess_dA = 0;
+    int32_t discharge_excess_dA = 0;
+
+    if(model->current_mA > 0) {
+        // We are charging. Work out the excess current above the limit.
+        charge_excess_dA = (model->current_mA / 100) - model->charge_current_limit_dA - CURRENT_LIMIT_ERROR_MARGIN_dA;
+    } else if(model->current_mA < 0) {
+        // Discharging
+        discharge_excess_dA = (-model->current_mA / 100) - model->discharge_current_limit_dA - CURRENT_LIMIT_ERROR_MARGIN_dA;
     }
+
+    // Accumulate any excess into its buffer, less a slow decay
+    accumulate_excess_charge(&model->excess_charge_buffer_dC, &model->excess_charge_remainder_dAms,
+                             max(charge_excess_dA, 0) - OVERCURRENT_BUFFER_DECAY_dA);
+    accumulate_excess_charge(&model->excess_discharge_buffer_dC, &model->excess_discharge_remainder_dAms,
+                             max(discharge_excess_dA, 0) - OVERCURRENT_BUFFER_DECAY_dA);
 }
 
 // Check if we are in the soft limit region, and accumulate excess
@@ -301,30 +316,25 @@ static void model_accumulate_soft_limit_overcurrent(bms_model_t *model) {
        model->cell_voltage_min_mV > get_cell_voltage_soft_min_mV(model)) {
         // Not in soft limit region, reset buffer
         model->soft_limit_charge_buffer_dC = 0;
+        model->soft_limit_charge_remainder_dAms = 0;
         return;
     }
 
+    // Charge beyond the limit counts up, discharge beyond the limit counts down
+    int32_t excess_dA = 0;
     if(model->current_mA > 0) {
         // Charging
-        int32_t excess_dA = (model->current_mA / 100) - model->charge_current_limit_dA;
-        model->soft_limit_charge_buffer_dC = sadd_i32(model->soft_limit_charge_buffer_dC,
-                                                      max(excess_dA, 0));
+        excess_dA = max((model->current_mA / 100) - model->charge_current_limit_dA, 0);
     } else if(model->current_mA < 0) {
         // Discharging
-        int32_t excess_dA = (-model->current_mA / 100) - model->discharge_current_limit_dA;
-        model->soft_limit_charge_buffer_dC = ssub_i32(model->soft_limit_charge_buffer_dC,
-                                                        max(excess_dA, 0));
+        excess_dA = -max((-model->current_mA / 100) - model->discharge_current_limit_dA, 0);
     }
-}
 
-static void model_check_overcurrent_accumulation(bms_model_t *model) {
-    // TODO - do we actually want to cut off the battery, or just raise events?
-
-    if(model->excess_charge_buffer_dC > OVERCURRENT_BUFFER_LIMIT_dC) {
-        // Too much excess charge, cut off charging
-    } else if(model->excess_discharge_buffer_dC > OVERCURRENT_BUFFER_LIMIT_dC) {
-        // Too much excess discharge, cut off discharging
-    }
+    // One tick of that current, in 0.1A x ms: 1000 of them make 0.1C. The part
+    // that isn't a whole 0.1C is carried to the next tick.
+    int32_t acc = model->soft_limit_charge_remainder_dAms + excess_dA * TIMESTEP_PERIOD_MS;
+    model->soft_limit_charge_buffer_dC = sadd_i32(model->soft_limit_charge_buffer_dC, acc / 1000);
+    model->soft_limit_charge_remainder_dAms = acc % 1000;
 }
 
 static void model_calculate_temperature_current_limits(bms_model_t *model) {
@@ -369,9 +379,16 @@ static void model_calculate_inverter_voltage_limits(const bms_model_t *model, in
     }
 
     // Apply user-configured offsets to account for errors in the inverter
-    // voltage reading.
-    max_voltage_limit_dV += model->pack_voltage_limit_upper_offset_dV;
-    min_voltage_limit_dV += model->pack_voltage_limit_lower_offset_dV;
+    // voltage reading (held within their bounds).
+    max_voltage_limit_dV += get_pack_voltage_limit_upper_offset_dV(model);
+    min_voltage_limit_dV += get_pack_voltage_limit_lower_offset_dV(model);
+
+    // Never ask the inverter to take the pack past every cell's hard limit,
+    // whatever the offsets and the cell spread say.
+    const int32_t hard_max_dV = ((int32_t)CELL_VOLTAGE_HARD_MAX_mV * NUM_CELLS) / 100;
+    const int32_t hard_min_dV = ((int32_t)CELL_VOLTAGE_HARD_MIN_mV * NUM_CELLS + 99) / 100;
+    if(max_voltage_limit_dV > hard_max_dV) max_voltage_limit_dV = hard_max_dV;
+    if(min_voltage_limit_dV < hard_min_dV) min_voltage_limit_dV = hard_min_dV;
 
     // Guard against a bad cell reading (e.g. one faulty tap skewing the mean)
     // or offsets driving the limits negative or inverting them.
@@ -446,8 +463,7 @@ void model_tick(bms_model_t *model) {
     model_apply_current_limits(model);
     model_accumulate_overcurrent(model);
     model_accumulate_soft_limit_overcurrent(model);
-
-    model_check_overcurrent_accumulation(model);
+    // (confirm_battery_safety() raises the overcurrent warnings from the buffers)
 
     model_calculate_inverter_outputs(model, &model->inverter_outputs);
 }

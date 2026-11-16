@@ -111,6 +111,15 @@ _Static_assert(NUM_THERMISTORS <= 32, "thermistor_fault_mask() has a bit per the
 // could be a considerable time delay between cellvoltage and pack samples.
 #define VOLTAGE_MISMATCH_THRESHOLD_mV 20000
 
+// Bounds on the user's pack voltage limit offsets (0.1V), which correct for the
+// inverter's voltage reading. Up to 10V in the direction that moves a limit
+// outwards (more charge, deeper discharge), up to 30V in the safe direction.
+// Writes outside them are refused, and saved values are held inside them.
+#define VOLTAGE_LIMIT_OFFSET_UPPER_MIN_dV (-300)
+#define VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV 100
+#define VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV (-100)
+#define VOLTAGE_LIMIT_OFFSET_LOWER_MAX_dV 300
+
 // Current limits to apply in the soft-limit region
 #define OVERCHARGE_DISCHARGE_CURRENT_LIMIT_dA 50 // in 0.1A units
 #define OVERDISCHARGE_CHARGE_CURRENT_LIMIT_dA 50 // in 0.1A units
@@ -119,8 +128,12 @@ _Static_assert(NUM_THERMISTORS <= 32, "thermistor_fault_mask() has a bit per the
 #define CURRENT_LIMIT_ERROR_MARGIN_dA 10 // in 0.1A units
 
 // How much excess normal-region charge/discharge (beyond current limits) we allow before
-// cutting off the battery to protect it.
+// raising OVERCURRENT_CHARGING/DISCHARGING (warnings: they report, they don't
+// open the contactors). 100C is 10A over the limit for 10s.
 #define OVERCURRENT_BUFFER_LIMIT_dC 1000 // in 0.1Coulomb units
+
+// The excess buffers drain at this rate, so a brief excursion is forgotten
+#define OVERCURRENT_BUFFER_DECAY_dA 1 // in 0.1A units
 
 // How much excess charge/discharge we allow in the soft-limit region before
 // cutting off the battery to protect it.
@@ -128,7 +141,7 @@ _Static_assert(NUM_THERMISTORS <= 32, "thermistor_fault_mask() has a bit per the
 // We dont't tolerate much overcharge (1A for 200 seconds)
 #define OVERCHARGE_BUFFER_LIMIT_dC 2000 // in 0.1Coulomb units
 
-// 5000 dC (50C) is 200mA (quiescent current for a big inverter) for ~40 minutes,
+// 5000 dC (500C) is 200mA (quiescent current for a big inverter) for ~40 minutes,
 // which should be long enough to get the inverter [dis]charging.
 #define OVERDISCHARGE_BUFFER_LIMIT_dC 5000 // in 0.1Coulomb units
 

@@ -377,11 +377,11 @@ uint8_t hmi_append_register_value(uint8_t *buf, uint16_t reg_id, bms_model_t *mo
             break;
         case HMI_REG_VOLTAGE_LIMIT_OFFSET_LOWER:
             buf[idx++] = HMI_TYPE_INT16;
-            idx += hmi_buf_append_uint16(&buf[idx], (uint16_t)model->pack_voltage_limit_lower_offset_dV);
+            idx += hmi_buf_append_uint16(&buf[idx], (uint16_t)get_pack_voltage_limit_lower_offset_dV(model));
             break;
         case HMI_REG_VOLTAGE_LIMIT_OFFSET_UPPER:
             buf[idx++] = HMI_TYPE_INT16;
-            idx += hmi_buf_append_uint16(&buf[idx], (uint16_t)model->pack_voltage_limit_upper_offset_dV);
+            idx += hmi_buf_append_uint16(&buf[idx], (uint16_t)get_pack_voltage_limit_upper_offset_dV(model));
             break;
         case HMI_REG_CELL_VOLTAGE_SOFT_MIN:
             buf[idx++] = HMI_TYPE_UINT16;

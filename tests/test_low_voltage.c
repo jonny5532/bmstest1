@@ -140,8 +140,11 @@ static void test_low_voltage_protection(void **state) {
     // Below the soft minimum: critical, escalating only after an hour
     assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_LOW), LEVEL_CRITICAL);
 
-    // 3. Sudden discharge to below HARD_MIN
-    tick(&bat, &model, -10000.0f, 100);
+    // 3. Sudden discharge to below HARD_MIN. The BMS counts each tick as
+    // TIMESTEP_PERIOD_MS, so 10kA passes the 500C buffer on the third.
+    for (int i = 0; i < 3; i++) {
+        tick(&bat, &model, -10000.0f, 100);
+    }
     assert_true(model.cell_voltage_min_mV <= CELL_VOLTAGE_HARD_MIN_mV);
     // Should have recorded VERY_LOW event (LEVEL_CRITICAL)
     assert_int_equal(get_event_level(ERR_CELL_VOLTAGE_VERY_LOW), LEVEL_CRITICAL);

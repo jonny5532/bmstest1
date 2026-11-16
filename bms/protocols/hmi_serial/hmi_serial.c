@@ -211,13 +211,16 @@ static void hmi_handle_write_registers(const uint8_t *rx_buf, size_t len, bms_mo
                     }
                     break;
                 case HMI_REG_VOLTAGE_LIMIT_OFFSET_LOWER:
-                    if(model->pack_voltage_limit_lower_offset_dV != v) {
+                    // Out of bounds: refused, the reply shows the value kept
+                    if(v >= VOLTAGE_LIMIT_OFFSET_LOWER_MIN_dV && v <= VOLTAGE_LIMIT_OFFSET_LOWER_MAX_dV
+                       && model->pack_voltage_limit_lower_offset_dV != v) {
                         model->pack_voltage_limit_lower_offset_dV = v;
                         needs_flashing = true;
                     }
                     break;
                 case HMI_REG_VOLTAGE_LIMIT_OFFSET_UPPER:
-                    if(model->pack_voltage_limit_upper_offset_dV != v) {
+                    if(v >= VOLTAGE_LIMIT_OFFSET_UPPER_MIN_dV && v <= VOLTAGE_LIMIT_OFFSET_UPPER_MAX_dV
+                       && model->pack_voltage_limit_upper_offset_dV != v) {
                         model->pack_voltage_limit_upper_offset_dV = v;
                         needs_flashing = true;
                     }
