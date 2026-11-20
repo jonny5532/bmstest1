@@ -622,17 +622,27 @@ void contactor_sm_tick(bms_model_t *model) {
             contactors_close();
 
             // Wait for current to fall before actually opening contactors.
-            if((
-                    check_current_is_below(model, CONTACTORS_INSTANT_OPEN_MA)
-                    || (check_current_is_below(model, CONTACTORS_DELAYED_OPEN_MA) && state_timeout((sm_t*)contactor_sm, CONTACTORS_OPEN_TIMEOUT_MS))
-            ) || (
-                model->contactor_req == CONTACTORS_REQUEST_FORCE_OPEN && (
-                    check_current_is_below(model, CONTACTORS_INSTANT_OPEN_MA)
-                    || state_timeout((sm_t*)contactor_sm, CONTACTORS_FORCE_OPEN_TIMEOUT_MS)
-                )
-            )) {
-                 model->contactor_req = CONTACTORS_REQUEST_NULL;
-                 state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_OPEN);
+            bool current_fallen = (
+                check_current_is_below(model, CONTACTORS_INSTANT_OPEN_MA)
+                || (check_current_is_below(model, CONTACTORS_DELAYED_OPEN_MA) && state_timeout((sm_t*)contactor_sm, CONTACTORS_OPEN_TIMEOUT_MS))
+            );
+            // Once the wait is up, a requested open goes ahead whatever the
+            // current, so a stop holds even if the inverter ignores the 0A
+            // limits. After an unexpected open (closing still requested) keep
+            // waiting: current flowing means the contactors are in fact closed,
+            // and they would only be closed again straight away.
+            bool wait_over = (
+                (model->contactor_req == CONTACTORS_REQUEST_OPEN && state_timeout((sm_t*)contactor_sm, CONTACTORS_OPEN_TIMEOUT_MS))
+                || (model->contactor_req == CONTACTORS_REQUEST_FORCE_OPEN && state_timeout((sm_t*)contactor_sm, CONTACTORS_FORCE_OPEN_TIMEOUT_MS))
+            );
+
+            if(current_fallen || wait_over) {
+                if(!current_fallen) {
+                    warning_printf("Opening contactors with %" PRId32 " mA flowing after %" PRIu32 " ms\n",
+                        model->current_mA, state_time((sm_t*)contactor_sm));
+                }
+                model->contactor_req = CONTACTORS_REQUEST_NULL;
+                state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_OPEN);
             }
             break;
         case CONTACTORS_STATE_TESTING_BYPASS_CLOSED:
