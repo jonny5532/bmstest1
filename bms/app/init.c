@@ -126,6 +126,7 @@ static void init_model() {
     } else {
         info_printf("No persistent slow data in NVM\n");
     }
+    model_check_cell_voltage_limits(&model);
     if(nvm_load_persistent_fast(&model)) {
         info_printf("Persistent fast data loaded from NVM\n");
     } else {

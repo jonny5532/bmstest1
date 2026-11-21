@@ -49,6 +49,12 @@ typedef struct {
 // The HMI reads x and P as HMI_ARRAY_EKF_STATE and HMI_ARRAY_EKF_COV
 _Static_assert(sizeof(((ekf_t *)0)->x) == 3 * sizeof(double), "update HMI_EKF_STATE_* to match");
 
+// The SoC is scaled to the working limits: 0% at the working min's factory-table
+// SOC, 100% at the working max's. With less than this between them (limits out
+// of order, or both off the same end of the table) it isn't scaled, so nothing
+// divides by zero or less.
+#define SOC_SCALE_MIN_SPAN 0.01f
+
 // Initialize the filter
 void ekf_init(ekf_t *ekf, double initial_soc, double initial_capacity, double initial_bias_A);
 

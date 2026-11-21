@@ -454,6 +454,29 @@ target_include_directories(test_bmb3y_temps PRIVATE
 
 add_test(NAME test_bmb3y_temps COMMAND ${MEMORY_CHECK} test_bmb3y_temps)
 
+# Soft and working cell voltage limits and the SoC, written over the HMI and
+# loaded at boot; the SoC estimators with bad limits
+add_executable(test_settings_validation
+    test_settings_validation.c
+    ../bms/protocols/hmi_serial/hmi_serial.c
+    ../bms/protocols/hmi_serial/hmi_registers.c
+    ../bms/protocols/hmi_serial/hmi_arrays.c
+    ../bms/app/model.c
+    ../bms/app/battery/current_limits.c
+    ../bms/app/battery/safety_checks.c
+    ../bms/app/estimators/ekf.c
+    ../bms/app/estimators/ocv_learn.c
+    ../bms/app/estimators/voltage_based.c
+    ../bms/sys/events/events.c
+)
+target_link_libraries(test_settings_validation PRIVATE cmocka m)
+target_include_directories(test_settings_validation PRIVATE
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+add_test(NAME test_settings_validation COMMAND ${MEMORY_CHECK} test_settings_validation)
+
 add_custom_target(coverage
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/coverage_report.sh ${CMAKE_CURRENT_BINARY_DIR}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

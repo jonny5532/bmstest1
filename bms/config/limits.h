@@ -106,6 +106,17 @@ _Static_assert(NUM_THERMISTORS <= 32, "thermistor_fault_mask() has a bit per the
 #define BATTERY_VOLTAGE_HARD_MAX_mV (NUM_CELLS * CELL_VOLTAGE_HARD_MAX_mV)
 #define BATTERY_VOLTAGE_HARD_MIN_mV (NUM_CELLS * CELL_VOLTAGE_HARD_MIN_mV)
 
+// The least room between the working min and max (mV): a write that leaves
+// less is refused (model.c). Once the lowest cell reaches the working min,
+// discharge resumes only when it is 100mV above it (current_limits.c), and the
+// working charge limit stops charging at the working max. With less than 100mV
+// between them the pack would sit at the bottom with discharge never allowed
+// again. It also keeps the SoC scale (0% at working min, 100% at working max)
+// from collapsing.
+#define CELL_VOLTAGE_WORKING_MIN_GAP_mV 100
+_Static_assert(DEFAULT_CELL_VOLTAGE_WORKING_MAX_mV - DEFAULT_CELL_VOLTAGE_WORKING_MIN_mV >= CELL_VOLTAGE_WORKING_MIN_GAP_mV,
+               "The profile's working min and max must be at least CELL_VOLTAGE_WORKING_MIN_GAP_mV apart");
+
 // Max discrepancy between BMB cell voltages and measured terminal voltage
 // (which should be calibrated away at zero current). If in slow mode there
 // could be a considerable time delay between cellvoltage and pack samples.

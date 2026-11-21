@@ -492,6 +492,12 @@ static void ekf_update_limits(bms_model_t *model) {
     // 100%; a full charge is pinned at the charge voltage's factory SOC, so reads 100%.
     model->ekf.prev_soc_min = table_soc(ocv_factory, (float)min_mV / 1000.0f);
     float soc_max = table_soc(ocv_factory, (float)max_mV / 1000.0f);
+    if (!(soc_max - model->ekf.prev_soc_min >= SOC_SCALE_MIN_SPAN)) {
+        // Limits out of order or too close to scale by: unscaled, the whole capacity
+        warning_printf("EKF Scaling: working limits %d-%d mV leave no SOC range, not scaling\n", min_mV, max_mV);
+        model->ekf.prev_soc_min = 0.0f;
+        soc_max = 1.0f;
+    }
     model->ekf.prev_soc_mul = 1.0f / (soc_max - model->ekf.prev_soc_min);
     model->ekf.prev_min_mV = min_mV;
     model->ekf.prev_max_mV = max_mV;
