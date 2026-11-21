@@ -130,14 +130,30 @@ bool check_precharge_successful(const bms_model_t *model, bool log_errors) {
     );
 }
 
+// Whether isolation has been read since the contactors last opened (it is
+// only read once they have been open ISOLATION_SETTLE_MS). Called in OPEN.
+static bool isolation_read_since_open(const bms_model_t *model) {
+    uint32_t open_ms = (uint32_t)(millis64() - model->contactor_sm.last_transition_time);
+    return model->isolation_open_millis != 0
+        && open_ms >= ISOLATION_SETTLE_MS
+        && millis() - model->isolation_open_millis <= open_ms - ISOLATION_SETTLE_MS;
+}
+
 // Checks that don't fault the BMS but must hold off closing the contactors.
 // Run stays requested, so closing goes ahead once they pass.
 bool confirm_battery_is_healthy(const bms_model_t *model) {
-    (void)model;
-
     // Isolation is only measured with the contactors open, so this is the
     // reading to act on: don't close onto a pack with a leak to chassis.
     if(bms_event_slots[ERR_ISOLATION_LOW].level != LEVEL_NONE) {
+        return false;
+    }
+
+    // A leak that appeared while the contactors were closed can't show until
+    // they have been open a while, so once isolation is zeroed (and raising
+    // ISOLATION_LOW), wait for a reading from this open spell. Otherwise a
+    // quick Stop/Run, or a re-close after an unexpected open, would close on
+    // the reading from before the last close.
+    if(isolation_zeroed(model) && !isolation_read_since_open(model)) {
         return false;
     }
 
