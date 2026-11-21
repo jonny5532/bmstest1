@@ -765,6 +765,84 @@ static void test_force_open_request(void **state) {
     assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
 }
 
+// Closed with `current_mA` flowing, then asked to open (as Stop does)
+static void closed_then_stopped(bms_model_t *model, int32_t current_mA) {
+    model->contactor_sm.state = CONTACTORS_STATE_CLOSED;
+    model->contactor_sm.last_transition_time = stored_millis64;
+    model->contactor_req = CONTACTORS_REQUEST_OPEN;
+    model->current_mA = current_mA;
+
+    expect_closed();
+    tick_sm(model, 10);
+    assert_int_equal(model->contactor_sm.state, CONTACTORS_STATE_AWAITING_OPEN);
+}
+
+static void test_stop_opens_after_timeout_while_current_flows(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    // The inverter keeps drawing 10A despite the 0A limits
+    closed_then_stopped(&model, -10000);
+
+    // Held closed for the whole wait...
+    for(int t = 0; t < CONTACTORS_OPEN_TIMEOUT_MS - 1000; t += 1000) {
+        expect_closed();
+        tick_sm(&model, 1000);
+        assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_AWAITING_OPEN);
+    }
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_OPEN);
+
+    // ...then opened regardless of the current
+    expect_closed();
+    tick_sm(&model, 1000);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_NULL);
+
+    expect_all_open();
+    tick_sm(&model, 10);
+}
+
+static void test_stop_opens_at_once_when_current_falls(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    closed_then_stopped(&model, 10000);
+
+    expect_closed();
+    tick_sm(&model, 10000);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_AWAITING_OPEN);
+
+    // Under 1A: opens without waiting out the rest of the 30s
+    model.current_mA = 800;
+    expect_closed();
+    tick_sm(&model, 10);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+}
+
+static void test_unexpected_open_with_current_keeps_waiting(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+
+    // Closed while operating (closing still requested), the contactor
+    // voltages looked like an unexpected open, but 10A still flows: the
+    // contactors are in fact closed, so they're not opened under load
+    model.contactor_sm.state = CONTACTORS_STATE_AWAITING_OPEN;
+    model.contactor_sm.last_transition_time = stored_millis64;
+    model.contactor_req = CONTACTORS_REQUEST_CLOSE;
+    model.current_mA = 10000;
+
+    for(int t = 0; t < 2 * CONTACTORS_OPEN_TIMEOUT_MS; t += 1000) {
+        expect_closed();
+        tick_sm(&model, 1000);
+    }
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_AWAITING_OPEN);
+    assert_false(model.contactor_sm.enable_current);
+
+    // A stop made meanwhile opens at once: the wait is already over
+    model.contactor_req = CONTACTORS_REQUEST_OPEN;
+    expect_closed();
+    tick_sm(&model, 10);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+}
+
 static void test_calibrate_request(void **state) {
     (void) state;
     bms_model_t model = {0};
@@ -1292,6 +1370,9 @@ int main(void) {
         cmocka_unit_test(test_open_request_from_closed),
         cmocka_unit_test(test_delayed_open_request_from_closed),
         cmocka_unit_test(test_force_open_request),
+        cmocka_unit_test(test_stop_opens_after_timeout_while_current_flows),
+        cmocka_unit_test(test_stop_opens_at_once_when_current_falls),
+        cmocka_unit_test(test_unexpected_open_with_current_keeps_waiting),
         cmocka_unit_test(test_calibrate_request),
         cmocka_unit_test(test_precharging_aborts_immediately_on_open_request),
         cmocka_unit_test(test_precharge_failed_recovers_to_open_after_cooldown),

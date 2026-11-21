@@ -629,8 +629,11 @@ static void bmb3y_read_cell_voltages_blocking(bms_model_t *model) {
 int bmb3y_timestep_offset = 0;
 // Use a shorter period when we're in a balancing pause cycle, to get back to balancing sooner.
 const int PAUSE_CYCLE_LENGTH = 10; // (min 10)
+// Whether a voltage or temperature read in this cycle failed
 bool crc_failed = false;
 bool started = false;
+// The period of the last tick, to notice entering or leaving slow mode
+static int last_period_mask = 0x3f;
 
 void bmb3y_tick(bms_model_t *model) {
     int period_mask = 0x3f;
@@ -655,6 +658,17 @@ void bmb3y_tick(bms_model_t *model) {
 
     // Derive a step number which loops every 'period' timesteps
     int step = ((timestep() + bmb3y_timestep_offset + period_mask - 5) & period_mask);
+
+    if(period_mask != last_period_mask) {
+        // Entering or leaving slow mode lands anywhere in the new cycle, maybe
+        // past the snapshot (step 1) and the voltage reads, leaving the
+        // snapshot and crc_failed from the last slow cycle (up to 41s old).
+        // Start a fresh cycle instead, so that slow mode is only left on
+        // readings taken in it.
+        bmb3y_timestep_offset = (bmb3y_timestep_offset - step) & period_mask;
+        step = 0;
+        last_period_mask = period_mask;
+    }
 
     if(step == 0) {
         // Wake up, send a hello (unclear what this actually does).
@@ -697,12 +711,16 @@ void bmb3y_tick(bms_model_t *model) {
         // Wake up, read temperatures
 
         bmb3y_send_super_wakeup();
-        bmb3y_read_temperatures_blocking(model);
+        if(!bmb3y_read_temperatures_blocking(model)) {
+            crc_failed = true;
+        }
     } else if(step == 9) {
         // Wake up, read more temps
 
         bmb3y_send_super_wakeup();
-        bmb3y_read_more_temps_blocking(model);
+        if(!bmb3y_read_more_temps_blocking(model)) {
+            crc_failed = true;
+        }
 
         if(!crc_failed && !model->balancing_active && model->cell_voltage_slow_mode && !bmb3y_should_use_slow_mode(model)) {
             // Exit slow mode now that we have fresh readings (both voltage and temp)
