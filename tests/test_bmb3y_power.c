@@ -114,6 +114,67 @@ static void test_idle_fault_uses_slow_mode(void **state) {
     assert_false(bmb3y_should_use_slow_mode(&model));
 }
 
+// Faulted a minute ago, healthy cells: slow unless something needs watching
+static void setup_idle_fault(bms_model_t *model) {
+    raise_bms_event(ERR_ESTOP_PRESSED, 0);
+    bms_event_slots[ERR_ESTOP_PRESSED].level = LEVEL_FATAL;
+    bms_model_t tmp = {0};
+    setup_model(model, SYSTEM_STATE_FAULT, 61000, get_minimum_balancing_voltage_mV(&tmp) + 200);
+}
+
+static void test_fault_with_current_flowing_stays_fast(void **state) {
+    (void) state;
+    bms_model_t model;
+
+    // Current through contactors that should be open (eg. one has welded)
+    setup_idle_fault(&model);
+    model.current_millis = stored_millis;
+    model.current_mA = CONTACTORS_INSTANT_OPEN_MA + 1;
+    assert_false(bmb3y_should_use_slow_mode(&model));
+    model.current_mA = -CONTACTORS_INSTANT_OPEN_MA - 1;
+    assert_false(bmb3y_should_use_slow_mode(&model));
+
+    // Sensor noise around zero
+    model.current_mA = CONTACTORS_INSTANT_OPEN_MA;
+    assert_true(bmb3y_should_use_slow_mode(&model));
+    model.current_mA = -CONTACTORS_INSTANT_OPEN_MA;
+    assert_true(bmb3y_should_use_slow_mode(&model));
+}
+
+static void test_fault_with_stale_current_goes_slow(void **state) {
+    (void) state;
+    bms_model_t model;
+
+    // A faulted current sensor mustn't keep the BMBs fast forever
+    setup_idle_fault(&model);
+    model.current_mA = 50000;
+    model.current_millis = stored_millis - CURRENT_STALE_FAULT_THRESHOLD_MS - 1;
+    assert_true(bmb3y_should_use_slow_mode(&model));
+    model.current_millis = 0;
+    assert_true(bmb3y_should_use_slow_mode(&model));
+}
+
+static void test_hot_fault_stays_fast(void **state) {
+    (void) state;
+    bms_model_t model;
+
+    setup_idle_fault(&model);
+    model.temperature_millis = stored_millis;
+    model.temperature_max = TEMPERATURE_SOFT_MAX;
+    assert_false(bmb3y_should_use_slow_mode(&model));
+
+    model.temperature_max = TEMPERATURE_SOFT_MAX - 0.1f;
+    assert_true(bmb3y_should_use_slow_mode(&model));
+
+    // A stale reading or a faulty thermistor doesn't hold it fast
+    model.temperature_max = TEMPERATURE_SOFT_MAX + 10.0f;
+    model.temperature_millis = stored_millis - CELL_TEMPERATURE_STALE_THRESHOLD_MS - 1;
+    assert_true(bmb3y_should_use_slow_mode(&model));
+    model.temperature_millis = stored_millis;
+    model.temperature_max = THERMISTOR_FAULT_dC * 0.1f;
+    assert_true(bmb3y_should_use_slow_mode(&model));
+}
+
 static void test_never_with_contactors_closed(void **state) {
     (void) state;
     bms_model_t model = {0};
@@ -165,6 +226,9 @@ int main(void) {
         cmocka_unit_test_setup(test_cell_voltage_low_with_contactors_open, setup),
         cmocka_unit_test_setup(test_cell_voltage_low_fault_uses_slow_mode, setup),
         cmocka_unit_test_setup(test_idle_fault_uses_slow_mode, setup),
+        cmocka_unit_test_setup(test_fault_with_current_flowing_stays_fast, setup),
+        cmocka_unit_test_setup(test_fault_with_stale_current_goes_slow, setup),
+        cmocka_unit_test_setup(test_hot_fault_stays_fast, setup),
         cmocka_unit_test_setup(test_never_with_contactors_closed, setup),
         cmocka_unit_test_setup(test_never_while_operating, setup),
         cmocka_unit_test_setup(test_stop_below_hard_minimum, setup),
