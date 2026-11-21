@@ -454,6 +454,23 @@ target_include_directories(test_bmb3y_temps PRIVATE
 
 add_test(NAME test_bmb3y_temps COMMAND ${MEMORY_CHECK} test_bmb3y_temps)
 
+# The BMB read schedule, against a fake isoSPI chain
+add_executable(test_bmb3y_tick
+    test_bmb3y_tick.c
+    ../bms/drivers/bmb3y/bmb3y.c
+    ../bms/drivers/bmb3y/crc.c
+    ../bms/sys/events/events.c
+    ../bms/app/state_machines/base.c
+)
+target_link_libraries(test_bmb3y_tick PRIVATE cmocka)
+target_include_directories(test_bmb3y_tick PRIVATE
+    ${cmocka_SOURCE_DIR}/include
+    include
+    ../bms
+)
+
+add_test(NAME test_bmb3y_tick COMMAND ${MEMORY_CHECK} test_bmb3y_tick)
+
 add_custom_target(coverage
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/coverage_report.sh ${CMAKE_CURRENT_BINARY_DIR}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
