@@ -495,10 +495,9 @@ static void test_overcurrent_accumulation(void **state) {
     // Let's just check it's > 0.
     assert_true(model.excess_charge_buffer_dC > 0);
     
-    // Run it enough times to exceed OVERCURRENT_BUFFER_LIMIT_dC (1000)
-    // 11 more ticks. Total 12 ticks.
-    // 12 * 90 dA = 1080 dC > 1000 dC limit
-    for(int i = 0; i < 112; i++) {
+    // Run it long enough to exceed OVERCURRENT_BUFFER_LIMIT_dC (100C): a
+    // minute, which does it from 2A of excess upwards
+    for(int i = 0; i < 60000 / TIMESTEP_PERIOD_MS; i++) {
         model.current_millis = stored_millis;
         model_tick(&model);
     }
@@ -515,7 +514,7 @@ static void test_overcurrent_accumulation(void **state) {
     model_tick(&model);
     assert_true(model.excess_discharge_buffer_dC > 0);
 
-    for(int i = 0; i < 112; i++) {
+    for(int i = 0; i < 60000 / TIMESTEP_PERIOD_MS; i++) {
         model.current_millis = stored_millis;
         model_tick(&model);
     }

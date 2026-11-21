@@ -130,9 +130,32 @@ bool check_precharge_successful(const bms_model_t *model, bool log_errors) {
     );
 }
 
+// Whether isolation has been read since the contactors last opened (it is
+// only read once they have been open ISOLATION_SETTLE_MS). Called in OPEN.
+static bool isolation_read_since_open(const bms_model_t *model) {
+    uint32_t open_ms = (uint32_t)(millis64() - model->contactor_sm.last_transition_time);
+    return model->isolation_open_millis != 0
+        && open_ms >= ISOLATION_SETTLE_MS
+        && millis() - model->isolation_open_millis <= open_ms - ISOLATION_SETTLE_MS;
+}
+
+// Checks that don't fault the BMS but must hold off closing the contactors.
+// Run stays requested, so closing goes ahead once they pass.
 bool confirm_battery_is_healthy(const bms_model_t *model) {
-    (void)model;
-    // Do we need this as well as the events system?
+    // Isolation is only measured with the contactors open, so this is the
+    // reading to act on: don't close onto a pack with a leak to chassis.
+    if(bms_event_slots[ERR_ISOLATION_LOW].level != LEVEL_NONE) {
+        return false;
+    }
+
+    // A leak that appeared while the contactors were closed can't show until
+    // they have been open a while, so once isolation is zeroed (and raising
+    // ISOLATION_LOW), wait for a reading from this open spell. Otherwise a
+    // quick Stop/Run, or a re-close after an unexpected open, would close on
+    // the reading from before the last close.
+    if(isolation_zeroed(model) && !isolation_read_since_open(model)) {
+        return false;
+    }
 
     return true;
 }
@@ -530,6 +553,7 @@ void contactor_sm_tick(bms_model_t *model) {
         switch(contactor_sm->state) {
             case CONTACTORS_STATE_PRECHARGING_INIT:
             case CONTACTORS_STATE_PRECHARGING:
+            case CONTACTORS_STATE_TESTING_BYPASS_CLOSED:
             case CONTACTORS_STATE_TESTING_INITIALLY_OPEN:
             case CONTACTORS_STATE_TESTING_PRE_SIDE_CLOSED:
             case CONTACTORS_STATE_TESTING_REOPENED:
@@ -577,12 +601,12 @@ void contactor_sm_tick(bms_model_t *model) {
             if(held_by_supervisor) {
                 // waiting for the supervisor
             } else if(model->contactor_req == CONTACTORS_REQUEST_CLOSE) {
-                model->contactor_req = CONTACTORS_REQUEST_NULL;
-
                 if(confirm_battery_is_healthy(model)) {
+                    model->contactor_req = CONTACTORS_REQUEST_NULL;
                     // Start a self-test of the contactors before precharging
                     state_transition((sm_t*)contactor_sm, CONTACTORS_STATE_TESTING_BYPASS_CLOSED);
                 }
+                // else leave the request pending until the checks pass
             } else if(model->contactor_req == CONTACTORS_REQUEST_OPEN || model->contactor_req == CONTACTORS_REQUEST_FORCE_OPEN) {
                 // already open, just clear the request
                 model->contactor_req = CONTACTORS_REQUEST_NULL;

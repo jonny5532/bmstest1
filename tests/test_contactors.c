@@ -805,6 +805,96 @@ static void test_precharging_aborts_immediately_on_open_request(void **state) {
     assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_NULL);
 }
 
+static void test_bypass_test_aborts_immediately_on_open_request(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+
+    // The precharge contactor alone is driven in this test step: an open
+    // request must drop it at once, not after the step's wait
+    model.contactor_sm.state = CONTACTORS_STATE_TESTING_BYPASS_CLOSED;
+    model.contactor_sm.last_transition_time = stored_millis64;
+    model.contactor_req = CONTACTORS_REQUEST_FORCE_OPEN;
+
+    expect_all_open();
+    tick_sm(&model, 10);
+
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_NULL);
+}
+
+static void test_close_held_while_isolation_low(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    memset(&bms_event_slots[ERR_ISOLATION_LOW], 0, sizeof(bms_event_slot_t));
+
+    model.contactor_sm.state = CONTACTORS_STATE_OPEN;
+    model.contactor_req = CONTACTORS_REQUEST_CLOSE;
+    raise_bms_event(ERR_ISOLATION_LOW, 0);
+
+    // Low isolation: stay open, keep the request
+    for(int i = 0; i < 3; i++) {
+        expect_all_open();
+        tick_sm(&model, 100);
+        assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+        assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_CLOSE);
+    }
+
+    // Isolation good again: the self-test starts
+    clear_bms_event(ERR_ISOLATION_LOW);
+    expect_all_open();
+    tick_sm(&model, 100);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_BYPASS_CLOSED);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_NULL);
+}
+
+static void test_close_waits_for_isolation_reading_since_open(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    memset(&bms_event_slots[ERR_ISOLATION_LOW], 0, sizeof(bms_event_slot_t));
+    model.isolation_zero_counts = 13000.0f; // zeroed, so ISOLATION_LOW is live
+
+    // A good reading from before the contactors last closed
+    model.isolation_open_millis = stored_millis;
+    stored_millis += 60000;
+    stored_millis64 += 60000;
+
+    // They have just opened (Stop), and Run follows straight away
+    model.contactor_sm.state = CONTACTORS_STATE_OPEN;
+    model.contactor_sm.last_transition_time = stored_millis64;
+    model.contactor_req = CONTACTORS_REQUEST_CLOSE;
+
+    // No reading yet this open spell: stay open, keep the request, also
+    // past the settle time if the reading doesn't come
+    for(int i = 0; i < 30; i++) {
+        expect_all_open();
+        tick_sm(&model, 100);
+        assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_OPEN);
+        assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_CLOSE);
+    }
+
+    // A reading this open spell (no ISOLATION_LOW): the self-test starts
+    model.isolation_open_millis = stored_millis;
+    expect_all_open();
+    tick_sm(&model, 100);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_BYPASS_CLOSED);
+    assert_int_equal(model.contactor_req, CONTACTORS_REQUEST_NULL);
+}
+
+static void test_close_not_held_for_isolation_reading_if_not_zeroed(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    memset(&bms_event_slots[ERR_ISOLATION_LOW], 0, sizeof(bms_event_slot_t));
+
+    // Not zeroed: isolation raises no events, so there's nothing to wait for
+    model.contactor_sm.state = CONTACTORS_STATE_OPEN;
+    model.contactor_sm.last_transition_time = stored_millis64;
+    model.contactor_req = CONTACTORS_REQUEST_CLOSE;
+
+    expect_all_open();
+    tick_sm(&model, 10);
+    assert_int_equal(model.contactor_sm.state, CONTACTORS_STATE_TESTING_BYPASS_CLOSED);
+}
+
 static void test_precharge_failed_recovers_to_open_after_cooldown(void **state) {
     (void) state;
     bms_model_t model = {0};
@@ -1269,6 +1359,10 @@ int main(void) {
         cmocka_unit_test(test_initial_state),
         cmocka_unit_test(test_close_request_to_testing_sequence),
         cmocka_unit_test(test_close_held_until_supervisor_enables),
+        cmocka_unit_test(test_close_held_while_isolation_low),
+        cmocka_unit_test(test_close_waits_for_isolation_reading_since_open),
+        cmocka_unit_test(test_close_not_held_for_isolation_reading_if_not_zeroed),
+        cmocka_unit_test(test_bypass_test_aborts_immediately_on_open_request),
         cmocka_unit_test(test_calibration_held_until_supervisor_enables),
         cmocka_unit_test(test_open_request_not_held),
         cmocka_unit_test(test_supervisor_enforcing_another_map_holds_close),

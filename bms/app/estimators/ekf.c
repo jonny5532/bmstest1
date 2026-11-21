@@ -521,7 +521,7 @@ uint32_t ekf_tick(bms_model_t *model, float charge_Ah, int32_t current_mA, int32
 #ifdef OCV_LEARN
     // Where the inverter stops charging, per cell: the working max plus the inverter limit offset
     float charge_V = (get_cell_voltage_working_max_mV(model) * NUM_CELLS * 0.001f
-                      + model->pack_voltage_limit_upper_offset_dV * 0.1f) / NUM_CELLS;
+                      + get_pack_voltage_limit_upper_offset_dV(model) * 0.1f) / NUM_CELLS;
     if (ocv_learn_tick(&model->ocv_learn, ocv_factory, (double)get_actual_capacity_mC(model) / 3600000.0,
                        charge_V, charge_Ah, current_amps, voltage_volts)) {
 #ifdef OCV_LEARN_TABLE
