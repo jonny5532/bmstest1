@@ -32,6 +32,15 @@ static inline bool bmb3y_should_use_slow_mode(bms_model_t *model) {
         return true;
     }
 
+    if(model->system_sm.state == SYSTEM_STATE_FAULT &&
+       state_time((sm_t*)&model->system_sm) > 60000 &&
+       model->balancing_sm.state != BALANCING_STATE_ACTIVE) {
+        // Faulted (contactors forced open until a reboot) for a minute, and
+        // not finishing a balancing session: nothing will use fast readings
+        // until a reboot, so save power.
+        return true;
+    }
+
     if(get_event_level(ERR_CELL_VOLTAGE_LOW) != LEVEL_NONE) {
         // In a cell-voltage-low state, save power with slow mode.
         return true;

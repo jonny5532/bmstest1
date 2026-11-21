@@ -88,6 +88,32 @@ static void test_cell_voltage_low_fault_uses_slow_mode(void **state) {
     assert_false(bmb3y_should_stop(&model));
 }
 
+static void test_idle_fault_uses_slow_mode(void **state) {
+    (void) state;
+    bms_model_t model = {0};
+    // Healthy cells, high enough to balance: only the fault keeps it idle
+    uint16_t cell_mV = get_minimum_balancing_voltage_mV(&model) + 200;
+
+    // Faulted for a reason other than low cells (here the e-stop), contactors
+    // forced open. FAULT only ends with a reboot, so without slow mode the
+    // BMBs would drain the pack at the fast rate until someone notices.
+    raise_bms_event(ERR_ESTOP_PRESSED, 0);
+    bms_event_slots[ERR_ESTOP_PRESSED].level = LEVEL_FATAL;
+
+    setup_model(&model, SYSTEM_STATE_FAULT, 61000, cell_mV);
+    assert_true(bmb3y_should_use_slow_mode(&model));
+
+    // Keep reading fast for the first minute after the trip
+    setup_model(&model, SYSTEM_STATE_FAULT, 59000, cell_mV);
+    assert_false(bmb3y_should_use_slow_mode(&model));
+
+    // Let a balancing session (possible in a FAULT without a fatal event,
+    // eg. an init timeout) finish first
+    setup_model(&model, SYSTEM_STATE_FAULT, 61000, cell_mV);
+    model.balancing_sm.state = BALANCING_STATE_ACTIVE;
+    assert_false(bmb3y_should_use_slow_mode(&model));
+}
+
 static void test_never_with_contactors_closed(void **state) {
     (void) state;
     bms_model_t model = {0};
@@ -106,7 +132,7 @@ static void test_never_with_contactors_closed(void **state) {
         model.contactor_sm.state = not_open[i];
         assert_false(bmb3y_should_use_slow_mode(&model));
 
-        setup_model(&model, SYSTEM_STATE_FAULT, 0, below_balancing);
+        setup_model(&model, SYSTEM_STATE_FAULT, 61000, below_balancing);
         model.contactor_sm.state = not_open[i];
         assert_false(bmb3y_should_use_slow_mode(&model));
     }
@@ -138,6 +164,7 @@ int main(void) {
         cmocka_unit_test_setup(test_inactive_too_low_to_balance, setup),
         cmocka_unit_test_setup(test_cell_voltage_low_with_contactors_open, setup),
         cmocka_unit_test_setup(test_cell_voltage_low_fault_uses_slow_mode, setup),
+        cmocka_unit_test_setup(test_idle_fault_uses_slow_mode, setup),
         cmocka_unit_test_setup(test_never_with_contactors_closed, setup),
         cmocka_unit_test_setup(test_never_while_operating, setup),
         cmocka_unit_test_setup(test_stop_below_hard_minimum, setup),
