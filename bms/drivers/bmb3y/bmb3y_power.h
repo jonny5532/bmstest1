@@ -15,6 +15,22 @@ static inline bool bmb3y_should_stop(const bms_model_t *model) {
     return get_event_level(ERR_CELL_VOLTAGE_VERY_LOW) == LEVEL_FATAL;
 }
 
+// Current flowing with the contactors open (eg. a welded contactor). A stale
+// reading doesn't count, so a faulted current sensor can't keep the BMBs fast.
+static inline bool bmb3y_current_flowing(const bms_model_t *model) {
+    return millis_recent_enough(model->current_millis, CURRENT_STALE_FAULT_THRESHOLD_MS) &&
+        (model->current_mA > CONTACTORS_INSTANT_OPEN_MA || model->current_mA < -CONTACTORS_INSTANT_OPEN_MA);
+}
+
+// Pack at or above the BATTERY_TEMPERATURE_HIGH limit. A stale reading or a
+// faulty thermistor (which makes the pack read THERMISTOR_FAULT_dC) doesn't
+// count, so a broken sensor can't keep the BMBs fast.
+static inline bool bmb3y_pack_hot(bms_model_t *model) {
+    return millis_recent_enough(model->temperature_millis, TEMPERATURE_STALE_THRESHOLD_MS(model)) &&
+        model->temperature_max >= TEMPERATURE_SOFT_MAX &&
+        model->temperature_max < THERMISTOR_FAULT_dC * 0.1f;
+}
+
 // Sample less often, to reduce battery self-discharge.
 static inline bool bmb3y_should_use_slow_mode(bms_model_t *model) {
     if(model->system_sm.state == SYSTEM_STATE_OPERATING ||
@@ -29,6 +45,17 @@ static inline bool bmb3y_should_use_slow_mode(bms_model_t *model) {
        state_time((sm_t*)&model->system_sm) > 60000 &&
        (model->cell_voltages_millis > 0 && model->cell_voltage_min_mV < get_minimum_balancing_voltage_mV(model))) {
         // Inactive for a minute, and too low to balance, save power.
+        return true;
+    }
+
+    if(model->system_sm.state == SYSTEM_STATE_FAULT &&
+       state_time((sm_t*)&model->system_sm) > 60000 &&
+       model->balancing_sm.state != BALANCING_STATE_ACTIVE &&
+       !bmb3y_current_flowing(model) &&
+       !bmb3y_pack_hot(model)) {
+        // Faulted (contactors forced open until a reboot) for a minute, not
+        // finishing a balancing session, and nothing worth watching closely:
+        // save power.
         return true;
     }
 
