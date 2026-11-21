@@ -131,29 +131,33 @@ static void hmi_handle_write_registers(const uint8_t *rx_buf, size_t len, bms_mo
             uint16_t v = hmi_buf_get_uint16(&rx_buf[rx_idx]);
             switch(reg_id) {
                 case HMI_REG_SOC:
-                    ekf_set_soc(model, v);
+                    // Above 100.00%: refused, the reply shows the SoC kept
+                    if(v <= 10000) {
+                        ekf_set_soc(model, v);
+                    }
                     break;
                 case HMI_REG_CELL_VOLTAGE_WORKING_MIN:
-                    if(get_cell_voltage_working_min_mV(model) != v) {
-                        model->cell_voltage_working_min_mV = v;
+                    // Out of order with the other limits: refused, the reply shows the value kept
+                    if(get_cell_voltage_working_min_mV(model) != v
+                       && set_cell_voltage_limit_mV(model, &model->cell_voltage_working_min_mV, v)) {
                         needs_flashing = true;
                     }
                     break;
                 case HMI_REG_CELL_VOLTAGE_WORKING_MAX:
-                    if(get_cell_voltage_working_max_mV(model) != v) {
-                        model->cell_voltage_working_max_mV = v;
+                    if(get_cell_voltage_working_max_mV(model) != v
+                       && set_cell_voltage_limit_mV(model, &model->cell_voltage_working_max_mV, v)) {
                         needs_flashing = true;
                     }
                     break;
                 case HMI_REG_CELL_VOLTAGE_SOFT_MIN:
-                    if(get_cell_voltage_soft_min_mV(model) != v) {
-                        model->cell_voltage_soft_min_mV = v;
+                    if(get_cell_voltage_soft_min_mV(model) != v
+                       && set_cell_voltage_limit_mV(model, &model->cell_voltage_soft_min_mV, v)) {
                         needs_flashing = true;
                     }
                     break;
                 case HMI_REG_CELL_VOLTAGE_SOFT_MAX:
-                    if(get_cell_voltage_soft_max_mV(model) != v) {
-                        model->cell_voltage_soft_max_mV = v;
+                    if(get_cell_voltage_soft_max_mV(model) != v
+                       && set_cell_voltage_limit_mV(model, &model->cell_voltage_soft_max_mV, v)) {
                         needs_flashing = true;
                     }
                     break;

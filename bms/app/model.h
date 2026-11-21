@@ -394,6 +394,13 @@ void store_thermistor_temperature(bms_model_t *model, uint8_t thermistor_index, 
 uint32_t thermistor_fault_mask(const bms_model_t *model);
 void store_bmb_die_temperature(bms_model_t *model, uint8_t module_index, int16_t temp_dC);
 
+// The soft and working cell voltage limits, as saved, are checked against each
+// other through the getters below (zero is the profile's, and each is held
+// inside the one outside it). See model.c.
+bool cell_voltage_limits_valid(const bms_model_t *model);
+bool set_cell_voltage_limit_mV(bms_model_t *model, uint16_t *limit_mV, uint16_t v);
+void model_check_cell_voltage_limits(bms_model_t *model);
+
 static inline uint16_t get_cell_voltage_soft_min_mV(const bms_model_t *model) {
     return max(
         (model->cell_voltage_soft_min_mV > 0) ? model->cell_voltage_soft_min_mV : DEFAULT_CELL_VOLTAGE_SOFT_MIN_mV,

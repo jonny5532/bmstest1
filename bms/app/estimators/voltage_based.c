@@ -27,7 +27,9 @@ uint16_t voltage_based_soc_estimate(const bms_model_t *model) {
 
     float soc_min = table_soc(table, get_cell_voltage_working_min_mV(model) / 1000.0f);
     float soc_max = table_soc(table, get_cell_voltage_working_max_mV(model) / 1000.0f);
-    soc = (soc - soc_min) / (soc_max - soc_min);
+    if (soc_max - soc_min >= SOC_SCALE_MIN_SPAN) {
+        soc = (soc - soc_min) / (soc_max - soc_min);
+    } // else limits out of order or too close to scale by: unscaled
     if (soc < 0.0f) soc = 0.0f;
     if (soc > 1.0f) soc = 1.0f;
     return (uint16_t)(soc * 10000.0f + 0.5f); // in 0.01% units

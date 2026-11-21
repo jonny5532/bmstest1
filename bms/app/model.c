@@ -451,3 +451,62 @@ void model_tick(bms_model_t *model) {
 
     model_calculate_inverter_outputs(model, &model->inverter_outputs);
 }
+
+// Whether the soft and working cell voltage limits in use are in order:
+// soft min < working min < working max < soft max, with at least
+// CELL_VOLTAGE_WORKING_MIN_GAP_mV between the working ones. The getters already
+// hold each working limit 25mV inside its soft one, so the working gap alone
+// also catches a soft min at or above the soft max, or a working limit beyond
+// the soft one on the other side.
+bool cell_voltage_limits_valid(const bms_model_t *model) {
+    return (int32_t)get_cell_voltage_working_max_mV(model)
+        >= (int32_t)get_cell_voltage_working_min_mV(model) + CELL_VOLTAGE_WORKING_MIN_GAP_mV;
+}
+
+// Saves v (0 for the profile's) as one of the soft or working limits, if the
+// limits stay valid with it. Otherwise the value is refused and the old one
+// kept. limit_mV points at one of the four in the model.
+bool set_cell_voltage_limit_mV(bms_model_t *model, uint16_t *limit_mV, uint16_t v) {
+    uint16_t kept = *limit_mV;
+    *limit_mV = v;
+    if(cell_voltage_limits_valid(model)) {
+        return true;
+    }
+    *limit_mV = kept;
+    return false;
+}
+
+// At boot, after the saved settings are loaded. Limits saved before they were
+// checked (or corrupted) could be out of order, which inverts the SoC, zeroes
+// the capacity sent to the inverter and holds both current limits at 0A, for
+// good. Fall back to the profile's for the working pair, else the soft pair,
+// else both, and say so. Only in memory: the saved values stay until the next
+// settings save.
+void model_check_cell_voltage_limits(bms_model_t *model) {
+    if(cell_voltage_limits_valid(model)) {
+        return;
+    }
+    const uint16_t soft_min = model->cell_voltage_soft_min_mV, soft_max = model->cell_voltage_soft_max_mV;
+    const uint16_t working_min = model->cell_voltage_working_min_mV, working_max = model->cell_voltage_working_max_mV;
+
+    const char *reset = "working";
+    model->cell_voltage_working_min_mV = 0;
+    model->cell_voltage_working_max_mV = 0;
+    if(!cell_voltage_limits_valid(model)) {
+        reset = "soft";
+        model->cell_voltage_working_min_mV = working_min;
+        model->cell_voltage_working_max_mV = working_max;
+        model->cell_voltage_soft_min_mV = 0;
+        model->cell_voltage_soft_max_mV = 0;
+        if(!cell_voltage_limits_valid(model)) {
+            reset = "soft and working";
+            model->cell_voltage_working_min_mV = 0;
+            model->cell_voltage_working_max_mV = 0;
+        }
+    }
+    warning_printf("Saved cell voltage limits out of order (soft %u-%umV, working %u-%umV, 0 = profile's): "
+                   "using the profile's %s limits, now soft %u-%umV, working %u-%umV\n",
+                   soft_min, soft_max, working_min, working_max, reset,
+                   get_cell_voltage_soft_min_mV(model), get_cell_voltage_soft_max_mV(model),
+                   get_cell_voltage_working_min_mV(model), get_cell_voltage_working_max_mV(model));
+}
